@@ -1,3 +1,13 @@
 <!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd" >
 <suite name="testall">
+  <test name="junit-tests" junit="true" preserve-order="false">
+    <classes>
+      <class name="org.alfresco.jlan.test.inmemory.JUnitSampleTest"/>
+    </classes>
+  </test>
+  <test name="testng-unit-tests" preserve-order="false">
+    <classes>
+      <class name="org.alfresco.jlan.test.inmemory.TestngSampleTest"/>
+    </classes>
+  </test>
 </suite>
