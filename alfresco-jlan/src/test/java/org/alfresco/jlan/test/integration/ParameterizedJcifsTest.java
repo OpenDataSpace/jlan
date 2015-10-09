@@ -56,15 +56,20 @@ public class ParameterizedJcifsTest {
     }
 
     @Parameters({"host", "user", "pass", "share", "cifsport"})
-        @BeforeSuite(alwaysRun = true)
-        public static void initSuite(final String host, final String user, final String pass,
-                final String share, @Optional Integer cifsport) {
-            m_host = host;
-            m_user = user;
-            m_pass = pass;
-            m_share = share;
-            m_cifsport = cifsport;
-        }
+    @BeforeSuite(alwaysRun = true)
+    public static void initSuite(
+            final String host,
+            final String user,
+            final String pass,
+            final String share,
+            @Optional Integer cifsport)
+    {
+        m_host = host;
+        m_user = user;
+        m_pass = pass;
+        m_share = share;
+        m_cifsport = cifsport;
+    }
 
     protected SmbFile getRoot() {
         return m_root;
@@ -108,9 +113,9 @@ public class ParameterizedJcifsTest {
         // Delete the test files
         for (final String name : filesToDelete.get()) {
             try {
-                final SmbFile sf = new SmbFile(getRoot(), name);
-                if (sf.exists()) {
-                    sf.delete();
+                final SmbFile file = new SmbFile(getRoot(), name);
+                if (file.exists()) {
+                    file.delete();
                 }
             } catch (SmbException e) {
                 LOGGER.warn("Cleanup file {} failed: {}", name, e.getMessage());
@@ -124,9 +129,9 @@ public class ParameterizedJcifsTest {
         Collections.reverse(foldersToDelete.get());
         for (final String name : foldersToDelete.get()) {
             try {
-                final SmbFile sf = new SmbFile(getRoot(), name);
-                if (sf.exists()) {
-                    sf.delete();
+                final SmbFile file = new SmbFile(getRoot(), name);
+                if (file.exists()) {
+                    file.delete();
                 }
             } catch (SmbException e) {
                 LOGGER.warn("Cleanup folder {} failed: {}", name, e.getMessage());
@@ -139,133 +144,133 @@ public class ParameterizedJcifsTest {
     /**
      * Generate a test file name that is unique per test
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getPerTestFileName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getPerTestFileName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(iter);
-        fName.append(".txt");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append(".txt");
 
-        filesToDelete.get().add(fName.toString());
-        return fName.toString();
+        filesToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     /**
      * Generate a test file name that is unique per thread
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getPerThreadFileName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getPerThreadFileName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(Thread.currentThread().getId());
-        fName.append("_");
-        fName.append(iter);
-        fName.append(".txt");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(Thread.currentThread().getId());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append(".txt");
 
-        filesToDelete.get().add(fName.toString());
-        return fName.toString();
+        filesToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     /**
      * Generate a test folder name that is unique per test
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getPerTestFolderName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getPerTestFolderName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(iter);
-        fName.append("/");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append("/");
 
-        foldersToDelete.get().add(fName.toString());
-        return fName.toString();
+        foldersToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     /**
      * Generate a test folder name that is unique per thread
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getPerThreadFolderName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getPerThreadFolderName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(Thread.currentThread().getId());
-        fName.append("_");
-        fName.append(iter);
-        fName.append("/");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(Thread.currentThread().getId());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append("/");
 
-        foldersToDelete.get().add(fName.toString());
-        return fName.toString();
+        foldersToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     /**
      * Generate a unique test file name
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getUniqueFileName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getUniqueFileName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(Thread.currentThread().getId());
-        fName.append("_");
-        fName.append(iter);
-        fName.append("_");
-        fName.append(getRoot().getServer());
-        fName.append(".txt");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(Thread.currentThread().getId());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append("_");
+        fileName.append(getRoot().getServer());
+        fileName.append(".txt");
 
-        filesToDelete.get().add(fName.toString());
-        return fName.toString();
+        filesToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     /**
      * Generate a unique test folder name
      *
-     * @param iter int
+     * @param iteration int
      * @return String
      */
-    public final String getUniqueFolderName(int iter) {
-        StringBuilder fName = new StringBuilder();
+    public final String getUniqueFolderName(int iteration) {
+        StringBuilder fileName = new StringBuilder();
         if (getPath() != null) {
-            fName.append(getPath());
+            fileName.append(getPath());
         }
-        fName.append(getTestname());
-        fName.append("_");
-        fName.append(Thread.currentThread().getId());
-        fName.append("_");
-        fName.append(iter);
-        fName.append("_");
-        fName.append(getRoot().getServer());
-        fName.append("/");
+        fileName.append(getTestname());
+        fileName.append("_");
+        fileName.append(Thread.currentThread().getId());
+        fileName.append("_");
+        fileName.append(iteration);
+        fileName.append("_");
+        fileName.append(getRoot().getServer());
+        fileName.append("/");
 
-        foldersToDelete.get().add(fName.toString());
-        return fName.toString();
+        foldersToDelete.get().add(fileName.toString());
+        return fileName.toString();
     }
 
     public final void registerFileNameForDelete(final String name) {
