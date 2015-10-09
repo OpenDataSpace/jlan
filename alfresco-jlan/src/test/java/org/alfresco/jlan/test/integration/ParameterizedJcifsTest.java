@@ -28,9 +28,7 @@ import jcifs.smb.SmbException;
 import jcifs.Config;
 
 public class ParameterizedJcifsTest {
-
-    protected static final Logger LOGGER = LoggerFactory
-        .getLogger(ParameterizedJcifsTest.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ParameterizedJcifsTest.class);
 
     private static AtomicLong firstThreadId = new AtomicLong();
 
@@ -81,62 +79,62 @@ public class ParameterizedJcifsTest {
     }
 
     @BeforeMethod(alwaysRun = true)
-        public void BeforeMethod(Method m) throws Exception {
-            Thread.currentThread().setName("T" + Thread.currentThread().getId());
-            firstThreadId.compareAndSet(0L, Thread.currentThread().getId());
-            LOGGER.info("Starting {}.{}", getTestname(), m.getName());
-            assertNotNull(m_host, "Target host");
-            assertNotNull(m_share, "Target share");
-            assertNotNull(m_user, "Target user");
-            assertNotNull(m_pass, "Target pass");
-            String url = "smb://" + m_user + ":" + m_pass + "@" + m_host;
-            if (null != m_cifsport) {
-                url += ":" + m_cifsport;
-            }
-            url += "/" + m_share + "/";
-            Config.setProperty("jcifs.resolveOrder", "DNS");
-            Config.setProperty("jcifs.smb.client.attrExpirationPeriod", "0");
-            Config.setProperty("jcifs.util.loglevel", "10");
-            // Config.setProperty("jcifs.smb.client.ssnLimit", "1");
-            m_root = new SmbFile(url);
-            assertNotNull(getRoot(), "Root");
+    public void BeforeMethod(Method m) throws Exception {
+        Thread.currentThread().setName("T" + Thread.currentThread().getId());
+        firstThreadId.compareAndSet(0L, Thread.currentThread().getId());
+        LOGGER.info("Starting {}.{}", getTestname(), m.getName());
+        assertNotNull(m_host, "Target host");
+        assertNotNull(m_share, "Target share");
+        assertNotNull(m_user, "Target user");
+        assertNotNull(m_pass, "Target pass");
+        String url = "smb://" + m_user + ":" + m_pass + "@" + m_host;
+        if (null != m_cifsport) {
+            url += ":" + m_cifsport;
         }
+        url += "/" + m_share + "/";
+        Config.setProperty("jcifs.resolveOrder", "DNS");
+        Config.setProperty("jcifs.smb.client.attrExpirationPeriod", "0");
+        Config.setProperty("jcifs.util.loglevel", "10");
+        // Config.setProperty("jcifs.smb.client.ssnLimit", "1");
+        m_root = new SmbFile(url);
+        assertNotNull(getRoot(), "Root");
+    }
 
     @AfterMethod(alwaysRun = true)
-        public void afterMethod(final Method m) throws Exception {
-            if (!filesToDelete.get().isEmpty()) {
-                LOGGER.debug("Cleaning up files of test {}", getTestname());
-            }
-            // Delete the test files
-            for (final String name : filesToDelete.get()) {
-                try {
-                    final SmbFile sf = new SmbFile(getRoot(), name);
-                    if (sf.exists()) {
-                        sf.delete();
-                    }
-                } catch (SmbException e) {
-                    LOGGER.warn("Cleanup file {} failed: {}", name, e.getMessage());
-                }
-            }
-            filesToDelete.get().clear();
-            if (!foldersToDelete.get().isEmpty()) {
-                LOGGER.debug("Cleaning up folders of test {}", getTestname());
-            }
-            // Delete the test folders in reverse order
-            Collections.reverse(foldersToDelete.get());
-            for (final String name : foldersToDelete.get()) {
-                try {
-                    final SmbFile sf = new SmbFile(getRoot(), name);
-                    if (sf.exists()) {
-                        sf.delete();
-                    }
-                } catch (SmbException e) {
-                    LOGGER.warn("Cleanup folder {} failed: {}", name, e.getMessage());
-                }
-            }
-            foldersToDelete.get().clear();
-            LOGGER.info("Finished {}.{}", getTestname(), m.getName());
+    public void afterMethod(final Method m) throws Exception {
+        if (!filesToDelete.get().isEmpty()) {
+            LOGGER.debug("Cleaning up files of test {}", getTestname());
         }
+        // Delete the test files
+        for (final String name : filesToDelete.get()) {
+            try {
+                final SmbFile sf = new SmbFile(getRoot(), name);
+                if (sf.exists()) {
+                    sf.delete();
+                }
+            } catch (SmbException e) {
+                LOGGER.warn("Cleanup file {} failed: {}", name, e.getMessage());
+            }
+        }
+        filesToDelete.get().clear();
+        if (!foldersToDelete.get().isEmpty()) {
+            LOGGER.debug("Cleaning up folders of test {}", getTestname());
+        }
+        // Delete the test folders in reverse order
+        Collections.reverse(foldersToDelete.get());
+        for (final String name : foldersToDelete.get()) {
+            try {
+                final SmbFile sf = new SmbFile(getRoot(), name);
+                if (sf.exists()) {
+                    sf.delete();
+                }
+            } catch (SmbException e) {
+                LOGGER.warn("Cleanup folder {} failed: {}", name, e.getMessage());
+            }
+        }
+        foldersToDelete.get().clear();
+        LOGGER.info("Finished {}.{}", getTestname(), m.getName());
+    }
 
     /**
      * Generate a test file name that is unique per test
@@ -145,9 +143,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getPerTestFileName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -167,9 +163,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getPerThreadFileName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -191,9 +185,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getPerTestFolderName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -213,9 +205,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getPerThreadFolderName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -237,9 +227,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getUniqueFileName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -263,9 +251,7 @@ public class ParameterizedJcifsTest {
      * @return String
      */
     public final String getUniqueFolderName(int iter) {
-
         StringBuilder fName = new StringBuilder();
-
         if (getPath() != null) {
             fName.append(getPath());
         }
@@ -297,7 +283,6 @@ public class ParameterizedJcifsTest {
      */
     public final void setPath(String path) {
         m_path = path;
-
         if (m_path != null) {
             if (m_path.endsWith("/") == false)
                 m_path += "/";

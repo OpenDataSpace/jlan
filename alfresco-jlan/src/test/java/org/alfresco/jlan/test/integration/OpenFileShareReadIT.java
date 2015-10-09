@@ -23,6 +23,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 import static org.testng.Assert.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -36,6 +39,7 @@ import jcifs.smb.SmbException;
  * @author gkspencer
  */
 public class OpenFileShareReadIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenFileShareReadIT.class);
 
     /**
      * Default constructor

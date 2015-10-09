@@ -20,6 +20,9 @@
 package org.alfresco.jlan.test.integration;
 
 import static org.testng.Assert.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -32,13 +35,14 @@ import jcifs.smb.SmbFile;
  * @author gkspencer
  */
 public class ConcurrentCreateFileIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentCreateFileIT.class);
 
-	/**
-	 * Default constructor
-	 */
-	public ConcurrentCreateFileIT() {
-		super("ConcurrentCreateFileIT");
-	}
+    /**
+     * Default constructor
+     */
+    public ConcurrentCreateFileIT() {
+        super("ConcurrentCreateFileIT");
+    }
 
     private void doTest(final int iteration) throws Exception {
         final String testFileName = getUniqueFileName(iteration);

@@ -19,6 +19,9 @@
 package org.alfresco.jlan.test.integration;
 
 import static org.testng.Assert.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -32,13 +35,14 @@ import jcifs.smb.SmbException;
  * @author gkspencer
  */
 public class NTCreateFileIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(NTCreateFileIT.class);
 
-	/**
-	 * Default constructor
-	 */
-	public NTCreateFileIT() {
-		super("NTCreateFileIT");
-	}
+    /**
+     * Default constructor
+     */
+    public NTCreateFileIT() {
+        super("NTCreateFileIT");
+    }
 
     private void doTest(final int iteration) throws Exception {
         // Create a test file name for this iteration

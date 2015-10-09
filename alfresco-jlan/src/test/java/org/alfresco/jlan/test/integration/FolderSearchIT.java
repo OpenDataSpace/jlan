@@ -36,20 +36,16 @@ import jcifs.smb.SmbFile;
  * @author gkspencer
  */
 public class FolderSearchIT extends ParameterizedJcifsTest {
-
     // Constants
-
     private static final String TESTFILENAME = "testFile";
     private static final String TESTFILEEXT  = ".txt";
     private static final String TESTFOLDERNAME = "testFolder";
 
     // Maximum/minimum number of files/folders allowed
-
-    private static final int MIN_FILECOUNT	= 10;
-    private static final int MAX_FILECOUNT	= 5000;
-
-    private static final int MIN_FOLDERCOUNT	= 10;
-    private static final int MAX_FOLDERCOUNT	= 5000;
+    private static final int MIN_FILECOUNT   = 10;
+    private static final int MAX_FILECOUNT   = 5000;
+    private static final int MIN_FOLDERCOUNT = 10;
+    private static final int MAX_FOLDERCOUNT = 5000;
 
     /**
      * Default constructor
@@ -148,18 +144,21 @@ public class FolderSearchIT extends ParameterizedJcifsTest {
     }
 
     @Parameters({"iterations", "filecount", "foldercount"})
-        @Test(groups = "functest")
-        public void test(@Optional("1") final int iterations, @Optional("100") final int fileCount,
-                @Optional("100") final int folderCount) throws Exception {
-            if (fileCount < MIN_FILECOUNT || fileCount > MAX_FILECOUNT) {
-                fail("Invalid filecount (" + MIN_FILECOUNT + " - " + MAX_FILECOUNT + ")");
-            }
-            if (folderCount < MIN_FILECOUNT || folderCount > MAX_FILECOUNT) {
-                fail("Invalid foldercount (" + MIN_FOLDERCOUNT + " - " + MAX_FOLDERCOUNT + ")");
-            }
-            prepareTree(fileCount, folderCount);
-            for (int i = 0; i < iterations; i++) {
-                doTest(i, fileCount, folderCount);
-            }
+    @Test(groups = "functest")
+    public void test(
+            @Optional("1") final int iterations,
+            @Optional("100") final int fileCount,
+            @Optional("100") final int folderCount) throws Exception
+    {
+        if (fileCount < MIN_FILECOUNT || fileCount > MAX_FILECOUNT) {
+            fail("Invalid filecount (" + MIN_FILECOUNT + " - " + MAX_FILECOUNT + ")");
         }
+        if (folderCount < MIN_FILECOUNT || folderCount > MAX_FILECOUNT) {
+            fail("Invalid foldercount (" + MIN_FOLDERCOUNT + " - " + MAX_FOLDERCOUNT + ")");
+        }
+        prepareTree(fileCount, folderCount);
+        for (int i = 0; i < iterations; i++) {
+            doTest(i, fileCount, folderCount);
+        }
+    }
 }

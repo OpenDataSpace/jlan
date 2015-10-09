@@ -9,6 +9,8 @@ import org.testng.Reporter;
 import java.io.OutputStream;
 
 import org.alfresco.jlan.util.MemorySize;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import jcifs.smb.SmbFile;
 
@@ -18,6 +20,7 @@ import jcifs.smb.SmbFile;
  * @author gkspencer
  */
 public class PerfDataTransferIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PerfDataTransferIT.class);
 
     // Maximum/minimum allowed file size
     private static final long MIN_FILESIZE = 50 * MemorySize.MEGABYTE;
@@ -84,29 +87,32 @@ public class PerfDataTransferIT extends ParameterizedJcifsTest {
     }
 
     @Parameters({"iterations", "filesize", "writesize"})
-        @Test(groups = "perftest", singleThreaded = true)
-        public void test(@Optional("1") final int iterations,
-                @Optional("500M") final String fs, @Optional("32K") final String ws) throws Exception {
-            long fileSize = 0;
-            int writeSize = 0;
-            try {
-                fileSize = MemorySize.getByteValue(fs);
-                if (fileSize < MIN_FILESIZE || fileSize > MAX_FILESIZE) {
-                    fail("Invalid file size (" + MIN_FILESIZE + " - " + MAX_FILESIZE + ")");
-                }
-            } catch (NumberFormatException ex) {
-                fail("Invalid file size " + fs);
+    @Test(groups = "perftest", singleThreaded = true)
+    public void test(
+            @Optional("1") final int iterations,
+            @Optional("500M") final String fs,
+            @Optional("32K") final String ws) throws Exception
+    {
+        long fileSize = 0;
+        int writeSize = 0;
+        try {
+            fileSize = MemorySize.getByteValue(fs);
+            if (fileSize < MIN_FILESIZE || fileSize > MAX_FILESIZE) {
+                fail("Invalid file size (" + MIN_FILESIZE + " - " + MAX_FILESIZE + ")");
             }
-            try {
-                writeSize = MemorySize.getByteValueInt(ws);
-                if (writeSize < MIN_WRITESIZE || writeSize > MAX_WRITESIZE) {
-                    fail("Invalid write buffer size (" + MIN_WRITESIZE + " - " + MAX_WRITESIZE + ")");
-                }
-            } catch (NumberFormatException ex) {
-                fail("Invalid write size " + ws);
-            }
-            for (int i = 0; i < iterations; i++) {
-                doTest(i, fileSize, writeSize);
-            }
+        } catch (NumberFormatException ex) {
+            fail("Invalid file size " + fs);
         }
+        try {
+            writeSize = MemorySize.getByteValueInt(ws);
+            if (writeSize < MIN_WRITESIZE || writeSize > MAX_WRITESIZE) {
+                fail("Invalid write buffer size (" + MIN_WRITESIZE + " - " + MAX_WRITESIZE + ")");
+            }
+        } catch (NumberFormatException ex) {
+            fail("Invalid write size " + ws);
+        }
+        for (int i = 0; i < iterations; i++) {
+            doTest(i, fileSize, writeSize);
+        }
+    }
 }

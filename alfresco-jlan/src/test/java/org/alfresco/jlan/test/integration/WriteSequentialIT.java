@@ -31,6 +31,8 @@ import org.testng.annotations.Test;
 import jcifs.smb.SmbFile;
 
 import org.alfresco.jlan.util.MemorySize;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Sequential File Write Test Class
@@ -38,25 +40,24 @@ import org.alfresco.jlan.util.MemorySize;
  * @author gkspencer
  */
 public class WriteSequentialIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(WriteSequentialIT.class);
 
-	// Maximum/minimum allowed file size and write size
+    // Maximum/minimum allowed file size and write size
+    private static final long MIN_FILESIZE = 100 * MemorySize.KILOBYTE;
+    private static final long MAX_FILESIZE = 2 * MemorySize.GIGABYTE;
 
-    private static final long MIN_FILESIZE	= 100 * MemorySize.KILOBYTE;
-    private static final long MAX_FILESIZE	= 2 * MemorySize.GIGABYTE;
+    private static final int MIN_WRITESIZE = 128;
+    private static final int MAX_WRITESIZE = (int) (64 * MemorySize.KILOBYTE);
 
-    private static final int MIN_WRITESIZE	= 128;
-    private static final int MAX_WRITESIZE	= (int) (64 * MemorySize.KILOBYTE);
-
-	// Characters to use in the write buffer patterns
-
+    // Characters to use in the write buffer patterns
     private static final String WRITEPATTERN = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXZ0123456789";
 
-	/**
-	 * Default constructor
-	 */
-	public WriteSequentialIT() {
-		super("WriteSequentialIT");
-	}
+    /**
+     * Default constructor
+     */
+    public WriteSequentialIT() {
+        super("WriteSequentialIT");
+    }
 
     private void doTest(final int iteration, final long fileSize, final int writeSize) throws Exception {
         final String testFileName = getUniqueFileName(iteration);
@@ -72,20 +73,20 @@ public class WriteSequentialIT extends ParameterizedJcifsTest {
         final byte[] ioBuf = new byte[writeSize];
         int patIdx = 0;
         try (final OutputStream s = f.getOutputStream()) {
-			// Write to the file until we hit the required file size
-			long written = 0L;
-			while (written < fileSize) {
-				// Fill each buffer with a different test pattern
-				if (patIdx == WRITEPATTERN.length()) {
-					patIdx = 0;
+            // Write to the file until we hit the required file size
+            long written = 0L;
+            while (written < fileSize) {
+                // Fill each buffer with a different test pattern
+                if (patIdx == WRITEPATTERN.length()) {
+                    patIdx = 0;
                 }
-				byte fillByte = (byte)WRITEPATTERN.charAt(patIdx++);
-				Arrays.fill(ioBuf, fillByte);
-				// Write to the file
-				s.write(ioBuf);
-				// Update the file size
-				written += ioBuf.length;
-			}
+                byte fillByte = (byte)WRITEPATTERN.charAt(patIdx++);
+                Arrays.fill(ioBuf, fillByte);
+                // Write to the file
+                s.write(ioBuf);
+                // Update the file size
+                written += ioBuf.length;
+             }
         }
         // Check the file is the expected size
         assertEquals(f.length(), fileSize, "Filesize");
@@ -113,29 +114,32 @@ public class WriteSequentialIT extends ParameterizedJcifsTest {
     }
 
     @Parameters({"iterations", "filesize", "writesize"})
-        @Test(groups = "functest")
-        public void test(@Optional("1") final int iterations, @Optional("10M") final String fs,
-                @Optional("8K") final String ws) throws Exception {
-            long fileSize = 0;
-            int writeSize = 0;
-            try {
-                fileSize = MemorySize.getByteValue(fs);
-                if (fileSize < MIN_FILESIZE || fileSize > MAX_FILESIZE) {
-                    fail("Invalid file size (" + MIN_FILESIZE + " - " + MAX_FILESIZE + ")");
-                }
-            } catch (NumberFormatException ex) {
-                fail("Invalid file size " + fs);
+    @Test(groups = "functest")
+    public void test(
+            @Optional("1") final int iterations,
+            @Optional("10M") final String fs,
+            @Optional("8K") final String ws) throws Exception
+    {
+        long fileSize = 0;
+        int writeSize = 0;
+        try {
+            fileSize = MemorySize.getByteValue(fs);
+            if (fileSize < MIN_FILESIZE || fileSize > MAX_FILESIZE) {
+                fail("Invalid file size (" + MIN_FILESIZE + " - " + MAX_FILESIZE + ")");
             }
-            try {
-                writeSize = MemorySize.getByteValueInt(ws);
-                if (writeSize < MIN_WRITESIZE || writeSize > MAX_WRITESIZE) {
-                    fail("Invalid write buffer size (" + MIN_WRITESIZE + " - " + MAX_WRITESIZE + ")");
-                }
-            } catch (NumberFormatException ex) {
-                fail("Invalid write size " + ws);
-            }
-            for (int i = 0; i < iterations; i++) {
-                doTest(i, fileSize, writeSize);
-            }
+        } catch (NumberFormatException ex) {
+            fail("Invalid file size " + fs);
         }
+        try {
+            writeSize = MemorySize.getByteValueInt(ws);
+            if (writeSize < MIN_WRITESIZE || writeSize > MAX_WRITESIZE) {
+                fail("Invalid write buffer size (" + MIN_WRITESIZE + " - " + MAX_WRITESIZE + ")");
+            }
+        } catch (NumberFormatException ex) {
+            fail("Invalid write size " + ws);
+        }
+        for (int i = 0; i < iterations; i++) {
+            doTest(i, fileSize, writeSize);
+        }
+    }
 }

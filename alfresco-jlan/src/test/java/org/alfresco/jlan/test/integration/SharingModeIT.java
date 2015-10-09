@@ -22,6 +22,9 @@ package org.alfresco.jlan.test.integration;
 import java.io.OutputStream;
 
 import static org.testng.Assert.*;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -35,13 +38,14 @@ import jcifs.smb.SmbException;
  * @author gkspencer
  */
 public class SharingModeIT extends ParameterizedJcifsTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SharingModeIT.class);
 
-	/**
-	 * Default constructor
-	 */
-	public SharingModeIT() {
-		super("SharingModeIT");
-	}
+    /**
+     * Default constructor
+     */
+    public SharingModeIT() {
+        super("SharingModeIT");
+    }
 
     private void doTest(final int iteration) throws Exception {
         final String testFileName = getPerTestFileName(iteration);
