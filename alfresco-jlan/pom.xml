@@ -409,7 +409,7 @@
         <it.cifsport>11445</it.cifsport>
         <it.sharename>JLAN</it.sharename>
         <it.localsharepath>target/it</it.localsharepath>
-        <it.iterations>50</it.iterations>
+        <it.iterations>1</it.iterations>
         <it.groups>functest</it.groups>
     </properties>
 </project>
