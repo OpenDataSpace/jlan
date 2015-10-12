@@ -1,25 +1,29 @@
 package org.alfresco.jlan.test.integration;
 
-import java.security.Provider;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.io.IOException;
 import java.lang.ThreadLocal;
 import java.lang.reflect.Method;
+import java.net.UnknownHostException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.testng.Assert.*;
-import org.testng.ITestContext;
 
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Optional;
-
+import org.alfresco.jlan.client.CIFSDiskSession;
+import org.alfresco.jlan.client.SessionFactory;
+import org.alfresco.jlan.client.SessionSettings;
+import org.alfresco.jlan.smb.PCShare;
+import org.alfresco.jlan.smb.SMBException;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +35,7 @@ public class ParameterizedJcifsTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParameterizedJcifsTest.class);
 
     private static AtomicLong firstThreadId = new AtomicLong();
+    private static AtomicInteger virtualCircuitId = new AtomicInteger(0);
 
     private static String m_host;
     private static String m_user;
@@ -69,6 +74,8 @@ public class ParameterizedJcifsTest {
         m_pass = pass;
         m_share = share;
         m_cifsport = cifsport;
+
+        Security.addProvider(new BouncyCastleProvider());
     }
 
     protected SmbFile getRoot() {
@@ -314,4 +321,17 @@ public class ParameterizedJcifsTest {
         } catch (InterruptedException ex) {
         }
     }
+
+    public static final CIFSDiskSession createCifsSess(String host, String sharename, String username, String password, Integer cifsport) throws UnknownHostException, IOException, SMBException {
+        SessionFactory.setSMBSigningEnabled(false);
+        PCShare share = new PCShare(host, sharename, username, password);
+        SessionSettings sessSettings = new SessionSettings();
+        sessSettings.setNativeSMBPort(cifsport);
+        sessSettings.setVirtualCircuit(virtualCircuitId.incrementAndGet());
+        return (CIFSDiskSession) SessionFactory.OpenDisk(share, sessSettings);
+    };
+
+    protected final CIFSDiskSession createCifsSess() throws UnknownHostException, IOException, SMBException {
+        return createCifsSess(m_host, m_share, m_user, m_pass, m_cifsport);
+    };
 }

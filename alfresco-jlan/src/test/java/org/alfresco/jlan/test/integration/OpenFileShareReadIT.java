@@ -27,6 +27,12 @@ import java.io.OutputStream;
 
 import static org.testng.Assert.*;
 
+import org.alfresco.jlan.client.CIFSDiskSession;
+import org.alfresco.jlan.client.CIFSFile;
+import org.alfresco.jlan.server.filesys.AccessMode;
+import org.alfresco.jlan.server.filesys.FileAction;
+import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.smb.SharingMode;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
@@ -49,17 +55,14 @@ public class OpenFileShareReadIT extends ParameterizedJcifsTest {
 
     private void doTest(final int iteration) throws Exception {
         final String testFileName = getPerTestFileName(iteration);
-        final SmbFile readWriteFile = new SmbFile(getRoot(), testFileName, SmbFile.FILE_SHARE_READ); 
+        CIFSDiskSession session = this.createCifsSess();
+        CIFSFile readWriteFile = session.NTCreate(testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal, SharingMode.READ, FileAction.NTOpen, 0, 0);
+        assertThat(readWriteFile, is(not(null)));
         final NtlmPasswordAuthentication auth = new NtlmPasswordAuthentication(getRoot().getURL().getUserInfo());
         final SmbFile readOnlyFile = new SmbFile(getRoot().getURL().toString(), testFileName, auth, SmbFile.FILE_SHARE_READ);
-
-        assertThat(readWriteFile.exists(), is(false));
-        assertThat(readOnlyFile.exists(), is(false));
-        readWriteFile.createNewFile();
-        assertThat(readWriteFile.exists(), is(true));
         assertThat(readOnlyFile.exists(), is(true));
 
-        try (OutputStream writeableStream = readWriteFile.getOutputStream()) {
+        try (OutputStream writeableStream = readWriteFile.asOutputStream()) {
             assertNotNull(writeableStream, "OutputStream");
             try (OutputStream nonWriteableStream = readOnlyFile.getOutputStream()) {
                 fail("Should not be reachable because the file must be read only");
