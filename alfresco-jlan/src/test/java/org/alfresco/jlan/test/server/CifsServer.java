@@ -1,14 +1,21 @@
 package org.alfresco.jlan.test.server;
 
+import static org.testng.AssertJUnit.assertNotNull;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.*;
+
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.security.Security;
 import java.util.TimeZone;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.alfresco.jlan.client.CIFSDiskSession;
 import org.alfresco.jlan.server.NetworkServer;
 import org.alfresco.jlan.server.ServerListener;
 import org.alfresco.jlan.server.auth.EnterpriseCifsAuthenticator;
+import org.alfresco.jlan.server.auth.LocalAuthenticator;
 import org.alfresco.jlan.server.auth.UserAccount;
 import org.alfresco.jlan.server.auth.UserAccountList;
 import org.alfresco.jlan.server.config.CoreServerConfigSection;
@@ -30,13 +37,20 @@ import org.alfresco.jlan.smb.server.SecurityMode;
 import org.alfresco.jlan.smb.server.disk.EnhJavaFileDiskDriver;
 import org.alfresco.jlan.test.integration.ParameterizedJcifsTest;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
 
+import jcifs.Config;
+import jcifs.smb.SmbFile;
+
 public class CifsServer {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CifsServer.class);
+
     @BeforeSuite(alwaysRun = true)
     public static void initSuite(){
         Security.addProvider(new BouncyCastleProvider());
@@ -113,6 +127,8 @@ public class CifsServer {
         EnterpriseCifsAuthenticator authenticator = new EnterpriseCifsAuthenticator();
         authenticator.setAccessMode(SecurityMode.UserMode);
         authenticator.setDebug(true);
+        authenticator.setConfig(server);
+        authenticator.initialize(server, new ConfigElement("Debug", "true"));
         cifs.setAuthenticator(authenticator);
 
         FilesystemsConfigSection fileSystem = new FilesystemsConfigSection(server);
@@ -125,6 +141,7 @@ public class CifsServer {
         UserAccountList users = new UserAccountList();
         UserAccount admin = new UserAccount("admin", "admin");
         admin.setComment("System Administrator");
+        admin.setAdministrator(true);
         users.addUser(admin);
         security.setUserAccounts(users);
         
@@ -139,21 +156,34 @@ public class CifsServer {
         server.addConfigSection(fileSystem);
         server.addConfigSection(cifs);
         server.addConfigSection(global);
-        SMBServer smbServer;
-        smbServer = new SMBServer(server);
+        Object serverIsRunning = new Object();
+        SMBServer smbServer = new SMBServer(server);
         smbServer.addServerListener(new ServerListener() {
             @Override
             public void serverStatusEvent(NetworkServer server, int event) {
                 if (event == ServerListener.ServerActive) {
-                    try {
-                        CIFSDiskSession session = ParameterizedJcifsTest.createCifsSess(hostname, shareName, "admin", "admin", cifsPort);
-                    } catch (IOException | SMBException e) {
-                        e.printStackTrace();
+                    synchronized (serverIsRunning) {
+                        serverIsRunning.notify();
                     }
                 }
             }
         });
         smbServer.startServer();
+        synchronized (serverIsRunning) {
+            try {
+                serverIsRunning.wait();
+              } catch ( InterruptedException e ) {
+              }
+        }
+
+        CIFSDiskSession session = ParameterizedJcifsTest.createCifsSess(hostname, shareName, "admin", "admin", cifsPort);
+        String url = "smb://" + "admin" + ":" + "admin" + "@" + hostname + ":" + cifsPort + "/" + shareName + "/";
+        Config.setProperty("jcifs.resolveOrder", "DNS");
+        Config.setProperty("jcifs.smb.client.attrExpirationPeriod", "0");
+        Config.setProperty("jcifs.util.loglevel", "10");
+        SmbFile root = new SmbFile(url);
+        assertNotNull(root);
+        assertThat(root.exists(), is(true));
         smbServer.shutdownServer(false);
     }
 }
