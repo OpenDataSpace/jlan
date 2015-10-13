@@ -20,7 +20,6 @@
 package org.alfresco.jlan.server.auth.kerberos;
 
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.Iterator;
 
 import org.alfresco.jlan.server.auth.asn.DERApplicationSpecific;
@@ -38,314 +37,291 @@ import org.alfresco.jlan.server.auth.asn.DERSequence;
  */
 public class KerberosApReq {
 
-	// Constants
+    // Constants
 
-	public static final int APOptionUseSessionKey	= 1;
-	public static final int APOptionMutualAuthReq	= 2;
+    public static final int APOptionUseSessionKey = 1;
+    public static final int APOptionMutualAuthReq = 2;
 
-	// Bit masks for AP options
+    // Bit masks for AP options
 
-	private static final int APOptionUseSessionKeyMask  = 0x40000000;
-	private static final int APOptionsMutualAuthReqMask = 0x20000000;
+    private static final int APOptionUseSessionKeyMask = 0x40000000;
+    private static final int APOptionsMutualAuthReqMask = 0x20000000;
 
-	// AP-REQ fields
+    // AP-REQ fields
 
-	private int m_APOptions;
-	private byte[] m_ticket;
+    private int m_APOptions;
+    private byte[] m_ticket;
 
-	// Authenticator encrypted data
+    // Authenticator encrypted data
 
-	private int m_authEncType;
-	private byte[] m_authEncData;
-	private int m_authEncKvno = -1;
+    private int m_authEncType;
+    private byte[] m_authEncData;
+    private int m_authEncKvno = -1;
 
-	/**
-	 * Default constructor
-	 */
-	public KerberosApReq()
-	{
-	}
+    /**
+     * Default constructor
+     */
+    public KerberosApReq() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public KerberosApReq(byte[] blob)
-		throws IOException
-	{
-		parseApReq( blob);
-	}
+    /**
+     * Class constructor
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public KerberosApReq(final byte[] blob) throws IOException {
+        parseApReq(blob);
+    }
 
-	/**
-	 * Return the APOptions
-	 *
-	 * @return int
-	 */
-	public final int getAPOptions()
-	{
-		return m_APOptions;
-	}
+    /**
+     * Return the APOptions
+     *
+     * @return int
+     */
+    public final int getAPOptions() {
+        return m_APOptions;
+    }
 
-	/**
-	 * Check if the use session key option is enabled
-	 *
-	 * @return boolean
-	 */
-	public final boolean useSessionKey()
-	{
-		return (m_APOptions & APOptionUseSessionKeyMask) != 0 ? true : false;
-	}
+    /**
+     * Check if the use session key option is enabled
+     *
+     * @return boolean
+     */
+    public final boolean useSessionKey() {
+        return (m_APOptions & APOptionUseSessionKeyMask) != 0 ? true : false;
+    }
 
-	/**
-	 * Check if the mutual authentication required option is enabled
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasMutualAuthentication()
-	{
-		return (m_APOptions & APOptionsMutualAuthReqMask) != 0 ? true : false;
-	}
+    /**
+     * Check if the mutual authentication required option is enabled
+     *
+     * @return boolean
+     */
+    public final boolean hasMutualAuthentication() {
+        return (m_APOptions & APOptionsMutualAuthReqMask) != 0 ? true : false;
+    }
 
-	/**
-	 * Return the ticket
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getTicket()
-	{
-		return m_ticket;
-	}
+    /**
+     * Return the ticket
+     *
+     * @return byte[]
+     */
+    public final byte[] getTicket() {
+        return m_ticket;
+    }
 
-	/**
-	 * Return the authenticator encryption type
-	 *
-	 * @return int
-	 */
-	public final int getAuthenticatorEncType()
-	{
-		return m_authEncType;
-	}
+    /**
+     * Return the authenticator encryption type
+     *
+     * @return int
+     */
+    public final int getAuthenticatorEncType() {
+        return m_authEncType;
+    }
 
-	/**
-	 * Return the authenticator encrypted data block
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getAuthenticator()
-	{
-		return m_authEncData;
-	}
+    /**
+     * Return the authenticator encrypted data block
+     *
+     * @return byte[]
+     */
+    public final byte[] getAuthenticator() {
+        return m_authEncData;
+    }
 
-	/**
-	 * Return the authenticator key version number
-	 *
-	 * @return int
-	 */
-	public final int getAuthenticatorKeyVersion()
-	{
-		return m_authEncKvno;
-	}
+    /**
+     * Return the authenticator key version number
+     *
+     * @return int
+     */
+    public final int getAuthenticatorKeyVersion() {
+        return m_authEncKvno;
+    }
 
-	/**
-	 * Parse an AP-REQ blob
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	private final void parseApReq( byte[] blob)
-		throws IOException
-	{
-		// Create a stream to parse the ASN.1 encoded AP-REQ blob
+    /**
+     * Parse an AP-REQ blob
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    private final void parseApReq(final byte[] blob) throws IOException {
+        // Create a stream to parse the ASN.1 encoded AP-REQ blob
 
-		DERBuffer derBuf = new DERBuffer( blob);
+        final DERBuffer derBuf = new DERBuffer(blob);
 
-		DERObject derObj = derBuf.unpackObject();
-		if ( derObj instanceof DERSequence)
-		{
-			// Enumerate the AP-REQ objects
+        DERObject derObj = derBuf.unpackObject();
+        if (derObj instanceof DERSequence) {
+            // Enumerate the AP-REQ objects
 
-			DERSequence derSeq = (DERSequence) derObj;
-			Iterator<DERObject> iterObj = derSeq.getObjects();
+            final DERSequence derSeq = (DERSequence) derObj;
+            final Iterator<DERObject> iterObj = derSeq.getObjects();
 
-			while ( iterObj.hasNext())
-			{
-				// Read an object
+            while (iterObj.hasNext()) {
+                // Read an object
 
-				derObj = (DERObject) iterObj.next();
+                derObj = iterObj.next();
 
-				if ( derObj != null && derObj.isTagged())
-				{
-					switch ( derObj.getTagNo())
-					{
-						// PVno
+                if (derObj != null && derObj.isTagged()) {
+                    switch (derObj.getTagNo()) {
+                        // PVno
 
-						case 0:
-							if ( derObj instanceof DERInteger)
-							{
-								DERInteger derInt = (DERInteger) derObj;
-								if ( derInt.getValue() != 5)
-									throw new IOException("Unexpected PVNO value in AP-REQ");
-							}
-							break;
+                        case 0:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                if (derInt.getValue() != 5) {
+                                    throw new IOException("Unexpected PVNO value in AP-REQ");
+                                }
+                            }
+                            break;
 
-						// Message type
+                        // Message type
 
-						case 1:
-							if ( derObj instanceof DERInteger)
-							{
-								DERInteger derInt = (DERInteger) derObj;
-								if ( derInt.getValue() != 14)
-									throw new IOException("Unexpected msg-type value in AP-REQ");
-							}
-							break;
+                        case 1:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                if (derInt.getValue() != 14) {
+                                    throw new IOException("Unexpected msg-type value in AP-REQ");
+                                }
+                            }
+                            break;
 
-						// AP-Options
+                        // AP-Options
 
-						case 2:
-							if ( derObj instanceof DERBitString)
-							{
-								DERBitString derBit = (DERBitString) derObj;
-								m_APOptions = derBit.intValue();
-							}
-							break;
+                        case 2:
+                            if (derObj instanceof DERBitString) {
+                                final DERBitString derBit = (DERBitString) derObj;
+                                m_APOptions = derBit.intValue();
+                            }
+                            break;
 
-						// Ticket
+                        // Ticket
 
-						case 3:
-							if ( derObj instanceof DERApplicationSpecific)
-							{
-								DERApplicationSpecific derApp = (DERApplicationSpecific) derObj;
-								m_ticket = derApp.getValue();
-							}
-							break;
+                        case 3:
+                            if (derObj instanceof DERApplicationSpecific) {
+                                final DERApplicationSpecific derApp = (DERApplicationSpecific) derObj;
+                                m_ticket = derApp.getValue();
+                            }
+                            break;
 
-						// Authenticator
+                        // Authenticator
 
-						case 4:
-							if ( derObj instanceof DERSequence)
-							{
-								DERSequence derAuthSeq = (DERSequence) derObj;
+                        case 4:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derAuthSeq = (DERSequence) derObj;
 
-								// Enumerate the sequence
+                                // Enumerate the sequence
 
-								Iterator<DERObject> iterSeq = derAuthSeq.getObjects();
+                                final Iterator<DERObject> iterSeq = derAuthSeq.getObjects();
 
-								while ( iterSeq.hasNext())
-								{
-									// Get the current sequence element
+                                while (iterSeq.hasNext()) {
+                                    // Get the current sequence element
 
-									derObj = (DERObject) iterSeq.next();
+                                    derObj = iterSeq.next();
 
-									if ( derObj != null && derObj.isTagged())
-									{
-										switch ( derObj.getTagNo())
-										{
-											// Encryption type
+                                    if (derObj != null && derObj.isTagged()) {
+                                        switch (derObj.getTagNo()) {
+                                            // Encryption type
 
-											case 0:
-												if ( derObj instanceof DERInteger)
-												{
-													DERInteger derInt = (DERInteger) derObj;
-													m_authEncType = derInt.intValue();
-												}
-												break;
+                                            case 0:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_authEncType = derInt.intValue();
+                                                }
+                                                break;
 
-											// Kvno
+                                            // Kvno
 
-											case 1:
-												if ( derObj instanceof DERInteger)
-												{
-													DERInteger derInt = (DERInteger) derObj;
-													m_authEncKvno = derInt.intValue();
-												}
-												break;
+                                            case 1:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_authEncKvno = derInt.intValue();
+                                                }
+                                                break;
 
-											// Cipher
+                                            // Cipher
 
-											case 2:
-												if ( derObj instanceof DEROctetString)
-												{
-													DEROctetString derOct = (DEROctetString) derObj;
-													m_authEncData = derOct.getValue();
-												}
-												break;
-										}
-									}
-								}
-							}
-							break;
-					}
-				}
-			}
-		}
-	}
+                                            case 2:
+                                                if (derObj instanceof DEROctetString) {
+                                                    final DEROctetString derOct = (DEROctetString) derObj;
+                                                    m_authEncData = derOct.getValue();
+                                                }
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+    }
 
-	/**
-	 * Parse a mech token to get the AP-REQ
-	 *
-	 * @param mechToken byte[]
-	 * @exception IOException
-	 */
-	public final void parseMechToken( byte[] mechToken)
-		throws IOException
-	{
-		// Create a stream to parse the ASN.1 encoded mech token
+    /**
+     * Parse a mech token to get the AP-REQ
+     *
+     * @param mechToken
+     *            byte[]
+     * @exception IOException
+     */
+    public final void parseMechToken(final byte[] mechToken) throws IOException {
+        // Create a stream to parse the ASN.1 encoded mech token
 
-		DERBuffer derBuf = new DERBuffer( mechToken);
-		byte[] apreqBlob = null;
+        DERBuffer derBuf = new DERBuffer(mechToken);
+        byte[] apreqBlob = null;
 
-		// Get the application specific object
+        // Get the application specific object
 
-		byte[] appByts = derBuf.unpackApplicationSpecificBytes();
+        final byte[] appByts = derBuf.unpackApplicationSpecificBytes();
 
-		if ( appByts != null) {
+        if (appByts != null) {
 
-			// Read the OID and token id
+            // Read the OID and token id
 
-			derBuf = new DERBuffer( appByts);
+            derBuf = new DERBuffer(appByts);
 
-			DERObject derObj = derBuf.unpackObject();
-			derBuf.unpackByte();
-			derBuf.unpackByte();
+            derBuf.unpackObject();
+            derBuf.unpackByte();
+            derBuf.unpackByte();
 
-			// Read the AP-REQ object
+            // Read the AP-REQ object
 
-			apreqBlob = derBuf.unpackApplicationSpecificBytes();
-		}
+            apreqBlob = derBuf.unpackApplicationSpecificBytes();
+        }
 
-		// Parse the AP-REQ, if found
+        // Parse the AP-REQ, if found
 
-		if ( apreqBlob != null)
-			parseApReq( apreqBlob);
-		else
-			throw new IOException("AP-REQ blob not found in mechToken");
-	}
+        if (apreqBlob != null) {
+            parseApReq(apreqBlob);
+        } else {
+            throw new IOException("AP-REQ blob not found in mechToken");
+        }
+    }
 
-	/**
-	 * Return the AP-REQ as a string
-	 *
-	 * @return String
-	 */
-	public String toString()
-	{
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the AP-REQ as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append("[AP-REQ:APOptions=");
-		str.append( hasMutualAuthentication() ? "MutualAuth " : "");
-		str.append( useSessionKey() ? "UseSessKey" : "");
+        str.append("[AP-REQ:APOptions=");
+        str.append(hasMutualAuthentication() ? "MutualAuth " : "");
+        str.append(useSessionKey() ? "UseSessKey" : "");
 
-		str.append(",Ticket=Len=");
-		str.append(m_ticket != null ? m_ticket.length : 0);
-		str.append(",Authenticator=EncType=");
-		str.append(m_authEncType);
-		str.append(",Kvno=");
-		str.append(getAuthenticatorKeyVersion());
-		str.append(",Len=");
-		str.append(m_authEncData != null ? m_authEncData.length : 0);
-		str.append("]");
+        str.append(",Ticket=Len=");
+        str.append(m_ticket != null ? m_ticket.length : 0);
+        str.append(",Authenticator=EncType=");
+        str.append(m_authEncType);
+        str.append(",Kvno=");
+        str.append(getAuthenticatorKeyVersion());
+        str.append(",Len=");
+        str.append(m_authEncData != null ? m_authEncData.length : 0);
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

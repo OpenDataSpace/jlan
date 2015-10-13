@@ -28,110 +28,113 @@ import java.io.IOException;
  */
 public class DERBitString extends DERObject {
 
-  // Bit flags value
+    // Bit flags value
 
-  private long m_bits;
+    private long m_bits;
 
-  /**
-   * Default constructor
-   */
-  public DERBitString() {
-  }
-
-  /**
-   * Class constructor
-   *
-   * @param bits int
-   */
-  public DERBitString( long bits) {
-    m_bits = bits;
-  }
-
-  /**
-   * Return the value
-   *
-   * @return long
-   */
-  public final long getValue() {
-    return m_bits;
-  }
-
-  /**
-   * Return the value as an integer
-   *
-   * @return int
-   */
-  public final int intValue() {
-	  return (int) m_bits;
-  }
-
-  /**
-   * Decode the object
-   *
-   * @param buf DERBuffer
-   * @throws IOException
-   */
-  public void derDecode(DERBuffer buf)
-    throws IOException {
-
-    // Decode the type
-
-    if ( buf.unpackType() == DER.BitString) {
-
-      // Unpack the length and bytes
-
-      int len = buf.unpackLength();
-      int lastBits = buf.unpackByte();
-
-      m_bits = 0;
-      long curByt = 0L;
-      len --;
-
-      for ( int idx = (len - 1); idx >= 0; idx--) {
-
-        // Get the value bytes
-
-    	curByt = (long) buf.unpackByte();
-        m_bits += curByt << (idx * 8);
-      }
+    /**
+     * Default constructor
+     */
+    public DERBitString() {
     }
-    else
-      throw new IOException("Wrong DER type, expected BitString");
-  }
 
-  /**
-   * Encode the object
-   *
-   * @param buf DERBuffer
-   * @throws IOException
-   */
-  public void derEncode(DERBuffer buf)
-    throws IOException {
-
-    // Pack the type, length and bytes
-
-    buf.packByte( DER.BitString);
-    buf.packByte( 0);
-
-    buf.packLength( 8);
-    for ( int idx = 7; idx >= 0; idx--) {
-    	long bytVal = m_bits >> ( idx * 8);
-    	buf.packByte((int) ( m_bits & 0xFF));
+    /**
+     * Class constructor
+     *
+     * @param bits
+     *            int
+     */
+    public DERBitString(final long bits) {
+        m_bits = bits;
     }
-  }
 
-  /**
-   * Return the bit string as a string
-   *
-   * @return String
-   */
-  public String toString() {
-    StringBuffer str = new StringBuffer();
+    /**
+     * Return the value
+     *
+     * @return long
+     */
+    public final long getValue() {
+        return m_bits;
+    }
 
-    str.append("[BitString:0x");
-    str.append( Long.toHexString( m_bits));
-    str.append("]");
+    /**
+     * Return the value as an integer
+     *
+     * @return int
+     */
+    public final int intValue() {
+        return (int) m_bits;
+    }
 
-    return str.toString();
-  }
+    /**
+     * Decode the object
+     *
+     * @param buf
+     *            DERBuffer
+     * @throws IOException
+     */
+    @Override
+    public void derDecode(final DERBuffer buf) throws IOException {
+
+        // Decode the type
+
+        if (buf.unpackType() == DER.BitString) {
+
+            // Unpack the length and bytes
+
+            int len = buf.unpackLength();
+            buf.unpackByte();
+
+            m_bits = 0;
+            long curByt = 0L;
+            len--;
+
+            for (int idx = (len - 1); idx >= 0; idx--) {
+
+                // Get the value bytes
+
+                curByt = buf.unpackByte();
+                m_bits += curByt << (idx * 8);
+            }
+        } else {
+            throw new IOException("Wrong DER type, expected BitString");
+        }
+    }
+
+    /**
+     * Encode the object
+     *
+     * @param buf
+     *            DERBuffer
+     * @throws IOException
+     */
+    @Override
+    public void derEncode(final DERBuffer buf) throws IOException {
+
+        // Pack the type, length and bytes
+
+        buf.packByte(DER.BitString);
+        buf.packByte(0);
+
+        buf.packLength(8);
+        for (int idx = 7; idx >= 0; idx--) {
+            buf.packByte((int) (m_bits & 0xFF));
+        }
+    }
+
+    /**
+     * Return the bit string as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuffer str = new StringBuffer();
+
+        str.append("[BitString:0x");
+        str.append(Long.toHexString(m_bits));
+        str.append("]");
+
+        return str.toString();
+    }
 }

@@ -20,7 +20,6 @@
 package org.alfresco.jlan.server.auth.kerberos;
 
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.Iterator;
 
 import org.alfresco.jlan.server.auth.asn.DERBuffer;
@@ -37,229 +36,208 @@ import org.alfresco.jlan.server.auth.asn.DERSequence;
  */
 public class KrbTicket {
 
-	// Realm and principal name
+    // Realm and principal name
 
-	private String m_realm;
-	private PrincipalName m_principalName;
+    private String m_realm;
+    private PrincipalName m_principalName;
 
-	// Encrypted part
+    // Encrypted part
 
-	private int m_encType;
-	private byte[] m_encPart;
-	private int m_encKvno = -1;
+    private int m_encType;
+    private byte[] m_encPart;
+    private int m_encKvno = -1;
 
-	/**
-	 * Default constructor
-	 */
-	public KrbTicket()
-	{
-	}
+    /**
+     * Default constructor
+     */
+    public KrbTicket() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public KrbTicket(byte[] blob)
-		throws IOException
-	{
-		parseTicket( blob);
-	}
+    /**
+     * Class constructor
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public KrbTicket(final byte[] blob) throws IOException {
+        parseTicket(blob);
+    }
 
-	/**
-	 * Return the realm
-	 */
-	public final String getRealm()
-	{
-		return m_realm;
-	}
+    /**
+     * Return the realm
+     */
+    public final String getRealm() {
+        return m_realm;
+    }
 
-	/**
-	 * Return the principal name
-	 *
-	 * @return PrincipalName
-	 */
-	public final PrincipalName getPrincipalName()
-	{
-		return m_principalName;
-	}
+    /**
+     * Return the principal name
+     *
+     * @return PrincipalName
+     */
+    public final PrincipalName getPrincipalName() {
+        return m_principalName;
+    }
 
-	/**
-	 * Return the encrypted part of the ticket
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getEncryptedPart()
-	{
-		return m_encPart;
-	}
+    /**
+     * Return the encrypted part of the ticket
+     *
+     * @return byte[]
+     */
+    public final byte[] getEncryptedPart() {
+        return m_encPart;
+    }
 
-	/**
-	 * Return the encrypted part type
-	 *
-	 * @return int
-	 */
-	public final int getEncryptedType()
-	{
-		return m_encType;
-	}
+    /**
+     * Return the encrypted part type
+     *
+     * @return int
+     */
+    public final int getEncryptedType() {
+        return m_encType;
+    }
 
-	/**
-	 * Return the encrypted part key version number
-	 *
-	 * @return int
-	 */
-	public final int getEncryptedPartKeyVersion()
-	{
-		return m_encKvno;
-	}
+    /**
+     * Return the encrypted part key version number
+     *
+     * @return int
+     */
+    public final int getEncryptedPartKeyVersion() {
+        return m_encKvno;
+    }
 
-	/**
-	 * Parse a Kerberos ticket blob
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public final void parseTicket( byte[] blob)
-		throws IOException
-	{
-		// Create a stream to parse the ASN.1 encoded Kerberos ticket blob
+    /**
+     * Parse a Kerberos ticket blob
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public final void parseTicket(final byte[] blob) throws IOException {
+        // Create a stream to parse the ASN.1 encoded Kerberos ticket blob
 
-		DERBuffer derBuf = new DERBuffer( blob);
+        final DERBuffer derBuf = new DERBuffer(blob);
 
-		DERObject derObj = derBuf.unpackObject();
-		if ( derObj instanceof DERSequence)
-		{
-			// Enumerate the Kerberos ticket objects
+        DERObject derObj = derBuf.unpackObject();
+        if (derObj instanceof DERSequence) {
+            // Enumerate the Kerberos ticket objects
 
-			DERSequence derSeq = (DERSequence) derObj;
-			Iterator<DERObject> iterObj = derSeq.getObjects();
+            final DERSequence derSeq = (DERSequence) derObj;
+            final Iterator<DERObject> iterObj = derSeq.getObjects();
 
-			while ( iterObj.hasNext())
-			{
-				// Read an object
+            while (iterObj.hasNext()) {
+                // Read an object
 
-				derObj = iterObj.next();
+                derObj = iterObj.next();
 
-				if ( derObj != null && derObj.isTagged())
-				{
-					switch ( derObj.getTagNo())
-					{
-						// Tkt-vno
+                if (derObj != null && derObj.isTagged()) {
+                    switch (derObj.getTagNo()) {
+                        // Tkt-vno
 
-						case 0:
-							if ( derObj instanceof DERInteger)
-							{
-								DERInteger derInt = (DERInteger) derObj;
-								if ( derInt.intValue() != 5)
-									throw new IOException("Unexpected VNO value in Kerberos ticket");
-							}
-							break;
+                        case 0:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                if (derInt.intValue() != 5) {
+                                    throw new IOException("Unexpected VNO value in Kerberos ticket");
+                                }
+                            }
+                            break;
 
-						// Realm
+                        // Realm
 
-						case 1:
-							if ( derObj instanceof DERGeneralString)
-							{
-								DERGeneralString derStr = (DERGeneralString) derObj;
-								m_realm = derStr.getValue();
-							}
-							break;
+                        case 1:
+                            if (derObj instanceof DERGeneralString) {
+                                final DERGeneralString derStr = (DERGeneralString) derObj;
+                                m_realm = derStr.getValue();
+                            }
+                            break;
 
-						// Principal name
+                        // Principal name
 
-						case 2:
-							if ( derObj instanceof DERSequence)
-							{
-								DERSequence derPrincSeq = (DERSequence) derObj;
-								m_principalName = new PrincipalName();
-								m_principalName.parsePrincipalName( derPrincSeq);
-							}
-							break;
+                        case 2:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derPrincSeq = (DERSequence) derObj;
+                                m_principalName = new PrincipalName();
+                                m_principalName.parsePrincipalName(derPrincSeq);
+                            }
+                            break;
 
-						// Encrypted part of the ticket
+                        // Encrypted part of the ticket
 
-						case 3:
-							if ( derObj instanceof DERSequence)
-							{
-								DERSequence derEncSeq = (DERSequence) derObj;
+                        case 3:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derEncSeq = (DERSequence) derObj;
 
-								// Enumerate the sequence
+                                // Enumerate the sequence
 
-								Iterator<DERObject> iterEncSeq = derEncSeq.getObjects();
+                                final Iterator<DERObject> iterEncSeq = derEncSeq.getObjects();
 
-								while ( iterEncSeq.hasNext())
-								{
-									// Get the current sequence element
+                                while (iterEncSeq.hasNext()) {
+                                    // Get the current sequence element
 
-									derObj = iterEncSeq.next();
+                                    derObj = iterEncSeq.next();
 
-									if ( derObj != null && derObj.isTagged())
-									{
-										switch ( derObj.getTagNo())
-										{
-											// Encryption type
+                                    if (derObj != null && derObj.isTagged()) {
+                                        switch (derObj.getTagNo()) {
+                                            // Encryption type
 
-											case 0:
-												if ( derObj instanceof DERInteger)
-												{
-													DERInteger derInt = (DERInteger) derObj;
-													m_encType = derInt.intValue();
-												}
-												break;
+                                            case 0:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_encType = derInt.intValue();
+                                                }
+                                                break;
 
-											// Kvno
+                                            // Kvno
 
-											case 1:
-												if ( derObj instanceof DERInteger)
-												{
-													DERInteger derInt = (DERInteger) derObj;
-													m_encKvno = derInt.intValue();
-												}
-												break;
+                                            case 1:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_encKvno = derInt.intValue();
+                                                }
+                                                break;
 
-											// Cipher
+                                            // Cipher
 
-											case 2:
-												if ( derObj instanceof DEROctetString)
-												{
-													DEROctetString derOct = (DEROctetString) derObj;
-													m_encPart = derOct.getValue();
-												}
-												break;
-										}
-									}
-								}
-							}
-							break;
-					}
-				}
-			}
-		}
-	}
+                                            case 2:
+                                                if (derObj instanceof DEROctetString) {
+                                                    final DEROctetString derOct = (DEROctetString) derObj;
+                                                    m_encPart = derOct.getValue();
+                                                }
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+        }
+    }
 
-	/**
-	 * Return the Kerberos ticket as a string
-	 *
-	 * @return String
-	 */
-	public String toString()
-	{
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the Kerberos ticket as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append("[KrbTkt Realm=");
-		str.append(getRealm());
-		str.append(",Principal=");
-		str.append(getPrincipalName());
-		str.append(",EncPart=Type=");
-		str.append(getEncryptedType());
-		str.append(",KVNO=");
-		str.append(getEncryptedPartKeyVersion());
-		str.append(",Len=");
-		str.append(getEncryptedPart() != null ? getEncryptedPart().length : 0);
-		str.append("]");
+        str.append("[KrbTkt Realm=");
+        str.append(getRealm());
+        str.append(",Principal=");
+        str.append(getPrincipalName());
+        str.append(",EncPart=Type=");
+        str.append(getEncryptedType());
+        str.append(",KVNO=");
+        str.append(getEncryptedPartKeyVersion());
+        str.append(",Len=");
+        str.append(getEncryptedPart() != null ? getEncryptedPart().length : 0);
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

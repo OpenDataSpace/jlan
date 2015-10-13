@@ -36,267 +36,244 @@ import org.alfresco.jlan.server.auth.asn.DERSequence;
  */
 public class EncKrbTicket {
 
-	// Encrypted ticket fields
-	//
-	// Flags
+    // Encrypted ticket fields
+    //
+    // Flags
 
-	private int m_flags;
+    private int m_flags;
 
-	// Encryption key
+    // Encryption key
 
-	private int m_encKeyType;
-	private byte[] m_encKey;
+    private int m_encKeyType;
+    private byte[] m_encKey;
 
-	// Realm
+    // Realm
 
-	private String m_realm;
+    private String m_realm;
 
-	// Principal name
+    // Principal name
 
-	private String m_principalName;
+    // Authorization data
 
-	// Authorization data
+    private final int m_authType = -1;
+    private byte[] m_authData;
 
-	private int m_authType = -1;
-	private byte[] m_authData;
+    /**
+     * Default constructor
+     */
+    public EncKrbTicket() {
+    }
 
-	/**
-	 * Default constructor
-	 */
-	public EncKrbTicket()
-	{
-	}
+    /**
+     * Class constructor
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public EncKrbTicket(final byte[] blob) throws IOException {
+        parseEncTicket(blob);
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public EncKrbTicket( byte[] blob)
-		throws IOException
-	{
-		parseEncTicket( blob);
-	}
+    /**
+     * Return the flags
+     *
+     * @return int
+     */
+    public final int getFlags() {
+        return m_flags;
+    }
 
-	/**
-	 * Return the flags
-	 *
-	 * @return int
-	 */
-	public final int getFlags()
-	{
-		return m_flags;
-	}
+    /**
+     * Return the realm
+     *
+     * @return String
+     */
+    public final String getRealm() {
+        return m_realm;
+    }
 
-	/**
-	 * Return the realm
-	 *
-	 * @return String
-	 */
-	public final String getRealm()
-	{
-		return m_realm;
-	}
+    /**
+     * Return the encryption key type
+     *
+     * @return int
+     */
+    public final int getEncryptionKeyType() {
+        return m_encKeyType;
+    }
 
-	/**
-	 * Return the encryption key type
-	 *
-	 * @return int
-	 */
-	public final int getEncryptionKeyType()
-	{
-		return m_encKeyType;
-	}
+    /**
+     * Return the encryption key
+     *
+     * @return byte[]
+     */
+    public final byte[] getEncryptionKey() {
+        return m_encKey;
+    }
 
-	/**
-	 * Return the encryption key
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getEncryptionKey()
-	{
-		return m_encKey;
-	}
+    /**
+     * Return the authorization data type, or -1 if not present
+     *
+     * @return int
+     */
+    public final int getAuthorizationDataType() {
+        return m_authType;
+    }
 
-	/**
-	 * Return the authorization data type, or -1 if not present
-	 *
-	 *  @return int
-	 */
-	public final int getAuthorizationDataType()
-	{
-		return m_authType;
-	}
+    /**
+     * Return the authorization data
+     *
+     * @return byte[]
+     */
+    public final byte[] getAuthorizationData() {
+        return m_authData;
+    }
 
-	/**
-	 * Return the authorization data
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getAuthorizationData()
-	{
-		return m_authData;
-	}
+    /**
+     * Parse an encrypted Kerberos ticket part
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public void parseEncTicket(final byte[] blob) throws IOException {
+        // Create a stream to parse the ASN.1 encoded Kerberos ticket blob
 
-	/**
-	 * Parse an encrypted Kerberos ticket part
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public void parseEncTicket( byte[] blob)
-		throws IOException
-	{
-		// Create a stream to parse the ASN.1 encoded Kerberos ticket blob
+        final DERBuffer derBuf = new DERBuffer(blob);
 
-		DERBuffer derBuf = new DERBuffer( blob);
+        DERObject derObj = derBuf.unpackObject();
+        if (derObj instanceof DERSequence) {
+            // Enumerate the Kerberos ticket objects
 
-		DERObject derObj = derBuf.unpackObject();
-		if ( derObj instanceof DERSequence)
-		{
-			// Enumerate the Kerberos ticket objects
+            final DERSequence derSeq = (DERSequence) derObj;
 
-			DERSequence derSeq = (DERSequence) derObj;
+            for (int idx = 0; idx < derSeq.numberOfObjects(); idx++) {
+                // Read an object
 
-			for ( int idx = 0; idx < derSeq.numberOfObjects(); idx++)
-			{
-				// Read an object
+                derObj = derSeq.getObjectAt(idx);
 
-				derObj = (DERObject) derSeq.getObjectAt(idx);
+                if (derObj != null && derObj.isTagged()) {
+                    switch (derObj.getTagNo()) {
+                        // Flags
 
-				if ( derObj != null && derObj.isTagged())
-				{
-					switch ( derObj.getTagNo())
-					{
-						// Flags
+                        case 0:
+                            if (derObj instanceof DERBitString) {
+                                final DERBitString derBits = (DERBitString) derObj;
+                                m_flags = derBits.intValue();
+                            }
+                            break;
 
-						case 0:
-							if ( derObj instanceof DERBitString)
-							{
-								DERBitString derBits = (DERBitString) derObj;
-								m_flags = derBits.intValue();
-							}
-							break;
+                        // Key
 
-						// Key
+                        case 1:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derEncSeq = (DERSequence) derObj;
 
-						case 1:
-							if ( derObj instanceof DERSequence)
-							{
-								DERSequence derEncSeq = (DERSequence) derObj;
+                                // Enumerate the sequence
 
-								// Enumerate the sequence
+                                for (int i = 0; i < derEncSeq.numberOfObjects(); i++) {
+                                    // Get the current sequence element
 
-								for ( int i = 0; i < derEncSeq.numberOfObjects(); i++)
-								{
-									// Get the current sequence element
+                                    derObj = derEncSeq.getObjectAt(i);
 
-									derObj = (DERObject) derEncSeq.getObjectAt(i);
+                                    if (derObj != null && derObj.isTagged()) {
+                                        switch (derObj.getTagNo()) {
+                                            // Encryption key type
 
-									if ( derObj != null && derObj.isTagged())
-									{
-										switch ( derObj.getTagNo())
-										{
-											// Encryption key type
+                                            case 0:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_encKeyType = (int) derInt.getValue();
+                                                }
+                                                break;
 
-											case 0:
-												if ( derObj instanceof DERInteger)
-												{
-													DERInteger derInt = (DERInteger) derObj;
-													m_encKeyType = (int) derInt.getValue();
-												}
-												break;
+                                            // Encryption key
 
-											// Encryption key
+                                            case 1:
+                                                if (derObj instanceof DEROctetString) {
+                                                    final DEROctetString derOct = (DEROctetString) derObj;
+                                                    m_encKey = derOct.getValue();
+                                                }
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
 
-											case 1:
-												if ( derObj instanceof DEROctetString)
-												{
-													DEROctetString derOct = (DEROctetString) derObj;
-													m_encKey = derOct.getValue();
-												}
-												break;
-										}
-									}
-								}
-							}
-							break;
+                        // Realm
 
-						// Realm
+                        case 2:
+                            if (derObj instanceof DERGeneralString) {
+                                final DERGeneralString derStr = (DERGeneralString) derObj;
+                                m_realm = derStr.getValue();
+                            }
+                            break;
 
-						case 2:
-							if ( derObj instanceof DERGeneralString)
-							{
-								DERGeneralString derStr = (DERGeneralString) derObj;
-								m_realm = derStr.getValue();
-							}
-							break;
+                        // Principal name
 
-						// Principal name
+                        case 3:
+                            break;
 
-						case 3:
-							break;
+                        // Transited encoding
 
-						// Transited encoding
+                        case 4:
+                            break;
 
-						case 4:
-							break;
+                        // Auth time
 
-						// Auth time
+                        case 5:
+                            break;
 
-						case 5:
-							break;
+                        // Start time
 
-						// Start time
+                        case 6:
+                            break;
 
-						case 6:
-							break;
+                        // End time
 
-						// End time
+                        case 7:
+                            break;
 
-						case 7:
-							break;
+                        // Renew till
 
-						// Renew till
+                        case 8:
+                            break;
 
-						case 8:
-							break;
+                        // Host address
 
-						// Host address
+                        case 9:
+                            break;
 
-						case 9:
-							break;
+                        // Authorization data
 
-						// Authorization data
+                        case 10:
+                            break;
+                    }
+                }
+            }
+        }
+    }
 
-						case 10:
-							break;
-					}
-				}
-			}
-		}
-	}
+    /**
+     * Return the encrypted ticket part as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-	/**
-	 * Return the encrypted ticket part as a string
-	 *
-	 * @return String
-	 */
-	public String toString()
-	{
-		StringBuilder str = new StringBuilder();
+        str.append("[EncKrbTkt Flags=0x");
+        str.append(Integer.toHexString(getFlags()));
+        str.append(",Key=Type=");
+        str.append(getEncryptionKeyType());
+        str.append(",Len=");
+        str.append(getEncryptionKey().length);
+        str.append(",Realm=");
+        str.append(getRealm());
+        str.append("]");
 
-		str.append("[EncKrbTkt Flags=0x");
-		str.append(Integer.toHexString( getFlags()));
-		str.append(",Key=Type=");
-		str.append(getEncryptionKeyType());
-		str.append(",Len=");
-		str.append(getEncryptionKey().length);
-		str.append(",Realm=");
-		str.append(getRealm());
-		str.append("]");
-
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

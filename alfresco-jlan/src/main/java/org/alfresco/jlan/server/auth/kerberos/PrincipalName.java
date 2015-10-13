@@ -32,121 +32,114 @@ import org.alfresco.jlan.util.StringList;
  */
 public class PrincipalName {
 
-	// Name type and naem string(s)
+    // Name type and naem string(s)
 
-	private int m_type;
-	private StringList m_names;
+    private int m_type;
+    private StringList m_names;
 
-	/**
-	 * Default constructor
-	 */
-	public PrincipalName()
-	{
-		m_names = new StringList();
-	}
+    /**
+     * Default constructor
+     */
+    public PrincipalName() {
+        m_names = new StringList();
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param typ int
-	 * @param names StringList
-	 */
-	public PrincipalName(int typ, StringList names)
-	{
-		m_type  = typ;
-		m_names = names;
-	}
+    /**
+     * Class constructor
+     *
+     * @param typ
+     *            int
+     * @param names
+     *            StringList
+     */
+    public PrincipalName(final int typ, final StringList names) {
+        m_type = typ;
+        m_names = names;
+    }
 
-	/**
-	 * Return the name type
-	 *
-	 * @return int
-	 */
-	public final int getType()
-	{
-		return m_type;
-	}
+    /**
+     * Return the name type
+     *
+     * @return int
+     */
+    public final int getType() {
+        return m_type;
+    }
 
-	/**
-	 * Return the name list
-	 *
-	 * @return StringList
-	 */
-	public final StringList getNames()
-	{
-		return m_names;
-	}
+    /**
+     * Return the name list
+     *
+     * @return StringList
+     */
+    public final StringList getNames() {
+        return m_names;
+    }
 
-	/**
-	 * Parse an ASN.1 principal name
-	 *
-	 * @param derSeq DERSequence
-	 */
-	public final void parsePrincipalName( DERSequence derSeq)
-	{
-		// Allocate the name list
+    /**
+     * Parse an ASN.1 principal name
+     *
+     * @param derSeq
+     *            DERSequence
+     */
+    public final void parsePrincipalName(final DERSequence derSeq) {
+        // Allocate the name list
 
-		m_names = new StringList();
+        m_names = new StringList();
 
-		// Enumerate the sequence
+        // Enumerate the sequence
 
-		for ( int idx = 0; idx < derSeq.numberOfObjects(); idx++)
-		{
-			// Read an object
+        for (int idx = 0; idx < derSeq.numberOfObjects(); idx++) {
+            // Read an object
 
-			DERObject derObj = (DERObject) derSeq.getObjectAt(idx);
+            final DERObject derObj = derSeq.getObjectAt(idx);
 
-			if ( derObj != null && derObj.isTagged())
-			{
-				switch ( derObj.getTagNo())
-				{
-					// Type
+            if (derObj != null && derObj.isTagged()) {
+                switch (derObj.getTagNo()) {
+                    // Type
 
-					case 0:
-						if ( derObj instanceof DERInteger)
-						{
-							DERInteger derInt = (DERInteger) derObj;
-							m_type = (int) derInt.getValue();
-						}
-						break;
+                    case 0:
+                        if (derObj instanceof DERInteger) {
+                            final DERInteger derInt = (DERInteger) derObj;
+                            m_type = (int) derInt.getValue();
+                        }
+                        break;
 
-					// Principal name components
+                    // Principal name components
 
-					case 1:
-						if ( derObj instanceof DERSequence)
-						{
-							DERSequence derNames = (DERSequence) derObj;
+                    case 1:
+                        if (derObj instanceof DERSequence) {
+                            final DERSequence derNames = (DERSequence) derObj;
 
-							for( int namIdx = 0; namIdx < derNames.numberOfObjects(); namIdx++)
-							{
-								DERGeneralString derStr = (DERGeneralString) derNames.getObjectAt(namIdx);
-								m_names.addString( derStr.getValue());
-							}
-						}
-				}
-			}
-		}
-	}
+                            for (int namIdx = 0; namIdx < derNames.numberOfObjects(); namIdx++) {
+                                final DERGeneralString derStr = (DERGeneralString) derNames.getObjectAt(namIdx);
+                                m_names.addString(derStr.getValue());
+                            }
+                        }
+                }
+            }
+        }
+    }
 
-	/**
-	 * Return the principal name as a string
-	 *
-	 * @return String
-	 */
-	public String toString()
-	{
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the principal name as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append("[Typ=");
-		str.append(getType());
-		str.append(",Names=");
+        str.append("[Typ=");
+        str.append(getType());
+        str.append(",Names=");
 
-		if ( m_names != null)
-			str.append(m_names);
-		else
-			str.append("null");
-		str.append("]");
+        if (m_names != null) {
+            str.append(m_names);
+        } else {
+            str.append("null");
+        }
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

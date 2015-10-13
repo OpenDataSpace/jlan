@@ -24,122 +24,128 @@ import org.ietf.jgss.GSSName;
 /**
  * Kerberos Details Class
  *
- * <p>Holds the Kerberos response token and session details about the user.
+ * <p>
+ * Holds the Kerberos response token and session details about the user.
  *
  * @author gkspencer
  */
 public class KerberosDetails {
 
-  // Source and target details
+    // Source and target details
 
-  private String m_krbSource;
+    private final String m_krbSource;
 
-  private String m_krbTarget;
+    private final String m_krbTarget;
 
-  // Kerberos response token
+    // Kerberos response token
 
-  private byte[] m_krbResponse;
+    private byte[] m_krbResponse;
 
-  /**
-   * Class constructor
-   *
-   * @param source GSSName
-   * @param target GSSName
-   * @param response byte[]
-   */
-  public KerberosDetails(GSSName source, GSSName target, byte[] response) {
+    /**
+     * Class constructor
+     *
+     * @param source
+     *            GSSName
+     * @param target
+     *            GSSName
+     * @param response
+     *            byte[]
+     */
+    public KerberosDetails(final GSSName source, final GSSName target, final byte[] response) {
 
-    m_krbSource = source.toString();
-    m_krbTarget = target.toString();
+        m_krbSource = source.toString();
+        m_krbTarget = target.toString();
 
-    m_krbResponse = response;
-  }
-
-  /**
-   * Return the context initiator for the Kerberos authentication
-   *
-   * @return String
-   */
-  public final String getSourceName() {
-
-    return m_krbSource;
-  }
-
-  /**
-   * Return the context acceptor for the Kerberos authentication
-   *
-   * @return String
-   */
-  public final String getTargetName() {
-
-    return m_krbTarget;
-  }
-
-  /**
-   * Return the Kerberos response token
-   *
-   * @return byte[]
-   */
-  public final byte[] getResponseToken() {
-
-    return m_krbResponse;
-  }
-
-  /**
-   * Set the response token
-   *
-   * @param tok byte[]
-   */
-  public final void setResponseToken(byte[] tok) {
-	  m_krbResponse = tok;
-  }
-
-  /**
-   * Parse the source name to return the user name part only
-   *
-   * @return String
-   */
-  public final String getUserName() {
-
-    String userName = m_krbSource;
-
-    if (m_krbSource != null) {
-      int pos = m_krbSource.indexOf('@');
-      if (pos != -1) {
-        userName = m_krbSource.substring(0, pos);
-      }
+        m_krbResponse = response;
     }
 
-    return userName;
-  }
+    /**
+     * Return the context initiator for the Kerberos authentication
+     *
+     * @return String
+     */
+    public final String getSourceName() {
 
-  /**
-   * Return the response token length
-   *
-   * @return int
-   */
-  public final int getResponseLength() {
+        return m_krbSource;
+    }
 
-    return m_krbResponse != null ? m_krbResponse.length : 0;
-  }
+    /**
+     * Return the context acceptor for the Kerberos authentication
+     *
+     * @return String
+     */
+    public final String getTargetName() {
 
-  /**
-   * Return the Kerberos authentication details as a string
-   *
-   * @return String
-   */
-  public String toString() {
+        return m_krbTarget;
+    }
 
-    StringBuffer str = new StringBuffer();
+    /**
+     * Return the Kerberos response token
+     *
+     * @return byte[]
+     */
+    public final byte[] getResponseToken() {
 
-    str.append("[Source=");
-    str.append(getSourceName());
-    str.append(",Target=");
-    str.append(getTargetName());
-    str.append(":Response=");
-    str.append(getResponseLength());
-    str.append(" bytes]");
+        return m_krbResponse;
+    }
 
-    return str.toString();
-  }
+    /**
+     * Set the response token
+     *
+     * @param tok
+     *            byte[]
+     */
+    public final void setResponseToken(final byte[] tok) {
+        m_krbResponse = tok;
+    }
+
+    /**
+     * Parse the source name to return the user name part only
+     *
+     * @return String
+     */
+    public final String getUserName() {
+
+        String userName = m_krbSource;
+
+        if (m_krbSource != null) {
+            final int pos = m_krbSource.indexOf('@');
+            if (pos != -1) {
+                userName = m_krbSource.substring(0, pos);
+            }
+        }
+
+        return userName;
+    }
+
+    /**
+     * Return the response token length
+     *
+     * @return int
+     */
+    public final int getResponseLength() {
+
+        return m_krbResponse != null ? m_krbResponse.length : 0;
+    }
+
+    /**
+     * Return the Kerberos authentication details as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+
+        final StringBuffer str = new StringBuffer();
+
+        str.append("[Source=");
+        str.append(getSourceName());
+        str.append(",Target=");
+        str.append(getTargetName());
+        str.append(":Response=");
+        str.append(getResponseLength());
+        str.append(" bytes]");
+
+        return str.toString();
+    }
 }

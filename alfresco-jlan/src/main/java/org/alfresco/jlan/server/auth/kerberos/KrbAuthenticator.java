@@ -20,7 +20,6 @@
 package org.alfresco.jlan.server.auth.kerberos;
 
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.Iterator;
 
 import org.alfresco.jlan.server.auth.asn.DERBuffer;
@@ -39,287 +38,264 @@ import org.alfresco.jlan.util.HexDump;
  */
 public class KrbAuthenticator {
 
-	// Kerberos authenticator fields
-	//
-	// Realm and principal
+    // Kerberos authenticator fields
+    //
+    // Realm and principal
 
-	private String m_realm;
-	private PrincipalName m_principalName;
+    private String m_realm;
+    private PrincipalName m_principalName;
 
-	// Microseconds
+    // Microseconds
 
-	private long m_microseconds;
+    private long m_microseconds;
 
-	// Timestamp
+    // Timestamp
 
-	private String m_timestamp;
+    private String m_timestamp;
 
-	// Sub-key
+    // Sub-key
 
-	private int m_subKeyType;
-	private byte[] m_subKey;
+    private int m_subKeyType;
+    private byte[] m_subKey;
 
-	// Sequence number
+    // Sequence number
 
-	private int m_seqNo;
+    private int m_seqNo;
 
-	/**
-	 * Default constructor
-	 */
-	public KrbAuthenticator()
-	{
-	}
+    /**
+     * Default constructor
+     */
+    public KrbAuthenticator() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param blob byte[]
-	 * @exception IOException
-	 */
-	public KrbAuthenticator( byte[] blob)
-		throws IOException
-	{
-		parseAuthenticator( blob);
-	}
+    /**
+     * Class constructor
+     *
+     * @param blob
+     *            byte[]
+     * @exception IOException
+     */
+    public KrbAuthenticator(final byte[] blob) throws IOException {
+        parseAuthenticator(blob);
+    }
 
-	/**
-	 * Return the realm
-	 *
-	 * @return String
-	 */
-	public final String getRealm()
-	{
-		return m_realm;
-	}
+    /**
+     * Return the realm
+     *
+     * @return String
+     */
+    public final String getRealm() {
+        return m_realm;
+    }
 
-	/**
-	 * Return the principal name
-	 *
-	 * @return PrincipalName
-	 */
-	public final PrincipalName getPrincipalName()
-	{
-		return m_principalName;
-	}
+    /**
+     * Return the principal name
+     *
+     * @return PrincipalName
+     */
+    public final PrincipalName getPrincipalName() {
+        return m_principalName;
+    }
 
-	/**
-	 * Return the timestamp
-	 *
-	 * @return String
-	 */
-	public final String getTimestamp()
-	{
-		return m_timestamp;
-	}
+    /**
+     * Return the timestamp
+     *
+     * @return String
+     */
+    public final String getTimestamp() {
+        return m_timestamp;
+    }
 
-	/**
-	 * Return the sub-key type
-	 *
-	 * @return int
-	 */public final int getSubKeyType()
-	 {
-		 return m_subKeyType;
-	 }
+    /**
+     * Return the sub-key type
+     *
+     * @return int
+     */
+    public final int getSubKeyType() {
+        return m_subKeyType;
+    }
 
-	 /**
-	  * Return the sub-key
-	  *
-	  * @return byte[]
-	  */
-	 public final byte[] getSubKey()
-	 {
-		 return m_subKey;
-	 }
+    /**
+     * Return the sub-key
+     *
+     * @return byte[]
+     */
+    public final byte[] getSubKey() {
+        return m_subKey;
+    }
 
-	/**
-	 * Return the sequence number
-	 *
-	 * @return int
-	 */
-	public final int getSequenceNumber()
-	{
-		return m_seqNo;
-	}
+    /**
+     * Return the sequence number
+     *
+     * @return int
+     */
+    public final int getSequenceNumber() {
+        return m_seqNo;
+    }
 
-	/**
-	 * Parse the ASN/1 encoded authenticator
-	 *
-	 * @param auth byte[]
-	 * @exception IOException
-	 */
-	public final void parseAuthenticator( byte[] auth)
-		throws IOException
-	{
-			// Create a stream to parse the ASN.1 encoded Kerberos ticket blob
+    /**
+     * Parse the ASN/1 encoded authenticator
+     *
+     * @param auth
+     *            byte[]
+     * @exception IOException
+     */
+    public final void parseAuthenticator(final byte[] auth) throws IOException {
+        // Create a stream to parse the ASN.1 encoded Kerberos ticket blob
 
-			DERBuffer derBuf = new DERBuffer( auth);
+        final DERBuffer derBuf = new DERBuffer(auth);
 
-			DERObject derObj = derBuf.unpackObject();
-			if ( derObj instanceof DERSequence)
-			{
-				// Enumerate the Kerberos ticket objects
+        DERObject derObj = derBuf.unpackObject();
+        if (derObj instanceof DERSequence) {
+            // Enumerate the Kerberos ticket objects
 
-				DERSequence derSeq = (DERSequence) derObj;
-				Iterator<DERObject> iterObj = derSeq.getObjects();
+            final DERSequence derSeq = (DERSequence) derObj;
+            final Iterator<DERObject> iterObj = derSeq.getObjects();
 
-				while ( iterObj.hasNext())
-				{
-					// Read an object
+            while (iterObj.hasNext()) {
+                // Read an object
 
-					derObj = iterObj.next();
+                derObj = iterObj.next();
 
-					if ( derObj != null && derObj.isTagged())
-					{
-						switch ( derObj.getTagNo())
-						{
-							// Authenticator VNO
+                if (derObj != null && derObj.isTagged()) {
+                    switch (derObj.getTagNo()) {
+                        // Authenticator VNO
 
-							case 0:
-								if ( derObj instanceof DERInteger)
-								{
-									DERInteger derInt = (DERInteger) derObj;
-									if ( derInt.intValue() != 5)
-										throw new IOException("");
-								}
-								break;
+                        case 0:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                if (derInt.intValue() != 5) {
+                                    throw new IOException("");
+                                }
+                            }
+                            break;
 
-							// Realm
+                        // Realm
 
-							case 1:
-								if ( derObj instanceof DERGeneralString)
-								{
-									DERGeneralString derStr = (DERGeneralString) derObj;
-									m_realm = derStr.getValue();
-								}
-								break;
+                        case 1:
+                            if (derObj instanceof DERGeneralString) {
+                                final DERGeneralString derStr = (DERGeneralString) derObj;
+                                m_realm = derStr.getValue();
+                            }
+                            break;
 
-							// Principal name
+                        // Principal name
 
-							case 2:
-								if ( derObj instanceof DERSequence)
-								{
-									DERSequence derPrincSeq = (DERSequence) derObj;
-									m_principalName = new PrincipalName();
-									m_principalName.parsePrincipalName( derPrincSeq);
-								}
-								break;
+                        case 2:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derPrincSeq = (DERSequence) derObj;
+                                m_principalName = new PrincipalName();
+                                m_principalName.parsePrincipalName(derPrincSeq);
+                            }
+                            break;
 
-							// Checksum
+                        // Checksum
 
-							case 3:
-								break;
+                        case 3:
+                            break;
 
-							// Microseconds
+                        // Microseconds
 
-							case 4:
-								if ( derObj instanceof DERInteger)
-								{
-									DERInteger derInt = (DERInteger) derObj;
-									m_microseconds = derInt.intValue();
-								}
-								break;
+                        case 4:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                m_microseconds = derInt.intValue();
+                            }
+                            break;
 
-							// Timestamp
+                        // Timestamp
 
-							case 5:
-								if ( derObj instanceof DERGeneralizedTime)
-								{
-									DERGeneralizedTime derTime = (DERGeneralizedTime) derObj;
-									m_timestamp = derTime.getValue();
-								}
-								break;
+                        case 5:
+                            if (derObj instanceof DERGeneralizedTime) {
+                                final DERGeneralizedTime derTime = (DERGeneralizedTime) derObj;
+                                m_timestamp = derTime.getValue();
+                            }
+                            break;
 
-							// Sub-key
+                        // Sub-key
 
-							case 6:
-								if ( derObj instanceof DERSequence)
-								{
-									DERSequence derEncSeq = (DERSequence) derObj;
+                        case 6:
+                            if (derObj instanceof DERSequence) {
+                                final DERSequence derEncSeq = (DERSequence) derObj;
 
-									// Enumerate the sequence
+                                // Enumerate the sequence
 
-									Iterator<DERObject> iterSeq = derEncSeq.getObjects();
+                                final Iterator<DERObject> iterSeq = derEncSeq.getObjects();
 
-									while ( iterSeq.hasNext())
-									{
-										// Get the current sequence element
+                                while (iterSeq.hasNext()) {
+                                    // Get the current sequence element
 
-										derObj = iterSeq.next();
+                                    derObj = iterSeq.next();
 
-										if ( derObj != null && derObj.isTagged())
-										{
-											switch ( derObj.getTagNo())
-											{
-												// Encryption key type
+                                    if (derObj != null && derObj.isTagged()) {
+                                        switch (derObj.getTagNo()) {
+                                            // Encryption key type
 
-												case 0:
-													if ( derObj instanceof DERInteger)
-													{
-														DERInteger derInt = (DERInteger) derObj;
-														m_subKeyType = derInt.intValue();
-													}
-													break;
+                                            case 0:
+                                                if (derObj instanceof DERInteger) {
+                                                    final DERInteger derInt = (DERInteger) derObj;
+                                                    m_subKeyType = derInt.intValue();
+                                                }
+                                                break;
 
-												// Encryption key
+                                            // Encryption key
 
-												case 1:
-													if ( derObj instanceof DEROctetString)
-													{
-														DEROctetString derOct = (DEROctetString) derObj;
-														m_subKey = derOct.getValue();
-													}
-													break;
-											}
-										}
-									}
-								}
-								break;
+                                            case 1:
+                                                if (derObj instanceof DEROctetString) {
+                                                    final DEROctetString derOct = (DEROctetString) derObj;
+                                                    m_subKey = derOct.getValue();
+                                                }
+                                                break;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
 
-							// Sequence number
+                        // Sequence number
 
-							case 7:
-								if ( derObj instanceof DERInteger)
-								{
-									DERInteger derInt = (DERInteger) derObj;
-									m_seqNo = derInt.intValue();
-								}
-								break;
+                        case 7:
+                            if (derObj instanceof DERInteger) {
+                                final DERInteger derInt = (DERInteger) derObj;
+                                m_seqNo = derInt.intValue();
+                            }
+                            break;
 
-							// Authorization data
+                        // Authorization data
 
-							case 8:
-								break;
-						}
-					}
-				}
-			}
-	}
+                        case 8:
+                            break;
+                    }
+                }
+            }
+        }
+    }
 
-	/**
-	 * Return the authentcator as a string
-	 *
-	 * @return String
-	 */
-	public String toString()
-	{
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the authentcator as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append("[KrbAuth Realm=");
-		str.append( getRealm());
-		str.append(",Principal=");
-		str.append(getPrincipalName());
-		str.append(",uSec=");
-		str.append( m_microseconds);
-		str.append(",Time=");
-		str.append( getTimestamp());
-		str.append(",SubKey=Type=");
-		str.append( getSubKeyType());
-		str.append(",Key=");
-		str.append( HexDump.hexString(getSubKey()));
-		str.append(",SeqNo=");
-		str.append( getSequenceNumber());
-		str.append("]");
+        str.append("[KrbAuth Realm=");
+        str.append(getRealm());
+        str.append(",Principal=");
+        str.append(getPrincipalName());
+        str.append(",uSec=");
+        str.append(m_microseconds);
+        str.append(",Time=");
+        str.append(getTimestamp());
+        str.append(",SubKey=Type=");
+        str.append(getSubKeyType());
+        str.append(",Key=");
+        str.append(HexDump.hexString(getSubKey()));
+        str.append(",SeqNo=");
+        str.append(getSequenceNumber());
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }
