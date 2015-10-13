@@ -21,105 +21,97 @@ package org.alfresco.jlan.sample;
 
 import java.security.MessageDigest;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.loader.FileProcessor;
 import org.alfresco.jlan.server.filesys.loader.FileSegment;
 import org.alfresco.jlan.util.HexDump;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * MD5 Checksum File Processor Class
  *
- * <p>Calculate an MD5 checksum for a file before it is stored and save the result in a database field.
+ * <p>
+ * Calculate an MD5 checksum for a file before it is stored and save the result in a database field.
  *
  * @author gkspencer
  */
 public class Md5SumFileProcessor implements FileProcessor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Md5SumFileProcessor.class);
 
-	//	Flag to indicate if the filesystem table has an MD5Sum field
+    /**
+     * Process a cached file just before it is to be stored.
+     *
+     * @param context
+     *            DiskDeviceContext
+     * @param state
+     *            FileState
+     * @param segment
+     *            FileSegment
+     */
+    @Override
+    public void processStoredFile(final DiskDeviceContext context, final FileState state, final FileSegment segment) {
+        // Calculate an MD5 checksum for the file
+        final String md5sum = calculateMd5Checksum(segment);
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("## StoreFile file={}, fid={}, temp={}, MD5={}", state.getPath(), state.getFileId(), segment.getTemporaryFile(), md5sum);
+        }
+    }
 
-	private boolean m_md5field = true;
+    /**
+     * Process a cached file just after being loaded.
+     *
+     * @param context
+     *            DiskDeviceContext
+     * @param state
+     *            FileState
+     * @param segment
+     *            FileSegment
+     */
+    @Override
+    public void processLoadedFile(final DiskDeviceContext context, final FileState state, final FileSegment segment) {
+    }
 
-	/**
-	 * Process a cached file just before it is to be stored.
-	 *
-	 * @param context DiskDeviceContext
-	 * @param state FileState
-	 * @param segment FileSegment
-	 */
-	public void processStoredFile(DiskDeviceContext context, FileState state, FileSegment segment) {
+    /**
+     * Calculate an MD5 checksum for a file
+     *
+     * @param segment
+     *            FileSegment
+     * @return String
+     */
+    protected final String calculateMd5Checksum(final FileSegment segment) {
+        MessageDigest md5 = null;
+        String checksum = null;
+        try {
+            // Get an MD5 message digest
+            md5 = MessageDigest.getInstance("MD5");
 
-		//	Calculate an MD5 checksum for the file
+            // Create a buffer for reading the file
+            final byte[] inbuf = new byte[512];
+            long fileOff = 0L;
+            int rdlen = segment.readBytes(inbuf, inbuf.length, 0, fileOff);
 
-		String md5sum = calculateMd5Checksum(segment);
-		Debug.println("## StoreFile file=" + state.getPath() + ", fid=" + state.getFileId() + ", temp=" + segment.getTemporaryFile() +
-									", MD5=" + md5sum);
-	}
+            // Read the file and calculate the MD5 checksum
+            while (rdlen > 0) {
+                // Update the MD5 checksum
+                md5.update(inbuf, 0, rdlen);
 
-	/**
-	 * Process a cached file just after being loaded.
-	 *
-	 * @param context DiskDeviceContext
-	 * @param state FileState
-	 * @param segment FileSegment
-	 */
-	public void processLoadedFile(DiskDeviceContext context, FileState state, FileSegment segment) {
-	}
+                // Update the file offset
+                fileOff += rdlen;
 
-	/**
-	 * Calculate an MD5 checksum for a file
-	 *
-	 * @param segment FileSegment
-	 * @return String
-	 */
-	protected final String calculateMd5Checksum(FileSegment segment) {
+                // Read another block of data
+                rdlen = segment.readBytes(inbuf, inbuf.length, 0, fileOff);
+            }
 
-		MessageDigest md5 = null;
-		String checksum = null;
+            // Get the final MD5 checksum
+            final byte[] md5sum = md5.digest();
 
-		try {
-
-			//	Get an MD5 message digest
-
-			md5 = MessageDigest.getInstance("MD5");
-
-			//	Create a buffer for reading the file
-
-			byte[] inbuf = new byte[512];
-			long fileOff = 0L;
-			int rdlen = segment.readBytes(inbuf, inbuf.length, 0, fileOff);
-
-			//	Read the file and calculate the MD5 checksum
-
-			while ( rdlen > 0) {
-
-				//	Update the MD5 checksum
-
-				md5.update(inbuf, 0, rdlen);
-
-				//	Update the file offset
-
-				fileOff += rdlen;
-
-				//	Read another block of data
-
-				rdlen = segment.readBytes(inbuf, inbuf.length, 0, fileOff);
-			}
-
-			//	Get the final MD5 checksum
-
-			byte[] md5sum = md5.digest();
-
-			//	Convert the checksum to a hex string
-
-			checksum = HexDump.hexString(md5sum);
-		}
-		catch (Exception ex) {
-		}
-
-		//	Return the checksum
-
-		return checksum;
-	}
+            // Convert the checksum to a hex string
+            checksum = HexDump.hexString(md5sum);
+        } catch (final Exception ex) {
+        }
+        // Return the checksum
+        return checksum;
+    }
 }
