@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.oncrpc.PortMapping;
 import org.alfresco.jlan.oncrpc.Rpc;
 import org.alfresco.jlan.oncrpc.RpcPacket;
@@ -35,6 +34,8 @@ import org.alfresco.jlan.server.NetworkServer;
 import org.alfresco.jlan.server.ServerListener;
 import org.alfresco.jlan.server.Version;
 import org.alfresco.jlan.server.config.ServerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Port Mapper Server Class
@@ -42,524 +43,490 @@ import org.alfresco.jlan.server.config.ServerConfiguration;
  * @author gkspencer
  */
 public class PortMapperServer extends NetworkServer implements RpcProcessor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PortMapperServer.class);
+    // Constants
+    //
+    // Server version
+    private static final String ServerVersion = Version.PortMapServerVersion;
 
-  //	Constants
-  //
-  //	Server version
+    // Default port mapper port
+    public final static int DefaultPort = 111;
 
-	private static final String ServerVersion = Version.PortMapServerVersion;
+    // Maximum request size to accept
+    public final static int MaxRequestSize = 1024;
 
-	//	Default port mapper port
+    // Configuration sections
+    private final NFSConfigSection m_nfsConfig;
 
-	public final static int DefaultPort				= 111;
+    // Incoming datagram handler for UDP requests
+    private UdpRpcDatagramHandler m_udpHandler;
 
-	//	Maximum request size to accept
+    // Incoming session handler for TCP requests
+    private TcpRpcSessionHandler m_tcpHandler;
 
-	public final static int MaxRequestSize		= 1024;
+    // Portmapper port
+    private int m_port;
 
-  //  Configuration sections
+    // Table of active port mappings
+    private Hashtable<Integer, PortMapping> m_mappings;
+    private Hashtable<Integer, PortMapping> m_noVerMappings;
 
-  private NFSConfigSection m_nfsConfig;
+    /**
+     * Class constructor
+     *
+     * @param config
+     *            ServerConfiguration
+     */
+    public PortMapperServer(final ServerConfiguration config) {
+        super("Portmap", config);
 
-	//	Incoming datagram handler for UDP requests
+        // Set the server version
+        setVersion(ServerVersion);
 
-	private UdpRpcDatagramHandler m_udpHandler;
+        // Get the NFS configuration
+        m_nfsConfig = (NFSConfigSection) config.getConfigSection(NFSConfigSection.SectionName);
 
-	//	Incoming session handler for TCP requests
+        if (m_nfsConfig != null) {
+            // Enable/disable debug output
+            setDebug(getNFSConfiguration().hasPortMapperDebug());
 
-	private TcpRpcSessionHandler m_tcpHandler;
+            // Set the port to use
+            if (getNFSConfiguration().getPortMapperPort() != 0) {
+                setPort(getNFSConfiguration().getPortMapperPort());
+            } else {
+                setPort(DefaultPort);
+            }
 
-	//	Portmapper port
-
-	private int m_port;
-
-	//	Table of active port mappings
-
-	private Hashtable<Integer, PortMapping> m_mappings;
-	private Hashtable<Integer, PortMapping> m_noVerMappings;
-
-	/**
-	 * Class constructor
-	 *
-	 * @param config ServerConfiguration
-	 */
-	public PortMapperServer(ServerConfiguration config) {
-		super("Portmap", config);
-
-		//	Set the server version
-
-		setVersion(ServerVersion);
-
-    //  Get the NFS configuration
-
-    m_nfsConfig = (NFSConfigSection) config.getConfigSection( NFSConfigSection.SectionName);
-
-    if ( m_nfsConfig != null) {
-
-  		//	Enable/disable debug output
-
-  		setDebug( getNFSConfiguration().hasPortMapperDebug());
-
-  		//	Set the port to use
-
-  		if ( getNFSConfiguration().getPortMapperPort() != 0)
-  		  setPort( getNFSConfiguration().getPortMapperPort());
-  		else
-  		  setPort(DefaultPort);
-
-  		//	Create the mappings tables
-
-  		m_mappings = new Hashtable<Integer, PortMapping>();
-  		m_noVerMappings = new Hashtable<Integer, PortMapping>();
-    }
-    else
-      setEnabled( false);
-	}
-
-	/**
-	 * Return the server port
-	 *
-	 * @return int
-	 */
-	public final int getPort() {
-	  return m_port;
-	}
-
-  /**
-   * Return the NFS configuration section
-   *
-   * @return NFSConfigSection
-   */
-  private final NFSConfigSection getNFSConfiguration() {
-    return m_nfsConfig;
-  }
-
-  /**
-   * Start the portmapper server
-   */
-  public void startServer() {
-
-    try {
-
-      //	Create the UDP RPC handler to accept incoming requests
-
-	    m_udpHandler = new UdpRpcDatagramHandler("PortMap", "Port", this, this, null, getPort(), MaxRequestSize);
-	    m_udpHandler.initializeSessionHandler(this);
-
-	    //	Start the UDP request listener is a seperate thread
-
-	    Thread udpThread = new Thread(m_udpHandler);
-	    udpThread.setName("PortMap_UDP");
-	    udpThread.start();
-
-	    //	Create the TCP RPC handler to accept incoming requests
-
-	    m_tcpHandler = new TcpRpcSessionHandler("PortMap", "Port", this, this, null, getPort(), MaxRequestSize);
-	    m_tcpHandler.initializeSessionHandler(this);
-
-	    //	Start the UDP request listener is a seperate thread
-
-	    Thread tcpThread = new Thread(m_tcpHandler);
-	    tcpThread.setName("PortMap_TCP");
-	    tcpThread.start();
-
-	    //	Add port mapper entries for the portmapper service
-
-	    PortMapping portMap = new PortMapping(PortMapper.ProgramId, PortMapper.VersionId, Rpc.UDP, getPort());
-	    addPortMapping(portMap);
-
-	    portMap = new PortMapping(PortMapper.ProgramId, PortMapper.VersionId, Rpc.TCP, getPort());
-	    addPortMapping(portMap);
-    }
-    catch (Exception ex) {
-      Debug.println(ex);
-    }
-  }
-
-  /**
-   * Shutdown the server
-   *
-   * @param immediate boolean
-   */
-  public void shutdownServer(boolean immediate) {
-
-    //	Stop the RPC handlers
-
-    if ( m_udpHandler != null) {
-      m_udpHandler.closeSessionHandler(this);
-      m_udpHandler = null;
+            // Create the mappings tables
+            m_mappings = new Hashtable<Integer, PortMapping>();
+            m_noVerMappings = new Hashtable<Integer, PortMapping>();
+        } else {
+            setEnabled(false);
+        }
     }
 
-    if ( m_tcpHandler != null) {
-      m_tcpHandler.closeSessionHandler(this);
-      m_tcpHandler = null;
+    /**
+     * Return the server port
+     *
+     * @return int
+     */
+    public final int getPort() {
+        return m_port;
     }
 
-    //	Fire a shutdown notification event
-
-    fireServerEvent(ServerListener.ServerShutdown);
-  }
-
-  /**
-   * Set the server port
-   *
-   * @param port int
-   */
-  public final void setPort(int port) {
-    m_port = port;
-  }
-
-  /**
-   * Process an RPC request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   * @throws IOException
-   */
-  public RpcPacket processRpc(RpcPacket rpc)
-  	throws IOException {
-
-    //	Validate the request
-
-    if ( rpc.getProgramId() != PortMapper.ProgramId) {
-
-      //	Request is not for us
-
-      rpc.buildAcceptErrorResponse(Rpc.StsProgUnavail);
-      return rpc;
-    }
-    else if ( rpc.getProgramVersion() != PortMapper.VersionId) {
-
-      //	Request is not for this version of portmapper
-
-      rpc.buildProgramMismatchResponse(PortMapper.VersionId, PortMapper.VersionId);
-      return rpc;
+    /**
+     * Return the NFS configuration section
+     *
+     * @return NFSConfigSection
+     */
+    private final NFSConfigSection getNFSConfiguration() {
+        return m_nfsConfig;
     }
 
-    //	Position the RPC buffer pointer at the start of the call parameters
+    /**
+     * Start the portmapper server
+     */
+    @Override
+    public void startServer() {
+        try {
+            // Create the UDP RPC handler to accept incoming requests
+            m_udpHandler = new UdpRpcDatagramHandler("PortMap", "Port", this, this, null, getPort(), MaxRequestSize);
+            m_udpHandler.initializeSessionHandler(this);
 
-    rpc.positionAtParameters();
+            // Start the UDP request listener is a seperate thread
+            final Thread udpThread = new Thread(m_udpHandler);
+            udpThread.setName("PortMap_UDP");
+            udpThread.start();
 
-    //	Process the RPC request
+            // Create the TCP RPC handler to accept incoming requests
+            m_tcpHandler = new TcpRpcSessionHandler("PortMap", "Port", this, this, null, getPort(), MaxRequestSize);
+            m_tcpHandler.initializeSessionHandler(this);
 
-    RpcPacket response = null;
+            // Start the UDP request listener is a seperate thread
+            final Thread tcpThread = new Thread(m_tcpHandler);
+            tcpThread.setName("PortMap_TCP");
+            tcpThread.start();
 
-    switch ( rpc.getProcedureId()) {
+            // Add port mapper entries for the portmapper service
+            PortMapping portMap = new PortMapping(PortMapper.ProgramId, PortMapper.VersionId, Rpc.UDP, getPort());
+            addPortMapping(portMap);
 
-    	//	Null request
-
-    	case PortMapper.ProcNull:
-    	  response = procNull(rpc);
-    	  break;
-
-    	//	Set a port
-
-    	case PortMapper.ProcSet:
-    	  response = procSet(rpc);
-    	  break;
-
-    	//	Release a port
-
-    	case PortMapper.ProcUnSet:
-    	  response = procUnSet(rpc);
-    	  break;
-
-    	//	Get the port for a service
-
-    	case PortMapper.ProcGetPort:
-    	  response = procGetPort(rpc);
-    	  break;
-
-    	//	Dump ports request
-
-    	case PortMapper.ProcDump:
-    	  response = procDump(rpc);
-    	  break;
+            portMap = new PortMapping(PortMapper.ProgramId, PortMapper.VersionId, Rpc.TCP, getPort());
+            addPortMapping(portMap);
+        } catch (final Exception ex) {
+            LOGGER.warn(ex.getMessage(), ex);
+        }
     }
 
-    //	Return the RPC response
+    /**
+     * Shutdown the server
+     *
+     * @param immediate
+     *            boolean
+     */
+    @Override
+    public void shutdownServer(final boolean immediate) {
 
-    return response;
-  }
+        // Stop the RPC handlers
 
-  /**
-   * Process the null request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   */
-  private final RpcPacket procNull(RpcPacket rpc) {
+        if (m_udpHandler != null) {
+            m_udpHandler.closeSessionHandler(this);
+            m_udpHandler = null;
+        }
 
-    //	Build the response
+        if (m_tcpHandler != null) {
+            m_tcpHandler.closeSessionHandler(this);
+            m_tcpHandler = null;
+        }
 
-    rpc.buildResponseHeader();
-    return rpc;
-  }
+        // Fire a shutdown notification event
 
-  /**
-   * Process the set request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   */
-  private final RpcPacket procSet(RpcPacket rpc) {
-
-    //	Get the call parameters
-
-    int progId = rpc.unpackInt();
-    int verId  = rpc.unpackInt();
-    int proto  = rpc.unpackInt();
-    int port   = rpc.unpackInt();
-
-    //	DEBUG
-
-    if ( Debug.EnableInfo && hasDebug())
-      Debug.println("[PortMap] Set port program=" + Rpc.getServiceName(progId) + ", version=" + verId +
-          					", protocol=" + (proto == Rpc.TCP ? "TCP" : "UDP") + ", port=" + port);
-
-    //	Check if the port is already mapped
-
-    PortMapping portMap = findPortMapping(progId, verId, proto);
-    int portAdded = Rpc.False;
-
-    if ( portMap == null) {
-
-      //	Add a mapping for the new service
-
-      portMap = new PortMapping(progId, verId, proto, port);
-      if ( addPortMapping(portMap) == true)
-        portAdded = Rpc.True;
+        fireServerEvent(ServerListener.ServerShutdown);
     }
 
-    //	Check if the service is on the same port as the current port mapping, and it is not
-    //	an attempt to set the port mapper service port.
-
-    else if ( progId != PortMapper.ProgramId && portMap.getPort() == port) {
-
-      //	Settings are the same as the existing service settings so accept it
-
-      portAdded = Rpc.True;
+    /**
+     * Set the server port
+     *
+     * @param port
+     *            int
+     */
+    public final void setPort(final int port) {
+        m_port = port;
     }
 
-    //	Build the response header
+    /**
+     * Process an RPC request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     * @throws IOException
+     */
+    @Override
+    public RpcPacket processRpc(final RpcPacket rpc) throws IOException {
 
-    rpc.buildResponseHeader();
+        // Validate the request
 
-    //	Pack a boolean indicating if the port was added, or not
+        if (rpc.getProgramId() != PortMapper.ProgramId) {
 
-    rpc.packInt(portAdded);
-    rpc.setLength();
+            // Request is not for us
 
-    //	Return the response
+            rpc.buildAcceptErrorResponse(Rpc.StsProgUnavail);
+            return rpc;
+        } else if (rpc.getProgramVersion() != PortMapper.VersionId) {
 
-    return rpc;
-  }
+            // Request is not for this version of portmapper
 
-  /**
-   * Process the unset request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   */
-  private final RpcPacket procUnSet(RpcPacket rpc) {
+            rpc.buildProgramMismatchResponse(PortMapper.VersionId, PortMapper.VersionId);
+            return rpc;
+        }
 
-    //	Get the call parameters
+        // Position the RPC buffer pointer at the start of the call parameters
 
-    int progId = rpc.unpackInt();
-    int verId  = rpc.unpackInt();
-    int proto  = rpc.unpackInt();
-    int port   = rpc.unpackInt();
+        rpc.positionAtParameters();
 
-    //	DEBUG
+        // Process the RPC request
 
-    if ( Debug.EnableInfo && hasDebug())
-      Debug.println("[PortMap] UnSet port program=" + Rpc.getServiceName(progId) + ", version=" + verId +
-          					", protocol=" + (proto == Rpc.TCP ? "TCP" : "UDP") + ", port=" + port);
+        RpcPacket response = null;
 
-    //	Check if the port is mapped, and it is not an attempt to remove a portmapper portt
+        switch (rpc.getProcedureId()) {
 
-    PortMapping portMap = findPortMapping(progId, verId, proto);
-    int portRemoved = Rpc.False;
+            // Null request
 
-    if ( portMap != null && progId != PortMapper.ProgramId) {
+            case PortMapper.ProcNull:
+                response = procNull(rpc);
+                break;
 
-      //	Remove the port mapping
+            // Set a port
 
-      if ( removePortMapping(portMap) == true)
-        portRemoved = Rpc.True;
+            case PortMapper.ProcSet:
+                response = procSet(rpc);
+                break;
+
+            // Release a port
+
+            case PortMapper.ProcUnSet:
+                response = procUnSet(rpc);
+                break;
+
+            // Get the port for a service
+
+            case PortMapper.ProcGetPort:
+                response = procGetPort(rpc);
+                break;
+
+            // Dump ports request
+
+            case PortMapper.ProcDump:
+                response = procDump(rpc);
+                break;
+        }
+
+        // Return the RPC response
+
+        return response;
     }
 
-    //	Build the response header
+    /**
+     * Process the null request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     */
+    private final RpcPacket procNull(final RpcPacket rpc) {
 
-    rpc.buildResponseHeader();
+        // Build the response
 
-    //	Pack a boolean indicating if the port was removed, or not
-
-    rpc.packInt(portRemoved);
-    rpc.setLength();
-
-    //	Return the response
-
-    return rpc;
-  }
-
-  /**
-   * Process the get port request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   */
-  private final RpcPacket procGetPort(RpcPacket rpc) {
-
-    //	Get the call parameters
-
-    int progId = rpc.unpackInt();
-    int verId  = rpc.unpackInt();
-    int proto  = rpc.unpackInt();
-
-    //	Find the required port mapping
-
-    PortMapping portMap = findPortMapping(progId, verId, proto);
-
-    //	DEBUG
-
-    if ( Debug.EnableInfo && hasDebug())
-      Debug.println("[PortMap] Get port program=" + Rpc.getServiceName(progId) + ", version=" + verId +
-          					", protocol=" + (proto == Rpc.TCP ? "TCP" : "UDP") +
-          					", port=" + ( portMap != null ? portMap.getPort() : 0));
-
-    //	Build the response header
-
-    rpc.buildResponseHeader();
-
-    //	Pack the port number of the requested RPC service, or zero if not found
-
-    rpc.packInt(portMap != null ? portMap.getPort() : 0);
-    rpc.setLength();
-
-    //	Return the response
-
-    return rpc;
-  }
-
-  /**
-   * Process the dump request
-   *
-   * @param rpc RpcPacket
-   * @return RpcPacket
-   */
-  private final RpcPacket procDump(RpcPacket rpc) {
-
-    //	DEBUG
-
-    if ( Debug.EnableInfo && hasDebug())
-      Debug.println("[PortMap] Dump ports request from " + rpc.getClientDetails());
-
-    //	Build the response
-
-    rpc.buildResponseHeader();
-
-    //	Pack the active port mappings structures
-
-    Enumeration enm = m_mappings.elements();
-
-    while ( enm.hasMoreElements()) {
-
-      //	Get the current port mapping
-
-      PortMapping portMap = (PortMapping) enm.nextElement();
-
-      //	Pack the port mapping structure
-
-      rpc.packInt(Rpc.True);
-      rpc.packPortMapping(portMap);
+        rpc.buildResponseHeader();
+        return rpc;
     }
 
-    //	Pack the end of list structure, set the response length
+    /**
+     * Process the set request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     */
+    private final RpcPacket procSet(final RpcPacket rpc) {
 
-    rpc.packInt(Rpc.False);
-    rpc.setLength();
+        // Get the call parameters
 
-    //	Return the response
+        final int progId = rpc.unpackInt();
+        final int verId = rpc.unpackInt();
+        final int proto = rpc.unpackInt();
+        final int port = rpc.unpackInt();
 
-    return rpc;
-  }
+        // DEBUG
 
-  /**
-   * Add a port mapping to the active list
-   *
-   * @param portMap PortMapping
-   * @return boolean
-   */
-  private final boolean addPortMapping(PortMapping portMap) {
+        if (LOGGER.isInfoEnabled() && hasDebug()) {
+            LOGGER.info("[PortMap] Set port program=" + Rpc.getServiceName(progId) + ", version=" + verId + ", protocol=" + (proto == Rpc.TCP ? "TCP" : "UDP")
+                    + ", port=" + port);
+        }
 
-    //	Check if there is an existing port mapping that matches the new port
+        // Check if the port is already mapped
 
-    Integer key = new Integer(portMap.hashCode());
-    if ( m_mappings.get(key) != null)
-      return false;
+        PortMapping portMap = findPortMapping(progId, verId, proto);
+        int portAdded = Rpc.False;
 
-    //	Add the port mapping
+        if (portMap == null) {
 
-    m_mappings.put( key, portMap);
+            // Add a mapping for the new service
 
-    //	Add a port mapping with a version id of zero
+            portMap = new PortMapping(progId, verId, proto, port);
+            if (addPortMapping(portMap) == true) {
+                portAdded = Rpc.True;
+            }
+        }
 
-    key = new Integer( PortMapping.generateHashCode(portMap.getProgramId(), 0, portMap.getProtocol()));
-    m_noVerMappings.put ( key, portMap);
+        // Check if the service is on the same port as the current port mapping, and it is not
+        // an attempt to set the port mapper service port.
 
-    //	Indicate that the mapping was added
+        else if (progId != PortMapper.ProgramId && portMap.getPort() == port) {
 
-    return true;
-  }
+            // Settings are the same as the existing service settings so accept it
 
-  /**
-   * Remove a port mapping from the active list
-   *
-   * @param portMap PortMapping
-   * @return boolean
-   */
-  private final boolean removePortMapping(PortMapping portMap) {
+            portAdded = Rpc.True;
+        }
 
-    //	Remove the port mapping from the active lists
+        // Build the response header
 
-    Integer key = new Integer(portMap.hashCode());
-    Object removedObj = m_mappings.remove(key);
+        rpc.buildResponseHeader();
 
-    key = new Integer( PortMapping.generateHashCode(portMap.getProgramId(), 0, portMap.getProtocol()));
-    m_noVerMappings.remove(key);
+        // Pack a boolean indicating if the port was added, or not
 
-    //	Return a status indicating if the mapping was removed
+        rpc.packInt(portAdded);
+        rpc.setLength();
 
-    return removedObj != null ? true : false;
-  }
+        // Return the response
 
-  /**
-   * Search for a port mapping
-   *
-   * @param progId int
-   * @param verId int
-   * @param proto int
-   * @return PortMapping
-   */
-  private final PortMapping findPortMapping(int progId, int verId, int proto) {
-
-    //	Create a key for the RPC service
-
-    Integer key = new Integer(PortMapping.generateHashCode(progId, verId, proto));
-
-    //	Search for the required port mapping, including the version id
-
-    PortMapping portMap = m_mappings.get(key);
-    if ( portMap == null && verId == 0) {
-
-      //	Search for the port mapping without the version id
-
-      portMap = m_noVerMappings.get(key);
+        return rpc;
     }
 
-    //	Return the port mapping, or null if not found
+    /**
+     * Process the unset request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     */
+    private final RpcPacket procUnSet(final RpcPacket rpc) {
 
-    return portMap;
-  }
+        // Get the call parameters
+
+        final int progId = rpc.unpackInt();
+        final int verId = rpc.unpackInt();
+        final int proto = rpc.unpackInt();
+        final int port = rpc.unpackInt();
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug()) {
+            LOGGER.info("[PortMap] UnSet port program=" + Rpc.getServiceName(progId) + ", version=" + verId + ", protocol="
+                    + (proto == Rpc.TCP ? "TCP" : "UDP") + ", port=" + port);
+        }
+
+        // Check if the port is mapped, and it is not an attempt to remove a portmapper portt
+
+        final PortMapping portMap = findPortMapping(progId, verId, proto);
+        int portRemoved = Rpc.False;
+
+        if (portMap != null && progId != PortMapper.ProgramId) {
+
+            // Remove the port mapping
+
+            if (removePortMapping(portMap) == true) {
+                portRemoved = Rpc.True;
+            }
+        }
+
+        // Build the response header
+
+        rpc.buildResponseHeader();
+
+        // Pack a boolean indicating if the port was removed, or not
+
+        rpc.packInt(portRemoved);
+        rpc.setLength();
+
+        // Return the response
+
+        return rpc;
+    }
+
+    /**
+     * Process the get port request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     */
+    private final RpcPacket procGetPort(final RpcPacket rpc) {
+        // Get the call parameters
+        final int progId = rpc.unpackInt();
+        final int verId = rpc.unpackInt();
+        final int proto = rpc.unpackInt();
+
+        // Find the required port mapping
+        final PortMapping portMap = findPortMapping(progId, verId, proto);
+        if (LOGGER.isInfoEnabled() && hasDebug()) {
+            LOGGER.info("[PortMap] Get port program=" + Rpc.getServiceName(progId) + ", version=" + verId + ", protocol=" + (proto == Rpc.TCP ? "TCP" : "UDP")
+                    + ", port=" + (portMap != null ? portMap.getPort() : 0));
+        }
+
+        // Build the response header
+        rpc.buildResponseHeader();
+
+        // Pack the port number of the requested RPC service, or zero if not found
+        rpc.packInt(portMap != null ? portMap.getPort() : 0);
+        rpc.setLength();
+
+        // Return the response
+        return rpc;
+    }
+
+    /**
+     * Process the dump request
+     *
+     * @param rpc
+     *            RpcPacket
+     * @return RpcPacket
+     */
+    private final RpcPacket procDump(final RpcPacket rpc) {
+        if (LOGGER.isInfoEnabled() && hasDebug()) {
+            LOGGER.info("[PortMap] Dump ports request from " + rpc.getClientDetails());
+        }
+
+        // Build the response
+        rpc.buildResponseHeader();
+
+        // Pack the active port mappings structures
+        final Enumeration<PortMapping> enm = m_mappings.elements();
+        while (enm.hasMoreElements()) {
+            // Get the current port mapping
+            final PortMapping portMap = (PortMapping) enm.nextElement();
+
+            // Pack the port mapping structure
+            rpc.packInt(Rpc.True);
+            rpc.packPortMapping(portMap);
+        }
+
+        // Pack the end of list structure, set the response length
+        rpc.packInt(Rpc.False);
+        rpc.setLength();
+
+        // Return the response
+        return rpc;
+    }
+
+    /**
+     * Add a port mapping to the active list
+     *
+     * @param portMap
+     *            PortMapping
+     * @return boolean
+     */
+    private final boolean addPortMapping(final PortMapping portMap) {
+        // Check if there is an existing port mapping that matches the new port
+        Integer key = new Integer(portMap.hashCode());
+        if (m_mappings.get(key) != null) {
+            return false;
+        }
+
+        // Add the port mapping
+        m_mappings.put(key, portMap);
+
+        // Add a port mapping with a version id of zero
+        key = new Integer(PortMapping.generateHashCode(portMap.getProgramId(), 0, portMap.getProtocol()));
+        m_noVerMappings.put(key, portMap);
+
+        // Indicate that the mapping was added
+        return true;
+    }
+
+    /**
+     * Remove a port mapping from the active list
+     *
+     * @param portMap
+     *            PortMapping
+     * @return boolean
+     */
+    private final boolean removePortMapping(final PortMapping portMap) {
+        // Remove the port mapping from the active lists
+        Integer key = new Integer(portMap.hashCode());
+        final Object removedObj = m_mappings.remove(key);
+
+        key = new Integer(PortMapping.generateHashCode(portMap.getProgramId(), 0, portMap.getProtocol()));
+        m_noVerMappings.remove(key);
+
+        // Return a status indicating if the mapping was removed
+        return removedObj != null ? true : false;
+    }
+
+    /**
+     * Search for a port mapping
+     *
+     * @param progId
+     *            int
+     * @param verId
+     *            int
+     * @param proto
+     *            int
+     * @return PortMapping
+     */
+    private final PortMapping findPortMapping(final int progId, final int verId, final int proto) {
+        // Create a key for the RPC service
+        final Integer key = new Integer(PortMapping.generateHashCode(progId, verId, proto));
+
+        // Search for the required port mapping, including the version id
+        PortMapping portMap = m_mappings.get(key);
+        if (portMap == null && verId == 0) {
+            // Search for the port mapping without the version id
+            portMap = m_noVerMappings.get(key);
+        }
+
+        // Return the port mapping, or null if not found
+        return portMap;
+    }
 }
