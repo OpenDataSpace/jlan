@@ -29,80 +29,75 @@ import org.springframework.extensions.config.ConfigElement;
  */
 public class IpAddressAccessControlParser extends AccessControlParser {
 
-	/**
-	 * Default constructor
-	 */
-	public IpAddressAccessControlParser() {
-	}
+    /**
+     * Default constructor
+     */
+    public IpAddressAccessControlParser() {
+    }
 
-	/**
-	 * Return the parser type
-	 *
-	 * @return String
-	 */
-	public String getType() {
-		return "address";
-	}
+    /**
+     * Return the parser type
+     *
+     * @return String
+     */
+    @Override
+    public String getType() {
+        return "address";
+    }
 
-	/**
-	 * Validate the parameters and create an address access control
-	 *
-	 * @param params ConfigElement
-	 * @return AccessControl
-	 * @throws ACLParseException
-	 */
-	public AccessControl createAccessControl(ConfigElement params)
-		throws ACLParseException {
+    /**
+     * Validate the parameters and create an address access control
+     *
+     * @param params
+     *            ConfigElement
+     * @return AccessControl
+     * @throws ACLParseException
+     */
+    @Override
+    public AccessControl createAccessControl(final ConfigElement params) throws ACLParseException {
+        // Get the access type
+        final int access = parseAccessType(params);
 
-		//	Get the access type
+        // Check if the single IP address format has been specified
+        String val = params.getAttribute("ip");
+        if (val != null) {
+            // Validate the parameters
+            if (val.length() == 0 || IPAddress.isNumericAddress(val) == false) {
+                throw new ACLParseException("Invalid IP address, " + val);
+            }
 
-		int access = parseAccessType(params);
+            if (params.getAttributeCount() != 2) {
+                throw new ACLParseException("Invalid parameter(s) specified for address");
+            }
 
-		//	Check if the single IP address format has been specified
+            // Create a single TCP/IP address access control rule
+            return new IpAddressAccessControl(val, null, getType(), access);
+        }
 
-		String val = params.getAttribute("ip");
-		if ( val != null) {
+        // Check if a subnet address and mask have been specified
+        val = params.getAttribute("subnet");
+        if (val != null) {
+            // Get the network mask parameter
+            final String maskVal = params.getAttribute("mask");
 
-			//	Validate the parameters
+            // Validate the parameters
+            if (maskVal == null || maskVal.length() == 0) {
+                throw new ACLParseException("Invalid subnet/mask parameter");
+            }
 
-			if ( val.length() == 0 || IPAddress.isNumericAddress(val) == false)
-				throw new ACLParseException("Invalid IP address, " + val);
+            if (IPAddress.isNumericAddress(val) == false) {
+                throw new ACLParseException("Invalid subnet parameter, " + val);
+            }
 
-			if ( params.getAttributeCount() != 2)
-				throw new ACLParseException("Invalid parameter(s) specified for address");
+            if (IPAddress.isNumericAddress(maskVal) == false) {
+                throw new ACLParseException("Invalid mask parameter, " + maskVal);
+            }
 
-			//	Create a single TCP/IP address access control rule
+            // Create a subnet address access control rule
+            return new IpAddressAccessControl(val, maskVal, getType(), access);
+        }
 
-			return new IpAddressAccessControl(val, null, getType(), access);
-		}
-
-		//	Check if a subnet address and mask have been specified
-
-		val = params.getAttribute("subnet");
-		if ( val != null) {
-
-			//	Get the network mask parameter
-
-			String maskVal = params.getAttribute("mask");
-
-			//	Validate the parameters
-
-			if ( maskVal.length() == 0 || maskVal == null)
-				throw new ACLParseException("Invalid subnet/mask parameter");
-
-			if ( IPAddress.isNumericAddress(val) == false)
-				throw new ACLParseException("Invalid subnet parameter, " + val);
-
-			if ( IPAddress.isNumericAddress(maskVal) == false)
-				throw new ACLParseException("Invalid mask parameter, " + maskVal);
-
-			//	Create a subnet address access control rule
-
-			return new IpAddressAccessControl(val, maskVal, getType(), access);
-		}
-
-		//	Invalid parameters
-
-		throw new ACLParseException("Unknown address parameter(s)");
-	}
+        // Invalid parameters
+        throw new ACLParseException("Unknown address parameter(s)");
+    }
 }
