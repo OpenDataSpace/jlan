@@ -52,12 +52,11 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.SSLEngineResult;
+import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.SSLEngineResult.HandshakeStatus;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.server.auth.ClientInfo;
 import org.alfresco.jlan.server.auth.acl.AccessControl;
@@ -184,7 +183,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
     private OutputStreamWriter m_out;
 
     // List of pending FTP commands
-    private List<FTPRequest> m_ftpCmdList;
+    private final List<FTPRequest> m_ftpCmdList;
 
     // Data connection
     private FTPDataSession m_dataSess;
@@ -202,7 +201,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
     // Flag to indicate if UTF-8 paths are enabled
     private boolean m_utf8Paths = true;
-    private UTF8Normalizer m_normalizer;
+    private final UTF8Normalizer m_normalizer;
 
     // Machine listing fact list
     private int m_mlstFacts = MLST_DEFAULT;
@@ -214,7 +213,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
     private SharedDeviceList m_shares;
 
     // List of shared device connections used by this session
-    private TreeConnectionHash m_connections;
+    private final TreeConnectionHash m_connections;
 
     // SSL/TLS testing
     private SSLContext m_sslContext;
@@ -225,7 +224,6 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
     // Protected buffer size and protection level
     private int m_pbSize = -1;
-    private String m_protLevel;
 
     /**
      * Class constructor
@@ -235,7 +233,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      * @param srv
      *            FTPServer
      */
-    public FTPSrvSession(Socket sock, FTPServer srv) {
+    public FTPSrvSession(final Socket sock, final FTPServer srv) {
         super(-1, srv, "FTP", null);
         // Save the local socket
         m_sock = sock;
@@ -243,7 +241,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Set the socket linger options, so the socket closes immediately when closed
         try {
             m_sock.setSoLinger(false, 0);
-        } catch (SocketException ex) {
+        } catch (final SocketException ex) {
         }
 
         // Indicate that the user is not logged in
@@ -265,6 +263,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
     /**
      * Close the FTP session, and associated data socket if active
      */
+    @Override
     public final void closeSession() {
         // Call the base class
         super.closeSession();
@@ -278,7 +277,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Check if there is an active transaction
         if (hasTransaction()) {
             if (LOGGER.isErrorEnabled()) {
-                debugPrintln("** Active transaction after packet processing, cleaning up **");
+                LOGGER.error("** Active transaction after packet processing, cleaning up **");
             }
 
             // Close the active transaction
@@ -290,7 +289,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         if (m_sock != null) {
             try {
                 m_sock.close();
-            } catch (Exception ex) {
+            } catch (final Exception ex) {
             }
             m_sock = null;
         }
@@ -299,7 +298,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         if (m_in != null) {
             try {
                 m_in.close();
-            } catch (Exception ex) {
+            } catch (final Exception ex) {
             }
             m_in = null;
         }
@@ -307,7 +306,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         if (m_out != null) {
             try {
                 m_out.close();
-            } catch (Exception ex) {
+            } catch (final Exception ex) {
             }
             m_out = null;
         }
@@ -316,7 +315,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         getFTPServer().removeSession(this);
 
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
-            debugPrintln("Session closed, " + getSessionId());
+            LOGGER.info("Session closed, " + getSessionId());
         }
     }
 
@@ -343,6 +342,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *
      * @return InetAddress
      */
+    @Override
     public final InetAddress getRemoteAddress() {
         return m_sock.getInetAddress();
     }
@@ -371,7 +371,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      * @param rootPath
      *            FTPPath
      */
-    public final void setRootPath(FTPPath rootPath) {
+    public final void setRootPath(final FTPPath rootPath) {
         // Initialize the current working directory using the root path
         m_cwd = new FTPPath(rootPath);
         m_cwd.setSharedDevice(getShareList(), this);
@@ -386,7 +386,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            boolean
      * @return FTPPath
      */
-    protected final FTPPath generatePathForRequest(FTPRequest req, boolean filePath) {
+    protected final FTPPath generatePathForRequest(final FTPRequest req, final boolean filePath) {
         return generatePathForRequest(req, filePath, true);
     }
 
@@ -401,7 +401,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            boolean
      * @return FTPPath
      */
-    protected final FTPPath generatePathForRequest(FTPRequest req, boolean filePath, boolean checkExists) {
+    protected final FTPPath generatePathForRequest(final FTPRequest req, final boolean filePath, final boolean checkExists) {
         // Convert the path from UTF-8, if enabled
         String path = req.getArgument();
 
@@ -413,13 +413,13 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
         if (path.compareTo(ROOT_DIRECTORY) == 0) {
             // Check if the FTP server has a default root directory configured
-            FTPServer ftpSrv = (FTPServer) getServer();
+            final FTPServer ftpSrv = (FTPServer) getServer();
             if (ftpSrv.hasRootPath()) {
                 ftpPath = ftpSrv.getRootPath();
             } else {
                 try {
                     ftpPath = new FTPPath("/");
-                } catch (Exception ex) {
+                } catch (final Exception ex) {
                 }
                 return ftpPath;
             }
@@ -430,7 +430,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             // Create a new path for the directory
             try {
                 ftpPath = new FTPPath(path);
-            } catch (InvalidPathException ex) {
+            } catch (final InvalidPathException ex) {
                 return null;
             }
 
@@ -469,7 +469,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                 // Path specifies the share name and possibly a subdirectory
                 try {
                     ftpPath.setFTPPath(FTP_SEPERATOR + path);
-                } catch (InvalidPathException ex) {
+                } catch (final InvalidPathException ex) {
                     return null;
                 }
             } else {
@@ -499,7 +499,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                 disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
 
                 // Check if the path exists
-                int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+                final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
                 if (sts == FileStatus.NotExist) {
                     // Get the path string, check if there is a leading seperator
                     String pathStr = req.getArgument();
@@ -523,7 +523,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                     // Path exists but is the wrong type (directory or file)
                     ftpPath = null;
                 }
-            } catch (Exception ex) {
+            } catch (final Exception ex) {
                 ftpPath = null;
             }
         }
@@ -539,7 +539,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @return String
      */
-    protected final String convertToFTPSeperators(String path) {
+    protected final String convertToFTPSeperators(final String path) {
         // Check if the path is valid
         if (path == null || path.indexOf(DIR_SEPERATOR) == -1) {
             return path;
@@ -556,14 +556,14 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @return DiskSharedDevice
      */
-    protected final DiskSharedDevice findShare(String name) {
+    protected final DiskSharedDevice findShare(final String name) {
         // Check if the name is valid
         if (name == null) {
             return null;
         }
 
         // Find the required disk share
-        SharedDevice shr = getFTPServer().getShareList().findShare(m_cwd.getShareName(), ShareType.DISK, true);
+        final SharedDevice shr = getFTPServer().getShareList().findShare(m_cwd.getShareName(), ShareType.DISK, true);
 
         if (shr != null && shr instanceof DiskSharedDevice) {
             return (DiskSharedDevice) shr;
@@ -579,7 +579,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      * @param bin
      *            boolean
      */
-    protected final void setBinary(boolean bin) {
+    protected final void setBinary(final boolean bin) {
         m_binary = bin;
     }
 
@@ -592,9 +592,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @exception IOException
      */
-    public final void sendFTPResponse(int stsCode, String msg) throws IOException {
+    public final void sendFTPResponse(final int stsCode, final String msg) throws IOException {
         // Build the output record
-        StringBuffer outbuf = new StringBuffer(10 + (msg != null ? msg.length() : 0));
+        final StringBuffer outbuf = new StringBuffer(10 + (msg != null ? msg.length() : 0));
         outbuf.append(stsCode);
         outbuf.append(" ");
         if (msg != null) {
@@ -602,11 +602,11 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         }
 
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_TXDATA)) {
-            debugPrintln("Tx msg=" + outbuf.toString());
+            LOGGER.info("Tx msg=" + outbuf.toString());
         }
 
         if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR) && stsCode >= 500) {
-            debugPrintln("Error status=" + stsCode + ", msg=" + msg);
+            LOGGER.error("Error status=" + stsCode + ", msg=" + msg);
         }
 
         // Add the CR/LF
@@ -635,9 +635,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @exception IOException
      */
-    public final void sendUnencryptedFTPResponse(int stsCode, String msg) throws IOException {
+    public final void sendUnencryptedFTPResponse(final int stsCode, final String msg) throws IOException {
         // Build the output record
-        StringBuffer outbuf = new StringBuffer(10 + (msg != null ? msg.length() : 0));
+        final StringBuffer outbuf = new StringBuffer(10 + (msg != null ? msg.length() : 0));
         outbuf.append(stsCode);
         outbuf.append(" ");
 
@@ -646,11 +646,11 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         }
 
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_TXDATA)) {
-            debugPrintln("Tx msg=" + outbuf.toString());
+            LOGGER.info("Tx msg=" + outbuf.toString());
         }
 
         if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR) && stsCode >= 500) {
-            debugPrintln("Error status=" + stsCode + ", msg=" + msg);
+            LOGGER.error("Error status=" + stsCode + ", msg=" + msg);
         }
 
         // Add the CR/LF
@@ -670,7 +670,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            StringBuffer
      * @exception IOException
      */
-    public final void sendFTPResponse(StringBuffer msg) throws IOException {
+    public final void sendFTPResponse(final StringBuffer msg) throws IOException {
         sendFTPResponse(msg.toString());
     }
 
@@ -681,9 +681,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @exception IOException
      */
-    public final void sendFTPResponse(String msg) throws IOException {
+    public final void sendFTPResponse(final String msg) throws IOException {
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_TXDATA)) {
-            debugPrintln("Tx msg=" + msg);
+            LOGGER.info("Tx msg=" + msg);
         }
 
         // Output the FTP response
@@ -691,7 +691,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             // Check if the response should be encrypted
             if (m_sslEngine != null) {
                 // Encrypt the response
-                StringBuilder str = new StringBuilder(msg.length() + CRLF.length());
+                final StringBuilder str = new StringBuilder(msg.length() + CRLF.length());
                 str.append(msg);
                 str.append(CRLF);
 
@@ -712,9 +712,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            String
      * @exception IOException
      */
-    protected final void sendEncryptedFTPResponse(String msg) throws IOException {
+    protected final void sendEncryptedFTPResponse(final String msg) throws IOException {
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_TXDATA)) {
-            debugPrintln("Tx msg=" + msg);
+            LOGGER.info("Tx msg=" + msg);
         }
 
         // Output the FTP response
@@ -722,14 +722,13 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             // Check if the response should be encrypted
             if (m_sslEngine != null) {
                 // Encrypt the response
-                byte[] respByts = msg.getBytes();
-                ByteBuffer inByts = ByteBuffer.wrap(respByts, 0, respByts.length);
+                final byte[] respByts = msg.getBytes();
+                final ByteBuffer inByts = ByteBuffer.wrap(respByts, 0, respByts.length);
 
                 m_sslOut.position(0);
                 m_sslOut.limit(m_sslOut.capacity());
 
-                // Decrypt the received data
-                SSLEngineResult sslRes = m_sslEngine.wrap(inByts, m_sslOut);
+                m_sslEngine.wrap(inByts, m_sslOut);
 
                 if (m_sslEngine.getHandshakeStatus() == SSLEngineResult.HandshakeStatus.NEED_TASK) {
                     Runnable task;
@@ -753,7 +752,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            FTPRequest
      * @exception IOException
      */
-    protected final void procUser(FTPRequest req) throws IOException {
+    protected final void procUser(final FTPRequest req) throws IOException {
         // Clear the current client information
         setClientInformation(null);
         setLoggedOn(false);
@@ -774,7 +773,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Check for an anonymous login
         if (getFTPServer().allowAnonymous() == true && req.getArgument().equalsIgnoreCase(getFTPServer().getAnonymousAccount())) {
             // Anonymous login, create guest client information
-            ClientInfo cinfo = ClientInfo.createInfo(getFTPServer().getAnonymousAccount(), null);
+            final ClientInfo cinfo = ClientInfo.createInfo(getFTPServer().getAnonymousAccount(), null);
             cinfo.setGuest(true);
             setClientInformation(cinfo);
 
@@ -797,7 +796,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            FTPRequest
      * @exception IOException
      */
-    protected final void procPassword(FTPRequest req) throws IOException {
+    protected final void procPassword(final FTPRequest req) throws IOException {
         // Check if the client information has been set, this indicates a user command has been
         // received
         if (hasClientInformation() == false) {
@@ -815,7 +814,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             sendFTPResponse(230, "User logged in, proceed");
 
             if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
-                debugPrintln("Anonymous login, info=" + req.getArgument());
+                LOGGER.info("Anonymous login, info=" + req.getArgument());
             }
         }
 
@@ -825,20 +824,20 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             getClientInformation().setPassword(req.getArgument());
 
             // Authenticate the user
-            FTPAuthenticator auth = getFTPServer().getFTPConfiguration().getFTPAuthenticator();
+            final FTPAuthenticator auth = getFTPServer().getFTPConfiguration().getFTPAuthenticator();
 
             if (auth.authenticateUser(getClientInformation(), this) == true) {
                 // User successfully logged on
                 sendFTPResponse(230, "User logged in, proceed");
                 setLoggedOn(true);
                 if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
-                    debugPrintln("User " + getClientInformation().getUserName() + ", logon successful");
+                    LOGGER.info("User " + getClientInformation().getUserName() + ", logon successful");
                 }
             } else {
                 // Return an access denied error
                 sendFTPResponse(530, "Access denied");
                 if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
-                    debugPrintln("User " + getClientInformation().getUserName() + ", logon failed");
+                    LOGGER.info("User " + getClientInformation().getUserName() + ", logon failed");
                 }
             }
         }
@@ -856,7 +855,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            FTPRequest
      * @exception IOException
      */
-    protected final void procPort(FTPRequest req) throws IOException {
+    protected final void procPort(final FTPRequest req) throws IOException {
         // Check if the user is logged in
         if (isLoggedOn() == false) {
             sendFTPNotLoggedOnResponse();
@@ -870,18 +869,18 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         }
 
         // Parse the address/port string into a IP address and port
-        StringTokenizer token = new StringTokenizer(req.getArgument(), ",");
+        final StringTokenizer token = new StringTokenizer(req.getArgument(), ",");
         if (token.countTokens() != 6) {
             sendFTPResponse(501, "Invalid argument");
             return;
         }
 
         // Parse the client address
-        String addrStr = token.nextToken() + "." + token.nextToken() + "." + token.nextToken() + "." + token.nextToken();
+        final String addrStr = token.nextToken() + "." + token.nextToken() + "." + token.nextToken() + "." + token.nextToken();
         InetAddress addr = null;
         try {
             addr = InetAddress.getByName(addrStr);
-        } catch (UnknownHostException ex) {
+        } catch (final UnknownHostException ex) {
             sendFTPResponse(501, "Invalid argument (address)");
             return;
         }
@@ -891,7 +890,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         try {
             port = Integer.parseInt(token.nextToken()) * 256;
             port += Integer.parseInt(token.nextToken());
-        } catch (NumberFormatException ex) {
+        } catch (final NumberFormatException ex) {
             sendFTPResponse(501, "Invalid argument (port)");
             return;
         }
@@ -899,7 +898,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Check if there is an existing data session
         if (m_dataSess != null) {
             if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
-                debugPrintln("Releasing existing data session, sess=" + m_dataSess);
+                LOGGER.info("Releasing existing data session, sess=" + m_dataSess);
             }
 
             // Release the current data session
@@ -914,7 +913,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         sendFTPResponse(200, "Port OK");
 
         if (LOGGER.isDebugEnabled() && hasDebug(DBG_DATAPORT)) {
-            debugPrintln("Port open addr=" + addr + ", port=" + port);
+            LOGGER.debug("Port open addr=" + addr + ", port=" + port);
         }
     }
 
@@ -925,7 +924,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
      *            FTPRequest
      * @exception IOException
      */
-    protected final void procPassive(FTPRequest req) throws IOException {
+    protected final void procPassive(final FTPRequest req) throws IOException {
         // Check if the user is logged in
         if (isLoggedOn() == false) {
             sendFTPNotLoggedOnResponse();
@@ -935,7 +934,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Check if there is an existing data session
         if (m_dataSess != null) {
             if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
-                debugPrintln("Releasing existing data session, sess=" + m_dataSess);
+                LOGGER.info("Releasing existing data session, sess=" + m_dataSess);
             }
 
             // Release the current data session
@@ -946,7 +945,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         // Create a passive data session
         try {
             m_dataSess = getFTPServer().allocatePassiveDataSession(this, m_sock.getLocalAddress());
-        } catch (IOException ex) {
+        } catch (final IOException ex) {
             m_dataSess = null;
         }
 
@@ -957,9 +956,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         }
 
         // Get the passive connection address/port and return to the client
-        int pasvPort = m_dataSess.getPassivePort();
+        final int pasvPort = m_dataSess.getPassivePort();
 
-        StringBuffer msg = new StringBuffer();
+        final StringBuffer msg = new StringBuffer();
 
         msg.append("227 Entering Passive Mode (");
         msg.append(getLocalFTPAddressString());
@@ -972,2958 +971,2920 @@ public class FTPSrvSession extends SrvSession implements Runnable {
         sendFTPResponse(msg);
 
         if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
-            debugPrintln("Passive open addr=" + m_sock.getLocalAddress() + ", port=" + pasvPort);
+            LOGGER.info("Passive open addr=" + m_sock.getLocalAddress() + ", port=" + pasvPort);
         }
     }
 
-	/**
-	 * Process a print working directory command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procPrintWorkDir(FTPRequest req)
-		throws IOException {
-		// Check if the user is logged in
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+    /**
+     * Process a print working directory command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procPrintWorkDir(final FTPRequest req) throws IOException {
+        // Check if the user is logged in
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		// Return the current working directory virtual path
-		sendFTPResponse(257, "\"" + m_cwd.getFTPPath() + "\"");
+        // Return the current working directory virtual path
+        sendFTPResponse(257, "\"" + m_cwd.getFTPPath() + "\"");
 
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY))
-			debugPrintln("Pwd ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
-	}
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY)) {
+            LOGGER.info("Pwd ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
+        }
+    }
 
-	/**
-	 * Process a change working directory command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procChangeWorkDir(FTPRequest req)
-		throws IOException {
-		// Check if the user is logged in
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+    /**
+     * Process a change working directory command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procChangeWorkDir(final FTPRequest req) throws IOException {
+        // Check if the user is logged in
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		// Check if the request has a valid argument
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Path not specified");
-			return;
-		}
+        // Check if the request has a valid argument
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Path not specified");
+            return;
+        }
 
-		// Create the new working directory path
-		FTPPath newPath = generatePathForRequest(req, false, true);
-		if ( newPath == null) {
-			sendFTPResponse(550, "Invalid path " + req.getArgument());
-			return;
-		}
+        // Create the new working directory path
+        final FTPPath newPath = generatePathForRequest(req, false, true);
+        if (newPath == null) {
+            sendFTPResponse(550, "Invalid path " + req.getArgument());
+            return;
+        }
 
-		// Set the new current working directory
-		m_cwd = newPath;
+        // Set the new current working directory
+        m_cwd = newPath;
 
-		// Return a success status
-		sendFTPResponse(250, "Requested file action OK");
+        // Return a success status
+        sendFTPResponse(250, "Requested file action OK");
 
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY))
-			debugPrintln("Cwd ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
-	}
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY)) {
+            LOGGER.info("Cwd ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
+        }
+    }
 
-	/**
-	 * Process a change directory up command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procCdup(FTPRequest req)
-		throws IOException {
-		// Check if the user is logged in
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+    /**
+     * Process a change directory up command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procCdup(final FTPRequest req) throws IOException {
+        // Check if the user is logged in
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		// Check if there is a current working directory path
-		if ( m_cwd.isRootPath()) {
-			// Already at the root directory, return an error status
-			sendFTPResponse(550, "Already at root directory");
-			return;
-		}		else {
-			// Remove the last directory from the path
-			m_cwd.removeDirectory();
-			if ( m_cwd.isRootPath() == false && m_cwd.getSharedDevice() == null)
-				m_cwd.setSharedDevice(getShareList(), this);
-		}
+        // Check if there is a current working directory path
+        if (m_cwd.isRootPath()) {
+            // Already at the root directory, return an error status
+            sendFTPResponse(550, "Already at root directory");
+            return;
+        } else {
+            // Remove the last directory from the path
+            m_cwd.removeDirectory();
+            if (m_cwd.isRootPath() == false && m_cwd.getSharedDevice() == null) {
+                m_cwd.setSharedDevice(getShareList(), this);
+            }
+        }
 
-		// Return a success status
-		sendFTPResponse(250, "Requested file action OK");
+        // Return a success status
+        sendFTPResponse(250, "Requested file action OK");
 
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY))
-			debugPrintln("Cdup ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
-	}
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY)) {
+            LOGGER.info("Cdup ftp=" + m_cwd.getFTPPath() + ", share=" + m_cwd.getShareName() + ", path=" + m_cwd.getSharePath());
+        }
+    }
 
-	/**
-	 * Process a long directory listing command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procList(FTPRequest req)
-		throws IOException {
+    /**
+     * Process a long directory listing command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procList(final FTPRequest req) throws IOException {
 
-		// Check if the user is logged in
+        // Check if the user is logged in
 
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		// Check if the client has requested hidden files, via the '-a' option
+        // Check if the client has requested hidden files, via the '-a' option
 
-		boolean hidden = false;
+        boolean hidden = false;
 
-		if ( req.hasArgument() && req.getArgument().startsWith(LIST_OPTION_PREFIX)) {
+        if (req.hasArgument() && req.getArgument().startsWith(LIST_OPTION_PREFIX)) {
 
-			// We only support the hidden files option
+            // We only support the hidden files option
 
-			String arg = req.getArgument();
-			if ( arg.indexOf(LIST_OPTION_HIDDEN) != -1) {
+            String arg = req.getArgument();
+            if (arg.indexOf(LIST_OPTION_HIDDEN) != -1) {
 
-				// Indicate that we want hidden files in the listing
+                // Indicate that we want hidden files in the listing
 
-				hidden = true;
-			}
+                hidden = true;
+            }
 
-			// Remove the option from the command argument, and update the
-			// request
+            // Remove the option from the command argument, and update the
+            // request
 
-			int pos = arg.indexOf(" ");
-			if ( pos > 0)
-				arg = arg.substring(pos + 1);
-			else
-				arg = null;
+            final int pos = arg.indexOf(" ");
+            if (pos > 0) {
+                arg = arg.substring(pos + 1);
+            } else {
+                arg = null;
+            }
 
-			req.updateArgument(arg);
-		}
+            req.updateArgument(arg);
+        }
 
-		// Create the path for the file listing
+        // Create the path for the file listing
 
-		FTPPath ftpPath = m_cwd;
-		if ( req.hasArgument())
-			ftpPath = generatePathForRequest(req, true, false);
+        FTPPath ftpPath = m_cwd;
+        if (req.hasArgument()) {
+            ftpPath = generatePathForRequest(req, true, false);
+        }
 
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
 
-		// Check if the session has the required access
+        // Check if the session has the required access
 
-		if ( ftpPath.isRootPath() == false) {
+        if (ftpPath.isRootPath() == false) {
 
-			// Check if the session has access to the filesystem
+            // Check if the session has access to the filesystem
 
-			TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
-			if ( tree == null || tree.hasReadAccess() == false) {
+            final TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
+            if (tree == null || tree.hasReadAccess() == false) {
 
-				// Session does not have access to the filesystem
+                // Session does not have access to the filesystem
 
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-		}
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+        }
 
-        try
-        {
-            if (ftpPath.hasSharePath() && WildCard.containsWildcards(ftpPath.getSharePath()) == false)
-            {
+        try {
+            if (ftpPath.hasSharePath() && WildCard.containsWildcards(ftpPath.getSharePath()) == false) {
                 // Create a temporary tree connection
-                TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
+                final TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
 
                 // Access the virtual filesystem driver
-                DiskInterface disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+                final DiskInterface disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
 
-                int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+                final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
-                if (sts == FileStatus.NotExist)
-                {
+                if (sts == FileStatus.NotExist) {
                     sendFTPResponse(500, "Invalid path");
                     return;
                 }
 
-                if (sts == FileStatus.DirectoryExists)
-                {
+                if (sts == FileStatus.DirectoryExists) {
                     ftpPath.setDirectory(true);
                 }
 
             }
-        }
-        catch (Exception ex) {
-            if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)) {
-                debugPrintln(" Error reading file list, " + ex.toString());
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error reading file list, " + ex.getMessage(), ex);
             }
-            // always need logging - this is unexpected
-            debugPrintln(ex);
 
             // Failed to send file listing
             sendFTPResponse(451, "Error reading file list");
-    	}
+        }
 
-		// Send the intermediate response
+        // Send the intermediate response
 
-		sendFTPResponse(150, "File status okay, about to open data connection");
+        sendFTPResponse(150, "File status okay, about to open data connection");
 
-		// Check if there is an active data session
+        // Check if there is an active data session
 
-		if ( m_dataSess == null) {
-			sendFTPResponse(425, "Can't open data connection");
-			return;
-		}
+        if (m_dataSess == null) {
+            sendFTPResponse(425, "Can't open data connection");
+            return;
+        }
 
-		// Get the data connection socket
+        // Get the data connection socket
 
-		Socket dataSock = null;
+        Socket dataSock = null;
 
-		try {
-			dataSock = m_dataSess.getSocket();
-		}
-		catch (Exception ex) {
-			debugPrintln(ex);
-		}
+        try {
+            dataSock = m_dataSess.getSocket();
+        } catch (final Exception ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
 
-		if ( dataSock == null) {
-			sendFTPResponse(426, "Connection closed; transfer aborted");
-			return;
-		}
+        if (dataSock == null) {
+            sendFTPResponse(426, "Connection closed; transfer aborted");
+            return;
+        }
 
-		// Output the directory listing to the client
+        // Output the directory listing to the client
 
-		Writer dataWrt = null;
+        Writer dataWrt = null;
 
-		try {
+        try {
 
-			// Open an output stream to the client
+            // Open an output stream to the client
 
-			if ( isUTF8Enabled())
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
-			else
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
-
-			// Check if a path has been specified to list
-
-			Vector<Object> files = null;
-
-			if ( req.hasArgument()) {
-			}
-
-			// Get a list of file information objects for the current directory
-
-			files = listFilesForPath(ftpPath, false, hidden);
-
-			// Output the file list to the client
-
-			if ( files != null) {
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH))
-					debugPrintln("List found " + files.size() + " files in " + ftpPath.getFTPPath());
-
-				// Output the file information to the client
-
-				StringBuffer str = new StringBuffer(256);
-
-				for (int i = 0; i < files.size(); i++) {
-
-					// Get the current file information
-
-					FileInfo finfo = (FileInfo) files.elementAt(i);
-
-					// Build the output record
-
-					str.setLength(0);
-
-					str.append(finfo.isDirectory() ? "d" : "-");
-					str.append("rw-rw-rw-   1 user group ");
-					str.append(finfo.getSize());
-					str.append(" ");
-
-					FTPDate.packUnixDate(str, new Date(finfo.getModifyDateTime()));
-
-					str.append(" ");
-
-					str.append(finfo.getFileName());
-					str.append(CRLF);
-
-					// Output the file information record
-
-					dataWrt.write(str.toString());
-				}
-			}
-
-			// End of file list transmission
-
-			sendFTPResponse(226, "Closing data connection");
-		}
-		catch (Exception ex) {
-            if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-
-                debugPrintln(" Error reading file list, " + ex.toString());
+            if (isUTF8Enabled()) {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
+            } else {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
             }
-            debugPrintln(ex);
 
+            // Check if a path has been specified to list
 
-			// Failed to send file listing
+            Vector<Object> files = null;
 
-			sendFTPResponse(451, "Error reading file list");
-		}
-		finally {
-
-			// Close the data stream to the client
-
-			if ( dataWrt != null)
-				dataWrt.close();
-
-			// Close the data connection to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-		}
-	}
-
-	/**
-	 * Process a short directory listing command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procNList(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Create the path for the file listing
-
-		FTPPath ftpPath = m_cwd;
-		if ( req.hasArgument())
-			ftpPath = generatePathForRequest(req, true);
-
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
-
-		// Check if the session has the required access
-
-		if ( ftpPath.isRootPath() == false) {
-
-			// Check if the session has access to the filesystem
-
-			TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
-			if ( tree == null || tree.hasReadAccess() == false) {
-
-				// Session does not have access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-		}
-
-		// Send the intermediate response
-
-		sendFTPResponse(150, "File status okay, about to open data connection");
-
-		// Check if there is an active data session
-
-		if ( m_dataSess == null) {
-			sendFTPResponse(425, "Can't open data connection");
-			return;
-		}
-
-		// Get the data connection socket
-
-		Socket dataSock = null;
-
-		try {
-			dataSock = m_dataSess.getSocket();
-		}
-		catch (Exception ex) {
-			debugPrintln(ex);
-		}
-
-		if ( dataSock == null) {
-			sendFTPResponse(426, "Connection closed; transfer aborted");
-			return;
-		}
-
-		// Output the directory listing to the client
-
-		Writer dataWrt = null;
-
-		try {
-
-			// Open an output stream to the client
-
-			if ( isUTF8Enabled())
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
-			else
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
-
-			// Check if a path has been specified to list
-
-			Vector files = null;
-
-			if ( req.hasArgument()) {
-			}
-
-			// Get a list of file information objects for the current directory
-
-			files = listFilesForPath(ftpPath, false, false);
-
-			// Output the file list to the client
-
-			if ( files != null) {
-				if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH))
-					debugPrintln("List found " + files.size() + " files in " + ftpPath.getFTPPath());
-
-				// Output the file information to the client
-
-				for (int i = 0; i < files.size(); i++) {
-
-					// Get the current file information
-
-					FileInfo finfo = (FileInfo) files.elementAt(i);
-
-					// Output the file information record
-
-					dataWrt.write(finfo.getFileName());
-					dataWrt.write(CRLF);
-				}
-			}
-
-			// End of file list transmission
-
-			sendFTPResponse(226, "Closing data connection");
-		}
-		catch (Exception ex) {
-            if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error reading file list, " + ex.toString());
+            if (req.hasArgument()) {
             }
-            debugPrintln(ex);
-
-
-			// Failed to send file listing
 
-			sendFTPResponse(451, "Error reading file list");
-		}
-		finally {
-
-			// Close the data stream to the client
-
-			if ( dataWrt != null)
-				dataWrt.close();
-
-			// Close the data connection to the client
+            // Get a list of file information objects for the current directory
 
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-		}
-	}
+            files = listFilesForPath(ftpPath, false, hidden);
 
-	/**
-	 * Process a system status command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procSystemStatus(FTPRequest req)
-		throws IOException {
+            // Output the file list to the client
 
-		// Return the system type
+            if (files != null) {
 
-		sendFTPResponse(215, "UNIX Type: Java FTP Server");
-	}
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH)) {
+                    LOGGER.info("List found " + files.size() + " files in " + ftpPath.getFTPPath());
+                }
 
-	/**
-	 * Process a server status command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procServerStatus(FTPRequest req)
-		throws IOException {
+                // Output the file information to the client
 
-		// Return server status information
+                final StringBuffer str = new StringBuffer(256);
 
-		sendFTPResponse(211, "JLAN Server - Java FTP Server");
-	}
+                for (int i = 0; i < files.size(); i++) {
 
-	/**
-	 * Process a help command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procHelp(FTPRequest req)
-		throws IOException {
+                    // Get the current file information
 
-		// Return help information
+                    final FileInfo finfo = (FileInfo) files.elementAt(i);
 
-		sendFTPResponse(211, "HELP text");
-	}
+                    // Build the output record
 
-	/**
-	 * Process a no-op command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procNoop(FTPRequest req)
-		throws IOException {
+                    str.setLength(0);
 
-		// Return a response
+                    str.append(finfo.isDirectory() ? "d" : "-");
+                    str.append("rw-rw-rw-   1 user group ");
+                    str.append(finfo.getSize());
+                    str.append(" ");
 
-		sendFTPResponse(200, "");
-	}
+                    FTPDate.packUnixDate(str, new Date(finfo.getModifyDateTime()));
 
-	/**
-	 * Process an options request
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procOptions(FTPRequest req)
-		throws IOException {
+                    str.append(" ");
 
-		// Check if the user is logged in
+                    str.append(finfo.getFileName());
+                    str.append(CRLF);
 
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+                    // Output the file information record
 
-		// Check if the parameter has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Required argument missing");
-			return;
-		}
-
-		// Parse the argument to get the sub-command and arguments
-
-		StringTokenizer token = new StringTokenizer(req.getArgument(), " ");
-		if ( token.hasMoreTokens() == false) {
-			sendFTPResponse(501, "Invalid argument");
-			return;
-		}
-
-		// Get the sub-command
-
-		String optsCmd = token.nextToken();
-
-		// UTF8 enable/disable command
-
-		if ( FeatureUTF8 && optsCmd.equalsIgnoreCase("UTF8")) {
-
-			// Get the next argument
-
-			if ( token.hasMoreTokens()) {
-				String optsArg = token.nextToken();
-				if ( optsArg.equalsIgnoreCase("ON")) {
-
-					// Enable UTF-8 file names
-
-					m_utf8Paths = true;
-				}
-				else if ( optsArg.equalsIgnoreCase("OFF")) {
-
-					// Disable UTF-8 file names
-
-					m_utf8Paths = false;
-				}
-				else {
-
-					// Invalid argument
-
-					sendFTPResponse(501, "OPTS UTF8 Invalid argument");
-					return;
-				}
-
-				// Report the new setting back to the client
-
-				sendFTPResponse(200, "OPTS UTF8 " + (isUTF8Enabled() ? "ON" : "OFF"));
-				if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-					debugPrintln("UTF8 options utf8=" + (isUTF8Enabled() ? "ON" : "OFF"));
-			}
-		}
-
-		// MLST/MLSD fact list command
-
-		else if ( FeatureMLST && optsCmd.equalsIgnoreCase("MLST")) {
-
-			// Check if the fact list argument is valid
-
-			if ( token.hasMoreTokens() == false) {
-
-				// Invalid fact list argument
-
-				sendFTPResponse(501, "OPTS MLST Invalid argument");
-				return;
-			}
-
-			// Parse the supplied fact names
-
-			int mlstFacts = 0;
-			StringTokenizer factTokens = new StringTokenizer(token.nextToken(), ";");
-			StringBuffer factStr = new StringBuffer();
-
-			while (factTokens.hasMoreTokens()) {
-
-				// Get the current fact name and validate
-
-				String factName = factTokens.nextToken();
-				int factIdx = -1;
-				int idx = 0;
-
-				while (idx < _factNames.length && factIdx == -1) {
-					if ( _factNames[idx].equalsIgnoreCase(factName))
-						factIdx = idx;
-					else
-						idx++;
-				}
-
-				// Check if the fact name is valid, ignore invalid names
-
-				if ( factIdx != -1) {
-
-					// Add the fact name to the reply tring
-
-					factStr.append(_factNames[factIdx]);
-					factStr.append(";");
-
-					// Add the fact to the fact bit mask
-
-					mlstFacts += (1 << factIdx);
-				}
-			}
-
-			// check if any valid fact names were found
-
-			if ( mlstFacts == 0) {
-				sendFTPResponse(501, "OPTS MLST Invalid Argument");
-				return;
-			}
-
-			// Update the MLST enabled fact list for this session
-
-			m_mlstFacts = mlstFacts;
-
-			// Send the response
-
-			sendFTPResponse(200, "MLST OPTS " + factStr.toString());
-
-			// DEBUG
-
-			if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH))
-				debugPrintln("MLst options facts=" + factStr.toString());
-		}
-		else {
-
-			// Unknown options request or feature not enabled
-
-			sendFTPResponse(501, "Invalid argument");
-		}
-	}
-
-	/**
-	 * Process a quit command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procQuit(FTPRequest req)
-		throws IOException {
-
-		// Return a response
-
-		sendFTPResponse(221, "Bye");
-
-		// DEBUG
-
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE))
-			debugPrintln("Quit closing connection(s) to client");
-
-		// Close the session(s) to the client
-
-		closeSession();
-	}
-
-	/**
-	 * Process a type command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procType(FTPRequest req)
-		throws IOException {
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Check if ASCII or binary mode is enabled
-
-		String arg = req.getArgument().toUpperCase();
-		if ( arg.startsWith("A"))
-			setBinary(false);
-		else if ( arg.startsWith("I") || arg.startsWith("L"))
-			setBinary(true);
-		else {
-
-			// Invalid argument
-
-			sendFTPResponse(501, "Syntax error, invalid parameter");
-			return;
-		}
-
-		// Return a success status
-
-		sendFTPResponse(200, "Command OK");
-
-		// DEBUG
-
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE))
-			debugPrintln("Type arg=" + req.getArgument() + ", binary=" + m_binary);
-	}
-
-	/**
-	 * Process a restart command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procRestart(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Validate the restart position
-
-		try {
-			m_restartPos = Integer.parseInt(req.getArgument());
-		}
-		catch (NumberFormatException ex) {
-			sendFTPResponse(501, "Invalid restart position");
-			return;
-		}
-
-		// Return a success status
-
-		sendFTPResponse(350, "Restart OK");
-
-		// DEBUG
-
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO))
-			debugPrintln("Restart pos=" + m_restartPos);
-	}
-
-	/**
-	 * Process a return file command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procReturnFile(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Create the path for the file listing
-
-		FTPPath ftpPath = generatePathForRequest(req, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
-
-		// Check if the path is the root directory
-
-		if ( ftpPath.isRootPath() || ftpPath.isRootSharePath()) {
-			sendFTPResponse(550, "That is a directory");
-			return;
-		}
-
-		// Send the intermediate response
-
-		sendFTPResponse(150, "Connection accepted");
-
-		// Check if there is an active data session
-
-		if ( m_dataSess == null) {
-			sendFTPResponse(425, "Can't open data connection");
-			return;
-		}
-
-		// Get the data connection socket
-
-		Socket dataSock = null;
-
-		try {
-			dataSock = m_dataSess.getSocket();
-		}
-		catch (Exception ex) {
-            if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error reading file list, " + ex.toString());
+                    dataWrt.write(str.toString());
+                }
             }
-            debugPrintln(ex);
-		}
 
-		if ( dataSock == null) {
-			sendFTPResponse(426, "Connection closed; transfer aborted");
-			return;
-		}
+            // End of file list transmission
 
-		// DEBUG
+            sendFTPResponse(226, "Closing data connection");
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
 
-		if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-			debugPrintln("Returning ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-					+ ftpPath.getSharePath());
+                LOGGER.error(" Error reading file list, " + ex.getMessage(), ex);
+            }
 
-		// Send the file to the client
+            // Failed to send file listing
+            sendFTPResponse(451, "Error reading file list");
+        } finally {
 
-		OutputStream os = null;
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-		NetworkFile netFile = null;
+            // Close the data stream to the client
 
-		try {
+            if (dataWrt != null) {
+                dataWrt.close();
+            }
 
-			// Open an output stream to the client
+            // Close the data connection to the client
 
-			os = dataSock.getOutputStream();
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+        }
+    }
 
-			// Create a temporary tree connection
+    /**
+     * Process a short directory listing command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procNList(final FTPRequest req) throws IOException {
 
-			tree = getTreeConnection(ftpPath.getSharedDevice());
+        // Check if the user is logged in
 
-			// Check if the file exists and it is a file, if so then open the file
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+        // Create the path for the file listing
 
-			// Create the file open parameters
+        FTPPath ftpPath = m_cwd;
+        if (req.hasArgument()) {
+            ftpPath = generatePathForRequest(req, true);
+        }
 
-			FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), FileAction.OpenIfExists, AccessMode.ReadOnly, 0, 0);
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
 
-			// Check if the file exists and it is a file
+        // Check if the session has the required access
 
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+        if (ftpPath.isRootPath() == false) {
 
-			if ( sts == FileStatus.FileExists) {
+            // Check if the session has access to the filesystem
 
-				// Open the file
+            final TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
+            if (tree == null || tree.hasReadAccess() == false) {
 
-				netFile = disk.openFile(this, tree, params);
-			}
+                // Session does not have access to the filesystem
 
-			// Check if the file has been opened
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+        }
 
-			if ( netFile == null) {
-				sendFTPResponse(550, "File " + req.getArgument() + " not available");
-				return;
-			}
+        // Send the intermediate response
 
-			// Allocate the buffer for the file data
+        sendFTPResponse(150, "File status okay, about to open data connection");
 
-			byte[] buf = new byte[DEFAULT_BUFFERSIZE];
-			long filePos = m_restartPos;
+        // Check if there is an active data session
 
-			int len = -1;
-			boolean abort = false;
+        if (m_dataSess == null) {
+            sendFTPResponse(425, "Can't open data connection");
+            return;
+        }
 
-			while (filePos < netFile.getFileSize() && abort == false) {
+        // Get the data connection socket
 
-				// Read another block of data from the file
+        Socket dataSock = null;
 
-				len = disk.readFile(this, tree, netFile, buf, 0, buf.length, filePos);
+        try {
+            dataSock = m_dataSess.getSocket();
+        } catch (final Exception ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
 
-				// DEBUG
+        if (dataSock == null) {
+            sendFTPResponse(426, "Connection closed; transfer aborted");
+            return;
+        }
 
-				if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO))
-					debugPrintln(" Write len=" + len + " bytes");
+        // Output the directory listing to the client
 
-				// Write the current data block to the client, update the file position
+        Writer dataWrt = null;
 
-				if ( len > 0) {
+        try {
 
-					// Write the data to the client
+            // Open an output stream to the client
 
-					os.write(buf, 0, len);
+            if (isUTF8Enabled()) {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
+            } else {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
+            }
 
-					// Update the file position
+            // Check if a path has been specified to list
 
-					filePos += len;
+            Vector files = null;
 
-					// Check if the transfer has been aborted
+            if (req.hasArgument()) {
+            }
 
-					abort = checkForAbort();
-				}
-			}
+            // Get a list of file information objects for the current directory
 
-			// Close the output stream to the client
+            files = listFilesForPath(ftpPath, false, false);
 
-			os.close();
-			os = null;
+            // Output the file list to the client
 
-			// Indicate that the file has been transmitted, or the transfer was aborted
+            if (files != null) {
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH)) {
+                    LOGGER.info("List found " + files.size() + " files in " + ftpPath.getFTPPath());
+                }
 
-			if ( abort == false)
-				sendFTPResponse(226, "Closing data connection");
-			else
-				sendFTPResponse(426, "Transfer aborted by client");
+                // Output the file information to the client
 
-			// Close the data session
+                for (int i = 0; i < files.size(); i++) {
 
-			getFTPServer().releaseDataSession(m_dataSess);
-			m_dataSess = null;
+                    // Get the current file information
 
-			// Close the network file
+                    final FileInfo finfo = (FileInfo) files.elementAt(i);
 
-			disk.closeFile(this, tree, netFile);
-			netFile = null;
+                    // Output the file information record
 
-			// DEBUG
+                    dataWrt.write(finfo.getFileName());
+                    dataWrt.write(CRLF);
+                }
+            }
 
-			if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO))
-				debugPrintln(" Transfer complete, file closed");
-		}
-		catch (SocketException ex) {
+            // End of file list transmission
 
-			// DEBUG
+            sendFTPResponse(226, "Closing data connection");
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error reading file list, " + ex.getMessage(), ex);
+            }
 
-			if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)) {
-				debugPrintln(" Error during transfer, " + ex.toString());
-				debugPrintln(ex);
-			}
+            // Failed to send file listing
 
+            sendFTPResponse(451, "Error reading file list");
+        } finally {
 
-			// Close the data socket to the client
+            // Close the data stream to the client
 
-			if ( m_dataSess != null) {
-				m_dataSess.closeSession();
-				m_dataSess = null;
-			}
+            if (dataWrt != null) {
+                dataWrt.close();
+            }
 
-			// Indicate that there was an error during transmission of the file data
+            // Close the data connection to the client
 
-			sendFTPResponse(426, "Data connection closed by client");
-		}
-		catch (FileOfflineException ex) {
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+        }
+    }
 
-			// DEBUG
+    /**
+     * Process a system status command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procSystemStatus(final FTPRequest req) throws IOException {
 
-			if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln(" Error during transfer, " + ex.toString());
+        // Return the system type
 
-			// Indicate that there was an error during transmission of the file data
+        sendFTPResponse(215, "UNIX Type: Java FTP Server");
+    }
 
-			sendFTPResponse(450, "File data is currently offline");
-		}
-		catch (Exception ex) {
+    /**
+     * Process a server status command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procServerStatus(final FTPRequest req) throws IOException {
 
-			// DEBUG
-			if (LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln(" Error during transfer, " + ex.toString());
+        // Return server status information
 
-			// Indicate that there was an error during transmission of the file data
+        sendFTPResponse(211, "JLAN Server - Java FTP Server");
+    }
 
-			sendFTPResponse(426, "Error during transmission");
-		}
-		finally {
+    /**
+     * Process a help command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procHelp(final FTPRequest req) throws IOException {
 
-			// Close the network file
+        // Return help information
 
-			if ( netFile != null && disk != null && tree != null)
-				disk.closeFile(this, tree, netFile);
+        sendFTPResponse(211, "HELP text");
+    }
 
-			// Close the output stream to the client
+    /**
+     * Process a no-op command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procNoop(final FTPRequest req) throws IOException {
 
-			if ( os != null)
-				os.close();
+        // Return a response
 
-			// Close the data connection to the client
+        sendFTPResponse(200, "");
+    }
 
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-		}
-	}
+    /**
+     * Process an options request
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procOptions(final FTPRequest req) throws IOException {
 
-	/**
-	 * Process a store file command
-	 *
-	 * @param req FTPRequest
-	 * @param append boolean
-	 * @exception IOException
-	 */
-	protected final void procStoreFile(FTPRequest req, boolean append)
-		throws IOException {
+        // Check if the user is logged in
 
-		// Check if the user is logged in
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+        // Check if the parameter has been specified
 
-		// Check if an argument has been specified
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Required argument missing");
+            return;
+        }
 
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
+        // Parse the argument to get the sub-command and arguments
 
-		// Create the path for the file listing
+        final StringTokenizer token = new StringTokenizer(req.getArgument(), " ");
+        if (token.hasMoreTokens() == false) {
+            sendFTPResponse(501, "Invalid argument");
+            return;
+        }
 
-		FTPPath ftpPath = generatePathForRequest(req, true, false);
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
+        // Get the sub-command
 
-		// Send the file to the client
+        final String optsCmd = token.nextToken();
 
-		InputStream is = null;
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-		NetworkFile netFile = null;
-		int sts = FileStatus.NotExist;
+        // UTF8 enable/disable command
+
+        if (FeatureUTF8 && optsCmd.equalsIgnoreCase("UTF8")) {
+
+            // Get the next argument
+
+            if (token.hasMoreTokens()) {
+                final String optsArg = token.nextToken();
+                if (optsArg.equalsIgnoreCase("ON")) {
+
+                    // Enable UTF-8 file names
+
+                    m_utf8Paths = true;
+                } else if (optsArg.equalsIgnoreCase("OFF")) {
+
+                    // Disable UTF-8 file names
+
+                    m_utf8Paths = false;
+                } else {
+
+                    // Invalid argument
+
+                    sendFTPResponse(501, "OPTS UTF8 Invalid argument");
+                    return;
+                }
+
+                // Report the new setting back to the client
+
+                sendFTPResponse(200, "OPTS UTF8 " + (isUTF8Enabled() ? "ON" : "OFF"));
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                    LOGGER.info("UTF8 options utf8=" + (isUTF8Enabled() ? "ON" : "OFF"));
+                }
+            }
+        }
+
+        // MLST/MLSD fact list command
+
+        else if (FeatureMLST && optsCmd.equalsIgnoreCase("MLST")) {
+
+            // Check if the fact list argument is valid
+
+            if (token.hasMoreTokens() == false) {
+
+                // Invalid fact list argument
+
+                sendFTPResponse(501, "OPTS MLST Invalid argument");
+                return;
+            }
+
+            // Parse the supplied fact names
+
+            int mlstFacts = 0;
+            final StringTokenizer factTokens = new StringTokenizer(token.nextToken(), ";");
+            final StringBuffer factStr = new StringBuffer();
+
+            while (factTokens.hasMoreTokens()) {
+
+                // Get the current fact name and validate
+
+                final String factName = factTokens.nextToken();
+                int factIdx = -1;
+                int idx = 0;
+
+                while (idx < _factNames.length && factIdx == -1) {
+                    if (_factNames[idx].equalsIgnoreCase(factName)) {
+                        factIdx = idx;
+                    } else {
+                        idx++;
+                    }
+                }
+
+                // Check if the fact name is valid, ignore invalid names
+
+                if (factIdx != -1) {
+
+                    // Add the fact name to the reply tring
+
+                    factStr.append(_factNames[factIdx]);
+                    factStr.append(";");
+
+                    // Add the fact to the fact bit mask
+
+                    mlstFacts += (1 << factIdx);
+                }
+            }
+
+            // check if any valid fact names were found
+
+            if (mlstFacts == 0) {
+                sendFTPResponse(501, "OPTS MLST Invalid Argument");
+                return;
+            }
+
+            // Update the MLST enabled fact list for this session
+
+            m_mlstFacts = mlstFacts;
+
+            // Send the response
+
+            sendFTPResponse(200, "MLST OPTS " + factStr.toString());
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH)) {
+                LOGGER.info("MLst options facts=" + factStr.toString());
+            }
+        } else {
+
+            // Unknown options request or feature not enabled
+
+            sendFTPResponse(501, "Invalid argument");
+        }
+    }
+
+    /**
+     * Process a quit command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procQuit(final FTPRequest req) throws IOException {
+
+        // Return a response
+
+        sendFTPResponse(221, "Bye");
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
+            LOGGER.info("Quit closing connection(s) to client");
+        }
+
+        // Close the session(s) to the client
+
+        closeSession();
+    }
+
+    /**
+     * Process a type command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procType(final FTPRequest req) throws IOException {
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Check if ASCII or binary mode is enabled
+
+        final String arg = req.getArgument().toUpperCase();
+        if (arg.startsWith("A")) {
+            setBinary(false);
+        } else if (arg.startsWith("I") || arg.startsWith("L")) {
+            setBinary(true);
+        } else {
+
+            // Invalid argument
+
+            sendFTPResponse(501, "Syntax error, invalid parameter");
+            return;
+        }
+
+        // Return a success status
+
+        sendFTPResponse(200, "Command OK");
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
+            LOGGER.info("Type arg=" + req.getArgument() + ", binary=" + m_binary);
+        }
+    }
+
+    /**
+     * Process a restart command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procRestart(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Validate the restart position
+
+        try {
+            m_restartPos = Integer.parseInt(req.getArgument());
+        } catch (final NumberFormatException ex) {
+            sendFTPResponse(501, "Invalid restart position");
+            return;
+        }
+
+        // Return a success status
+
+        sendFTPResponse(350, "Restart OK");
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO)) {
+            LOGGER.info("Restart pos=" + m_restartPos);
+        }
+    }
+
+    /**
+     * Process a return file command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procReturnFile(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Create the path for the file listing
+
+        final FTPPath ftpPath = generatePathForRequest(req, true);
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
+
+        // Check if the path is the root directory
+
+        if (ftpPath.isRootPath() || ftpPath.isRootSharePath()) {
+            sendFTPResponse(550, "That is a directory");
+            return;
+        }
+
+        // Send the intermediate response
+
+        sendFTPResponse(150, "Connection accepted");
+
+        // Check if there is an active data session
+
+        if (m_dataSess == null) {
+            sendFTPResponse(425, "Can't open data connection");
+            return;
+        }
+
+        // Get the data connection socket
+
+        Socket dataSock = null;
+
+        try {
+            dataSock = m_dataSess.getSocket();
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error reading file list, " + ex.getMessage(), ex);
+            }
+        }
+
+        if (dataSock == null) {
+            sendFTPResponse(426, "Connection closed; transfer aborted");
+            return;
+        }
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+            LOGGER.info("Returning ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+        }
+
+        // Send the file to the client
+
+        OutputStream os = null;
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+        NetworkFile netFile = null;
+
+        try {
+
+            // Open an output stream to the client
+
+            os = dataSock.getOutputStream();
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Check if the file exists and it is a file, if so then open the file
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+
+            // Create the file open parameters
+
+            final FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), FileAction.OpenIfExists, AccessMode.ReadOnly, 0, 0);
+
+            // Check if the file exists and it is a file
+
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+
+            if (sts == FileStatus.FileExists) {
+
+                // Open the file
+
+                netFile = disk.openFile(this, tree, params);
+            }
+
+            // Check if the file has been opened
+
+            if (netFile == null) {
+                sendFTPResponse(550, "File " + req.getArgument() + " not available");
+                return;
+            }
+
+            // Allocate the buffer for the file data
+
+            final byte[] buf = new byte[DEFAULT_BUFFERSIZE];
+            long filePos = m_restartPos;
+
+            int len = -1;
+            boolean abort = false;
+
+            while (filePos < netFile.getFileSize() && abort == false) {
+
+                // Read another block of data from the file
+
+                len = disk.readFile(this, tree, netFile, buf, 0, buf.length, filePos);
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO)) {
+                    LOGGER.info(" Write len=" + len + " bytes");
+                }
+
+                // Write the current data block to the client, update the file position
+
+                if (len > 0) {
+
+                    // Write the data to the client
+
+                    os.write(buf, 0, len);
+
+                    // Update the file position
+
+                    filePos += len;
+
+                    // Check if the transfer has been aborted
+
+                    abort = checkForAbort();
+                }
+            }
+
+            // Close the output stream to the client
+
+            os.close();
+            os = null;
+
+            // Indicate that the file has been transmitted, or the transfer was aborted
+
+            if (abort == false) {
+                sendFTPResponse(226, "Closing data connection");
+            } else {
+                sendFTPResponse(426, "Transfer aborted by client");
+            }
+
+            // Close the data session
+
+            getFTPServer().releaseDataSession(m_dataSess);
+            m_dataSess = null;
+
+            // Close the network file
+
+            disk.closeFile(this, tree, netFile);
+            netFile = null;
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO)) {
+                LOGGER.info(" Transfer complete, file closed");
+            }
+        } catch (final SocketException ex) {
+
+            // DEBUG
+
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
+            }
+
+            // Close the data socket to the client
+
+            if (m_dataSess != null) {
+                m_dataSess.closeSession();
+                m_dataSess = null;
+            }
+
+            // Indicate that there was an error during transmission of the file data
+
+            sendFTPResponse(426, "Data connection closed by client");
+        } catch (final FileOfflineException ex) {
+
+            // DEBUG
+
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
+            }
+
+            // Indicate that there was an error during transmission of the file data
+
+            sendFTPResponse(450, "File data is currently offline");
+        } catch (final Exception ex) {
+
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
+            }
+
+            // Indicate that there was an error during transmission of the file data
+
+            sendFTPResponse(426, "Error during transmission");
+        } finally {
+
+            // Close the network file
+
+            if (netFile != null && disk != null && tree != null) {
+                disk.closeFile(this, tree, netFile);
+            }
+
+            // Close the output stream to the client
+
+            if (os != null) {
+                os.close();
+            }
+
+            // Close the data connection to the client
+
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+        }
+    }
+
+    /**
+     * Process a store file command
+     *
+     * @param req
+     *            FTPRequest
+     * @param append
+     *            boolean
+     * @exception IOException
+     */
+    protected final void procStoreFile(final FTPRequest req, final boolean append) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Create the path for the file listing
+
+        final FTPPath ftpPath = generatePathForRequest(req, true, false);
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
+
+        // Send the file to the client
+
+        InputStream is = null;
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+        NetworkFile netFile = null;
+        int sts = FileStatus.NotExist;
 
         // Flag to indicate if the file should be deleted on close, used if there is an error during the upload
         // and the file did not exist before the upload
 
         boolean deleteOnClose = false;
 
-		try {
+        try {
 
-			// Create a temporary tree connection
+            // Create a temporary tree connection
 
-			tree = getTreeConnection(ftpPath.getSharedDevice());
+            tree = getTreeConnection(ftpPath.getSharedDevice());
 
-			// Check if the session has the required access to the filesystem
+            // Check if the session has the required access to the filesystem
 
-			if ( tree == null || tree.hasWriteAccess() == false) {
+            if (tree == null || tree.hasWriteAccess() == false) {
 
-				// Session does not have write access to the filesystem
+                // Session does not have write access to the filesystem
 
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
 
-			// Check if the file exists
+            // Check if the file exists
 
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
-			if ( sts == FileStatus.DirectoryExists) {
+            if (sts == FileStatus.DirectoryExists) {
 
-				// Return an error status
+                // Return an error status
 
-				sendFTPResponse(500, "Invalid path (existing directory)");
-				return;
-			}
+                sendFTPResponse(500, "Invalid path (existing directory)");
+                return;
+            }
 
-			// Create the file open parameters
+            // Create the file open parameters
 
-			int openAction = FileAction.CreateNotExist;
-			if ( sts == FileStatus.FileExists)
-				openAction = append == false ? FileAction.TruncateExisting : FileAction.OpenIfExists;
+            int openAction = FileAction.CreateNotExist;
+            if (sts == FileStatus.FileExists) {
+                openAction = append == false ? FileAction.TruncateExisting : FileAction.OpenIfExists;
+            }
 
-			FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), openAction, AccessMode.ReadWrite, 0, 0);
+            final FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), openAction, AccessMode.ReadWrite, 0, 0);
 
-	        // Transaction begins in the innards of 'disk'
+            // Transaction begins in the innards of 'disk'
 
-	        try
-	        {
-	            // Are we opening an existing file or creating a new one?
-	            if ( sts == FileStatus.FileExists)
-	            {
-	                // Open and truncate the existing file
-	                netFile = disk.openFile(this, tree, params);
-	            }
-	            else
-	            {
-	                // Create a new file
-	                netFile = disk.createFile(this, tree, params);
-	            }
+            try {
+                // Are we opening an existing file or creating a new one?
+                if (sts == FileStatus.FileExists) {
+                    // Open and truncate the existing file
+                    netFile = disk.openFile(this, tree, params);
+                } else {
+                    // Create a new file
+                    netFile = disk.createFile(this, tree, params);
+                }
 
-	            // Notify change listeners that a new file has been created
-	            DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
+                // Notify change listeners that a new file has been created
+                final DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
 
-	            if ( diskCtx.hasChangeHandler())
-	                diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionAdded, ftpPath.getSharePath());
+                if (diskCtx.hasChangeHandler()) {
+                    diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionAdded, ftpPath.getSharePath());
+                }
 
-	            // Send the intermediate response
+                // Send the intermediate response
 
-	            sendFTPResponse(150, "File status okay, about to open data connection");
+                sendFTPResponse(150, "File status okay, about to open data connection");
 
-	            // Check if there is an active data session
+                // Check if there is an active data session
 
-	            if ( m_dataSess == null) {
-	                sendFTPResponse(425, "Can't open data connection");
-	                return;
-	            }
+                if (m_dataSess == null) {
+                    sendFTPResponse(425, "Can't open data connection");
+                    return;
+                }
 
-	            // Get the data connection socket
+                // Get the data connection socket
 
-	            Socket dataSock = null;
+                Socket dataSock = null;
 
-	            try {
-	                dataSock = m_dataSess.getSocket();
-	            }
-	            catch (Exception ex) {
-	            }
+                try {
+                    dataSock = m_dataSess.getSocket();
+                } catch (final Exception ex) {
+                }
 
-	            if ( dataSock == null) {
-	                sendFTPResponse(426, "Connection closed; transfer aborted");
-	                return;
-	            }
+                if (dataSock == null) {
+                    sendFTPResponse(426, "Connection closed; transfer aborted");
+                    return;
+                }
 
-                    dataSock.setSoTimeout(getFTPServer().getFTPConfiguration().getFTPSrvSessionTimeout());
+                dataSock.setSoTimeout(getFTPServer().getFTPConfiguration().getFTPSrvSessionTimeout());
 
-	            // Open an input stream from the client
+                // Open an input stream from the client
 
-	            is = dataSock.getInputStream();
+                is = dataSock.getInputStream();
 
-	            // DEBUG
-
-	            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-	                debugPrintln("Storing ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-	                        + ftpPath.getSharePath() + (append ? " (Append)" : ""));
-
-	            // Allocate the buffer for the file data
-
-	            byte[] buf = new byte[DEFAULT_BUFFERSIZE];
-	            long filePos = 0;
-	            int len = is.read(buf, 0, buf.length);
-	            boolean abort = false;
-
-	            // If the data is to be appended then set the starting file position to the end of the
-	            // file
-
-	            if ( append == true)
-	                filePos = netFile.getFileSize();
-
-	            // Read/write loop
-
-	            while (len > 0 && abort == false) {
-
-	                // DEBUG
-
-	                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO))
-	                    debugPrintln(" Receive len=" + len + " bytes");
-
-	                // Write the current data block to the file, update the file position
-
-	                disk.writeFile(this, tree, netFile, buf, 0, len, filePos);
-	                filePos += len;
-
-	                // Read another block of data from the client
-
-	                len = is.read(buf, 0, buf.length);
-
-	                // Check if the file transfer has been aborted
-
-	                abort = checkForAbort();
-	            }
-
-	            // Close the input stream from the client
-
-	            is.close();
-	            is = null;
-
-	            // Close the network file
-
-	            disk.closeFile(this, tree, netFile);
-	            netFile = null;
-
-	            // Indicate that the file has been received, or the transfer was aborted
-
-	            if ( abort == false)
-	                sendFTPResponse(226, "Closing data connection");
-	            else
-	                sendFTPResponse(426, "Transfer aborted by client");
-
-	            // DEBUG
-
-	            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO))
-	                debugPrintln(" Transfer complete, file closed");
-
-	        }
-	        finally
-	        {
-	            endTransaction();
-	        }
-	    }
-	    catch (SocketException ex) {
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln(" Error during transfer, " + ex.toString());
-
-			// Close the data socket to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-
-			// Indicate that there was an error during transmission of the file data
-
-			sendFTPResponse(426, "Data connection closed by client");
-		}
-		catch (DiskFullException ex) {
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln(" Error during transfer, " + ex.toString());
-
-			// Close the data socket to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-
-			// If the file did not exist before the upload then mark it to delete on close
-
-			if ( sts != FileStatus.FileExists) {
-			    deleteOnClose = true;
-
-			    // DEBUG
-
-			    if (LOGGER.isDebugEnabled() && hasDebug(DBG_ERROR))
-			        debugPrintln(" Marking file for delete on close (quota exceeded)");
-			}
-
-			// Indicate that there was an error during writing of the file
-
-	        sendFTPResponse(451, "Disk full or Quota Exceeded");
-	    }
-		catch (AccessDeniedException ex) {
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln(" Error during transfer, " + ex.toString());
-
-			// Close the data socket to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-
-			// If the file did not exist before the upload then mark it to delete on close
-
-			if ( sts != FileStatus.FileExists) {
-			    deleteOnClose = true;
-
-			    // DEBUG
-
-			    if (LOGGER.isDebugEnabled() && hasDebug(DBG_ERROR))
-			        debugPrintln(" Marking file for delete on close (access denied)");
-			}
-
-			// Indicate that there was an error during writing of the file
-
-	        sendFTPResponse(451, "Access denied, file may be in use or locked by another user");
-	    }
-            catch (SocketTimeoutException ex)
-            {
                 // DEBUG
 
-                if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR))
-                {
-                    debugPrintln(" Error during transmission: session timeout.");
-                    debugPrintln(" Marking file for delete on close.");
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                    LOGGER.info("Storing ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath()
+                            + (append ? " (Append)" : ""));
                 }
+
+                // Allocate the buffer for the file data
+
+                final byte[] buf = new byte[DEFAULT_BUFFERSIZE];
+                long filePos = 0;
+                int len = is.read(buf, 0, buf.length);
+                boolean abort = false;
+
+                // If the data is to be appended then set the starting file position to the end of the
+                // file
+
+                if (append == true) {
+                    filePos = netFile.getFileSize();
+                }
+
+                // Read/write loop
+
+                while (len > 0 && abort == false) {
+
+                    // DEBUG
+
+                    if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO)) {
+                        LOGGER.info(" Receive len=" + len + " bytes");
+                    }
+
+                    // Write the current data block to the file, update the file position
+
+                    disk.writeFile(this, tree, netFile, buf, 0, len, filePos);
+                    filePos += len;
+
+                    // Read another block of data from the client
+
+                    len = is.read(buf, 0, buf.length);
+
+                    // Check if the file transfer has been aborted
+
+                    abort = checkForAbort();
+                }
+
+                // Close the input stream from the client
+
+                is.close();
+                is = null;
+
+                // Close the network file
+
+                disk.closeFile(this, tree, netFile);
+                netFile = null;
+
+                // Indicate that the file has been received, or the transfer was aborted
+
+                if (abort == false) {
+                    sendFTPResponse(226, "Closing data connection");
+                } else {
+                    sendFTPResponse(426, "Transfer aborted by client");
+                }
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILEIO)) {
+                    LOGGER.info(" Transfer complete, file closed");
+                }
+
+            } finally {
+                endTransaction();
+            }
+        } catch (final SocketException ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
+            }
+
+            // Close the data socket to the client
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+
+            // Indicate that there was an error during transmission of the file data
+            sendFTPResponse(426, "Data connection closed by client");
+        } catch (final DiskFullException ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
+            }
+
+            // Close the data socket to the client
+
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+
+            // If the file did not exist before the upload then mark it to delete on close
+
+            if (sts != FileStatus.FileExists) {
                 deleteOnClose = true;
 
-                // Indicate that there was an error during transmission of the file data
+                // DEBUG
 
-                sendFTPResponse(426, "Error during transmission: session timeout");
+                if (LOGGER.isDebugEnabled() && hasDebug(DBG_ERROR)) {
+                    LOGGER.debug(" Marking file for delete on close (quota exceeded)");
+                }
             }
-	    catch (Exception ex)
-	    {
 
-			// DEBUG
+            // Indicate that there was an error during writing of the file
 
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-				debugPrintln(" Error during transfer, " + ex.toString());
-			}
-			debugPrintln( ex);
+            sendFTPResponse(451, "Disk full or Quota Exceeded");
+        } catch (final AccessDeniedException ex) {
 
-			// Indicate that there was an error during transmission of the file data
+            // DEBUG
 
-			sendFTPResponse(426, "Error during transmission");
-		}
-		finally {
-
-		    // Check if the file should be marked for delete on close, only when an error occurs
-
-		    if ( netFile != null && deleteOnClose == true)
-		        netFile.setDeleteOnClose( true);
-
-			// Close the network file
-
-			if ( netFile != null && disk != null && tree != null)
-				disk.closeFile(this, tree, netFile);
-
-			// Close the input stream to the client
-
-			if ( is != null)
-				is.close();
-
-			// Close the data connection to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-		}
-	}
-
-	/**
-	 * Process a delete file command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procDeleteFile(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Create the path for the file
-
-		FTPPath ftpPath = generatePathForRequest(req, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path specified");
-			return;
-		}
-
-		// Delete the specified file
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Check if the session has the required access to the filesystem
-
-			if ( tree == null || tree.hasWriteAccess() == false) {
-
-				// Session does not have write access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-
-			// Check if the file exists and it is a file
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
-
-			if ( sts == FileStatus.FileExists) {
-
-				// Delete the file
-
-				disk.deleteFile(this, tree, ftpPath.getSharePath());
-
-				// Check if there are any file/directory change notify requests active
-
-				DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
-				if ( diskCtx.hasChangeHandler())
-					diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionRemoved, ftpPath.getSharePath());
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-					debugPrintln("Deleted ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-							+ ftpPath.getSharePath());
-			}
-			else {
-
-				// File does not exist or is a directory
-
-				sendFTPResponse(550, "File " + req.getArgument()
-						+ (sts == FileStatus.NotExist ? " not available" : " is a directory"));
-				return;
-			}
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error deleting file, " + ex.toString());
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
             }
-            debugPrintln(ex);
-			sendFTPResponse(450, "File action not taken");
-			return;
-		}
 
-		// Return a success status
+            // Close the data socket to the client
 
-		sendFTPResponse(250, "File " + req.getArgument() + " deleted");
-	}
-
-	/**
-	 * Process a rename from command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procRenameFrom(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Clear the current rename from path details, if any
-
-		m_renameFrom = null;
-
-		// Create the path for the file/directory
-
-		FTPPath ftpPath = generatePathForRequest(req, false, false);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path specified");
-			return;
-		}
-
-		// Check that the file exists, and it is a file
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Check if the session has the required access to the filesystem
-
-			if ( tree == null || tree.hasWriteAccess() == false) {
-
-				// Session does not have write access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-
-			// Check if the file exists and it is a file
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
-
-			if ( sts != FileStatus.NotExist) {
-
-				// Save the rename from file details, rename to command should follow
-
-				m_renameFrom = ftpPath;
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-					debugPrintln("RenameFrom ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-							+ ftpPath.getSharePath());
-			}
-			else {
-
-				// File/directory does not exist
-
-				sendFTPResponse(550, "File " + req.getArgument()
-						+ (sts == FileStatus.NotExist ? " not available" : " is a directory"));
-				return;
-			}
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error renaming file from, " + ex.toString());
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
             }
-            debugPrintln(ex);
-			sendFTPResponse(450, "File action not taken");
-			return;
-		}
 
-		// Return a success status
+            // If the file did not exist before the upload then mark it to delete on close
 
-		sendFTPResponse(350, "File " + req.getArgument() + " OK");
-	}
+            if (sts != FileStatus.FileExists) {
+                deleteOnClose = true;
 
-	/**
-	 * Process a rename to command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procRenameTo(FTPRequest req)
-		throws IOException {
+                // DEBUG
 
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Check if the rename from has already been set
-
-		if ( m_renameFrom == null) {
-			sendFTPResponse(550, "Rename from not set");
-			return;
-		}
-
-		// Create the path for the new file name
-
-		FTPPath ftpPath = generatePathForRequest(req, true, false);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path specified");
-			return;
-		}
-
-		// Check that the rename is on the same share
-
-		if ( m_renameFrom.getShareName().compareTo(ftpPath.getShareName()) != 0) {
-			sendFTPResponse(550, "Cannot rename across shares");
-			return;
-		}
-
-		// Rename the file
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Check if the session has the required access to the filesystem
-
-			if ( tree == null || tree.hasWriteAccess() == false) {
-
-				// Session does not have write access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-
-			// Check if the file exists and it is a file
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
-
-			if ( (sts == FileStatus.NotExist) ||
-				 // Special condition where we are changing case of file name but the search above is case insensitive
-			     ((sts == FileStatus.FileExists) & m_renameFrom.getSharePath().equalsIgnoreCase(ftpPath.getSharePath()))
-			     ) {
-
-				// Rename the file/directory
-
-				disk.renameFile(this, tree, m_renameFrom.getSharePath(), ftpPath.getSharePath());
-
-				// Check if there are any file/directory change notify requests active
-
-				DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
-				if ( diskCtx.hasChangeHandler())
-					diskCtx.getChangeHandler().notifyRename(m_renameFrom.getSharePath(), ftpPath.getSharePath());
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-					debugPrintln("RenameTo ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-							+ ftpPath.getSharePath());
-			}
-			else {
-
-				// Destination file already exists or is a directory
-				sendFTPResponse(550, "File " + req.getArgument()
-						+ (sts == FileStatus.FileExists ? " already exists" : " is a directory"));
-				return;
-			}
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error rename to, " + ex.toString());
+                if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                    LOGGER.error(" Marking file for delete on close (access denied)");
+                }
             }
-            debugPrintln(ex);
-			sendFTPResponse(450, "File action not taken");
-			return;
-		}
-		finally {
 
-			// Clear the rename details
+            // Indicate that there was an error during writing of the file
 
-			m_renameFrom = null;
-		}
+            sendFTPResponse(451, "Access denied, file may be in use or locked by another user");
+        } catch (final SocketTimeoutException ex) {
+            // DEBUG
 
-		// Return a success status
-
-		sendFTPResponse(250, "File renamed OK");
-	}
-
-	/**
-	 * Process a create directory command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procCreateDirectory(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Check if the new directory contains multiple directories
-
-		FTPPath ftpPath = generatePathForRequest(req, false, false);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path " + req.getArgument());
-			return;
-		}
-
-		// Create the new directory
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Check if the session has the required access to the filesystem
-
-			if ( tree == null || tree.hasWriteAccess() == false) {
-
-				// Session does not have write access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-
-			// Check if the directory exists
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
-
-			if ( sts == FileStatus.NotExist) {
-
-				// Create the new directory
-
-				FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), FileAction.CreateNotExist,
-						AccessMode.ReadWrite, FileAttribute.NTDirectory, 0);
-
-				disk.createDirectory(this, tree, params);
-
-				// Notify change listeners that a new directory has been created
-
-				DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
-
-				if ( diskCtx.hasChangeHandler())
-					diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionAdded, ftpPath.getSharePath());
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY))
-					debugPrintln("CreateDir ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-							+ ftpPath.getSharePath());
-			}
-			else {
-
-				// File/directory already exists with that name, return an error
-
-				sendFTPResponse(450, sts == FileStatus.FileExists ? "File exists with that name" : "Directory already exists");
-				return;
-			}
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error creating directory, " + ex.toString());
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transmission: session timeout.");
+                LOGGER.error(" Marking file for delete on close.");
             }
-            debugPrintln(ex);
-			sendFTPResponse(450, "Failed to create directory");
-			return;
-		}
+            deleteOnClose = true;
 
-		// Return the FTP path to the client
+            // Indicate that there was an error during transmission of the file data
 
-		sendFTPResponse(257, ftpPath.getFTPPath());
-	}
+            sendFTPResponse(426, "Error during transmission: session timeout");
+        } catch (final Exception ex) {
 
-	/**
-	 * Process a delete directory command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procRemoveDirectory(FTPRequest req)
-		throws IOException {
+            // DEBUG
 
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Check if the directory path contains multiple directories
-
-		FTPPath ftpPath = generatePathForRequest(req, false);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path " + req.getArgument());
-			return;
-		}
-
-		// Check if the path is the root directory, cannot delete directories from the root
-		// directory
-		// as it maps to the list of available disk shares.
-
-		if ( ftpPath.isRootPath() || ftpPath.isRootSharePath()) {
-			sendFTPResponse(550, "Access denied, cannot delete directory in root");
-			return;
-		}
-
-		// Delete the directory
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Check if the session has the required access to the filesystem
-
-			if ( tree == null || tree.hasWriteAccess() == false) {
-
-				// Session does not have write access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-
-			// Check if the directory exists
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
-
-			if ( sts == FileStatus.DirectoryExists) {
-
-				// Delete the new directory
-
-				disk.deleteDirectory(this, tree, ftpPath.getSharePath());
-
-				// Check if there are any file/directory change notify requests active
-
-				DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
-				if ( diskCtx.hasChangeHandler())
-					diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionRemoved, ftpPath.getSharePath());
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY))
-					debugPrintln("DeleteDir ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path="
-							+ ftpPath.getSharePath());
-			}
-			else {
-
-				// File already exists with that name or directory does not exist return an error
-
-				sendFTPResponse(550, sts == FileStatus.FileExists ? "File exists with that name" : "Directory does not exist");
-				return;
-			}
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error deleting directory, " + ex.toString());
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error during transfer, " + ex.getMessage(), ex);
             }
-            debugPrintln(ex);
-			sendFTPResponse(550, "Failed to delete directory");
-			return;
-		}
 
-		// Return a success status
+            // Indicate that there was an error during transmission of the file data
 
-		sendFTPResponse(250, "Directory deleted OK");
-	}
+            sendFTPResponse(426, "Error during transmission");
+        } finally {
 
-	/**
-	 * Process a machine listing request, single folder
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procMachineListing(FTPRequest req)
-		throws IOException {
+            // Check if the file should be marked for delete on close, only when an error occurs
 
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPResponse(530, "Not logged in");
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Create the path to be listed
-
-		FTPPath ftpPath = generatePathForRequest(req, false, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
-
-		// Get the file information
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Access the virtual filesystem driver
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-
-			// Get the file information
-
-			FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
-
-			if ( finfo == null) {
-				sendFTPResponse(550, "Path " + req.getArgument() + " not available");
-				return;
-			}
-			else if ( finfo.isDirectory() == false) {
-				sendFTPResponse(501, "Path " + req.getArgument() + " is not a directory");
-				return;
-			}
-
-			// Return the folder details
-
-			sendFTPResponse("250- Listing " + req.getArgument());
-
-			StringBuffer mlstStr = new StringBuffer(80);
-			mlstStr.append(" ");
-
-			generateMlstString(finfo, m_mlstFacts, mlstStr, true);
-			mlstStr.append(CRLF);
-
-			sendFTPResponse(mlstStr.toString());
-			sendFTPResponse("250 End");
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-				debugPrintln("Mlst ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", info=" + finfo);
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error retrieving file information, " + ex.toString());
+            if (netFile != null && deleteOnClose == true) {
+                netFile.setDeleteOnClose(true);
             }
-            debugPrintln(ex);
-			sendFTPResponse(550, "Error retrieving file information");
-		}
-	}
 
-	/**
-	 * Process a machine listing request, folder contents
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procMachineListingContents(FTPRequest req)
-		throws IOException {
+            // Close the network file
 
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if the request has an argument, if not then use the current working directory
-
-		if ( req.hasArgument() == false)
-			req.updateArgument(".");
-
-		// Create the path for the file listing
-
-		FTPPath ftpPath = m_cwd;
-		if ( req.hasArgument())
-			ftpPath = generatePathForRequest(req, true);
-
-		if ( ftpPath == null) {
-			sendFTPResponse(500, "Invalid path");
-			return;
-		}
-
-		// Check if the session has the required access
-
-		if ( ftpPath.isRootPath() == false) {
-
-			// Check if the session has access to the filesystem
-
-			TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
-			if ( tree == null || tree.hasReadAccess() == false) {
-
-				// Session does not have access to the filesystem
-
-				sendFTPResponse(550, "Access denied");
-				return;
-			}
-		}
-
-		// Send the intermediate response
-
-		sendFTPResponse(150, "File status okay, about to open data connection");
-
-		// Check if there is an active data session
-
-		if ( m_dataSess == null) {
-			sendFTPResponse(425, "Can't open data connection");
-			return;
-		}
-
-		// Get the data connection socket
-
-		Socket dataSock = null;
-
-		try {
-			dataSock = m_dataSess.getSocket();
-		}
-		catch (Exception ex) {
-			debugPrintln(ex);
-		}
-
-		if ( dataSock == null) {
-			sendFTPResponse(426, "Connection closed; transfer aborted");
-			return;
-		}
-
-		// Output the directory listing to the client
-
-		Writer dataWrt = null;
-
-		try {
-
-			// Open an output stream to the client
-
-			if ( isUTF8Enabled())
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
-			else
-				dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
-
-			// Get a list of file information objects for the current directory
-
-			Vector<Object> files = null;
-
-			files = listFilesForPath(ftpPath, false, false);
-
-			// Output the file list to the client
-
-			if ( files != null) {
-
-				// DEBUG
-
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH))
-					debugPrintln("MLsd found " + files.size() + " files in " + ftpPath.getFTPPath());
-
-				// Output the file information to the client
-
-				StringBuffer str = new StringBuffer(MLSD_BUFFER_SIZE);
-
-				for (int i = 0; i < files.size(); i++) {
-
-					// Get the current file information
-
-					FileInfo finfo = (FileInfo) files.elementAt(i);
-
-					generateMlstString(finfo, m_mlstFacts, str, false);
-					str.append(CRLF);
-
-					// Output the file information record when the buffer is full
-
-					if ( str.length() >= MLSD_BUFFER_SIZE) {
-
-						// Output the file data records
-
-						dataWrt.write(str.toString());
-
-						// Reset the buffer
-
-						str.setLength(0);
-					}
-				}
-
-				// Flush any remaining file record data
-
-				if ( str.length() > 0)
-					dataWrt.write(str.toString());
-			}
-
-			// End of file list transmission
-
-			sendFTPResponse(226, "Closing data connection");
-		}
-		catch (Exception ex) {
-
-			// Failed to send file listing
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error reading file list, " + ex.toString());
+            if (netFile != null && disk != null && tree != null) {
+                disk.closeFile(this, tree, netFile);
             }
-            debugPrintln(ex);
 
+            // Close the input stream to the client
 
-			sendFTPResponse(451, "Error reading file list");
-		}
-		finally {
-
-			// Close the data stream to the client
-
-			if ( dataWrt != null)
-				dataWrt.close();
-
-			// Close the data connection to the client
-
-			if ( m_dataSess != null) {
-				getFTPServer().releaseDataSession(m_dataSess);
-				m_dataSess = null;
-			}
-		}
-	}
-
-	/**
-	 * Process a get modification date/time command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procGetModifyDateTime(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Create the path for the file request
-
-		FTPPath ftpPath = generatePathForRequest(req, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path");
-			return;
-		}
-
-		// Get the file information
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Access the virtual filesystem driver
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-
-			// Get the file information
-
-			FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
-
-			if ( finfo == null) {
-				sendFTPResponse(550, "File " + req.getArgument() + " not available");
-				return;
-			}
-
-			// Return the file modification date/time
-
-			if ( finfo.hasModifyDateTime())
-				sendFTPResponse(213, FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
-			else
-				sendFTPResponse(550, "Modification date/time not available for " + finfo.getFileName());
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-				debugPrintln("File modify date/time ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName()
-						+ ", modified=" + finfo.getModifyDateTime());
-		}
-		catch (Exception ex) {
-			sendFTPResponse(550, "Error retrieving file modification date/time");
-		}
-	}
-
-	/**
-	 * Process a modify date/time command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procModifyDateTime(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Check the format of the argument to detemine if this is a get or set modify date/time
-		// request
-		//
-		// Get format is just the filename/path
-		// Set format is YYYYMMDDHHMMSS <path>
-
-		String path = req.getArgument();
-		long modifyDateTime = 0L;
-
-		if ( path.length() > MDTM_DATETIME_MINLEN && path.indexOf(' ') != -1) {
-
-			// Check if the first argument looks like a date/time value
-
-			boolean settime = true;
-			for (int i = 0; i < MDTM_DATETIME_MINLEN; i++) {
-				if ( Character.isDigit(path.charAt(i)) == false)
-					settime = false;
-			}
-
-			// Looks like a date/time value
-
-			if ( settime == true) {
-
-				try {
-
-					// Parse the various fields
-
-					int year = Integer.valueOf(path.substring(0, 4)).intValue();
-					int month = Integer.valueOf(path.substring(4, 6)).intValue();
-					int day = Integer.valueOf(path.substring(6, 8)).intValue();
-
-					int hours = Integer.valueOf(path.substring(8, 10)).intValue();
-					int mins = Integer.valueOf(path.substring(10, 12)).intValue();
-					int secs = Integer.valueOf(path.substring(12, 14)).intValue();
-
-					// Check if the date/time includes milliseconds
-
-					int millis = 0;
-					int sep = path.indexOf(' ', MDTM_DATETIME_MINLEN);
-
-					if ( path.charAt(MDTM_DATETIME_MINLEN) == '.') {
-
-						// Find the seperator between the date/time and path
-
-						millis = Integer.valueOf(path.substring(MDTM_DATETIME_MINLEN + 1, sep)).intValue();
-					}
-
-					// Create the modify date/time, month is zero based
-
-					Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
-
-					cal.set(year, month - 1, day, hours, mins, secs);
-					if ( millis != 0)
-						cal.set(Calendar.MILLISECOND, millis);
-
-					// Get the modify date/time
-
-					modifyDateTime = cal.getTimeInMillis();
-
-					// Remove the date/time from the request argument
-
-					path = path.substring(sep + 1);
-					req.updateArgument(path);
-
-					// DEBUG
-
-					if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-						debugPrintln("Modify date/time arg=" + path + ", utcTime=" + modifyDateTime);
-				}
-				catch (NumberFormatException ex) {
-				}
-			}
-		}
-
-		// Create the path for the file request
-
-		FTPPath ftpPath = generatePathForRequest(req, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path");
-			return;
-		}
-
-		// Get the file information
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Access the virtual filesystem driver
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-
-			// Check if the modify date/time should be set
-
-			if ( modifyDateTime != 0L) {
-
-				// Set the file/folder modification date/time
-
-				FileInfo finfo = new FileInfo();
-				finfo.setModifyDateTime(modifyDateTime);
-				finfo.setFileInformationFlags(FileInfo.SetModifyDate);
-
-				disk.setFileInformation(this, tree, ftpPath.getSharePath(), finfo);
-			}
-
-			// Get the file information
-
-			FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
-
-			if ( finfo == null) {
-				sendFTPResponse(550, "File " + req.getArgument() + " not available");
-				return;
-			}
-
-			// Return the file modification date/time
-
-			if ( finfo.hasModifyDateTime())
-				sendFTPResponse(213, FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
-			else
-				sendFTPResponse(550, "Modification date/time not available for " + finfo.getFileName());
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-				debugPrintln("File modify date/time ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName()
-						+ ", modified=" + finfo.getModifyDateTime());
-		}
-		catch (Exception ex) {
-			sendFTPResponse(550, "Error retrieving file modification date/time");
-		}
-	}
-
-	/**
-	 * Process a server features request
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procFeatures(FTPRequest req)
-		throws IOException {
-
-		// Return the list of supported server features
-
-		sendFTPResponse("211-Features supported");
-
-		// Modify date/time and size commands supported
-
-		if ( FeatureMFMT)
-			sendFTPResponse(" MFMT");
-
-		if ( FeatureSIZE)
-			sendFTPResponse(" SIZE");
-
-		if ( FeatureUTF8)
-			sendFTPResponse(" UTF8");
-
-		// Machine listing supported, build the fact list
-
-		if ( FeatureMLST) {
-			StringBuffer mlstStr = new StringBuffer();
-
-			mlstStr.append(" MLST ");
-
-			for (int i = 0; i < _factNames.length; i++) {
-
-				// Output the fact name
-
-				mlstStr.append(_factNames[i]);
-
-				// Check if the fact is enabled by default
-
-				if ( (MLST_DEFAULT & (1 << i)) != 0)
-					mlstStr.append("*");
-				mlstStr.append(";");
-			}
-
-			sendFTPResponse(mlstStr.toString());
-			sendFTPResponse(" MLSD");
-		}
-
-		if ( FeatureAUTH)
-		    sendFTPResponse(" AUTH TLS");
-
-		sendFTPResponse(211, "END");
-	}
-
-	/**
-	 * Process a file size command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procFileSize(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if an argument has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Syntax error, parameter required");
-			return;
-		}
-
-		// Create the path for the file listing
-
-		FTPPath ftpPath = generatePathForRequest(req, true);
-		if ( ftpPath == null) {
-			sendFTPResponse(550, "Invalid path");
-			return;
-		}
-
-		// Get the file information
-
-		DiskInterface disk = null;
-		TreeConnection tree = null;
-
-		try {
-
-			// Create a temporary tree connection
-
-			tree = getTreeConnection(ftpPath.getSharedDevice());
-
-			// Access the virtual filesystem driver
-
-			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-
-			// Get the file information
-
-			FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
-
-			if ( finfo == null) {
-				sendFTPResponse(550, "File " + req.getArgument() + " not available");
-				return;
-			}
-
-			// Return the file size
-
-			sendFTPResponse(213, "" + finfo.getSize());
-
-			// DEBUG
-
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_FILE))
-				debugPrintln("File size ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", size="
-						+ finfo.getSize());
-		}
-		catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Error retriving file size, " + ex.toString());
+            if (is != null) {
+                is.close();
             }
-            debugPrintln(ex);
 
-			sendFTPResponse(550, "Error retrieving file size");
-		}
-	}
+            // Close the data connection to the client
 
-	/**
-	 * Process a site specific command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procSite(FTPRequest req)
-		throws IOException {
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+        }
+    }
 
-		// Check if the user is logged in
+    /**
+     * Process a delete file command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procDeleteFile(final FTPRequest req) throws IOException {
 
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
+        // Check if the user is logged in
 
-		// Check if the FTP server has a site interface
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		if ( getFTPServer().hasSiteInterface()) {
+        // Check if an argument has been specified
 
-			// Pass the request to the site interface
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
 
-			FTPSiteInterface siteInterface = getFTPServer().getSiteInterface();
+        // Create the path for the file
 
-			siteInterface.processFTPSiteCommand(this, req);
-		}
-		else {
+        final FTPPath ftpPath = generatePathForRequest(req, true);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path specified");
+            return;
+        }
 
-			// SITE command not implemented
+        // Delete the specified file
 
-			sendFTPResponse(501, "SITE commands not implemented");
-		}
-	}
+        DiskInterface disk = null;
+        TreeConnection tree = null;
 
-	/**
-	 * Process a structure command. This command is obsolete.
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procStructure(FTPRequest req)
-		throws IOException {
+        try {
 
-		// Check for the file structure argument
+            // Create a temporary tree connection
 
-		if ( req.hasArgument() && req.getArgument().equalsIgnoreCase("F")) {
+            tree = getTreeConnection(ftpPath.getSharedDevice());
 
-			// Return a success status
+            // Check if the session has the required access to the filesystem
 
-			sendFTPResponse(200, "OK");
-		}
-		else {
+            if (tree == null || tree.hasWriteAccess() == false) {
 
-			// Return an error response
+                // Session does not have write access to the filesystem
 
-			sendFTPResponse(504, "Obsolete");
-		}
-	}
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
 
-	/**
-	 * Process a mode command. This command is obsolete.
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procMode(FTPRequest req)
-		throws IOException {
+            // Check if the file exists and it is a file
 
-		// Check for the stream transfer mode argument
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
-		if ( req.hasArgument() && req.getArgument().equalsIgnoreCase("S")) {
+            if (sts == FileStatus.FileExists) {
 
-			// Return a success status
+                // Delete the file
 
-			sendFTPResponse(200, "OK");
-		}
-		else {
+                disk.deleteFile(this, tree, ftpPath.getSharePath());
 
-			// Return an error response
+                // Check if there are any file/directory change notify requests active
 
-			sendFTPResponse(504, "Obsolete");
-		}
-	}
+                final DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
+                if (diskCtx.hasChangeHandler()) {
+                    diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionRemoved, ftpPath.getSharePath());
+                }
 
-	/**
-	 * Process an allocate command. This command is obsolete.
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procAllocate(FTPRequest req)
-		throws IOException {
+                // DEBUG
 
-		// Return a response
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                    LOGGER.info("Deleted ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+                }
+            } else {
 
-		sendFTPResponse(202, "Obsolete");
-	}
+                // File does not exist or is a directory
 
-	/**
-	 * Process an abort command. The main abort processing is done in the store/return file handling
-	 * during an active file transfer.
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procAbort(FTPRequest req)
-		throws IOException {
+                sendFTPResponse(550, "File " + req.getArgument() + (sts == FileStatus.NotExist ? " not available" : " is a directory"));
+                return;
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error deleting file, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(450, "File action not taken");
+            return;
+        }
 
-		// Return a success response
+        // Return a success status
 
-		sendFTPResponse(226, "No active transfer to abort");
-	}
+        sendFTPResponse(250, "File " + req.getArgument() + " deleted");
+    }
 
-	/**
-	 * Process an authentication command for SSL/TLS.
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procAuth(FTPRequest req)
-		throws IOException {
+    /**
+     * Process a rename from command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procRenameFrom(final FTPRequest req) throws IOException {
 
-		// Check if SSL/TLS sessions are enabled
+        // Check if the user is logged in
 
-		if ( getFTPServer().getFTPConfiguration().isFTPSEnabled() == false) {
-			sendFTPResponse( 534, "SSL/TLS sessions not available");
-			return;
-		}
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
 
-		// Switch the control session into SSL/TLS mode
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Clear the current rename from path details, if any
+
+        m_renameFrom = null;
+
+        // Create the path for the file/directory
+
+        final FTPPath ftpPath = generatePathForRequest(req, false, false);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path specified");
+            return;
+        }
+
+        // Check that the file exists, and it is a file
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Check if the session has the required access to the filesystem
+
+            if (tree == null || tree.hasWriteAccess() == false) {
+
+                // Session does not have write access to the filesystem
+
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+
+            // Check if the file exists and it is a file
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+
+            if (sts != FileStatus.NotExist) {
+
+                // Save the rename from file details, rename to command should follow
+
+                m_renameFrom = ftpPath;
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                    LOGGER.info("RenameFrom ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+                }
+            } else {
+
+                // File/directory does not exist
+
+                sendFTPResponse(550, "File " + req.getArgument() + (sts == FileStatus.NotExist ? " not available" : " is a directory"));
+                return;
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error renaming file from, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(450, "File action not taken");
+            return;
+        }
+
+        // Return a success status
+
+        sendFTPResponse(350, "File " + req.getArgument() + " OK");
+    }
+
+    /**
+     * Process a rename to command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procRenameTo(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Check if the rename from has already been set
+
+        if (m_renameFrom == null) {
+            sendFTPResponse(550, "Rename from not set");
+            return;
+        }
+
+        // Create the path for the new file name
+
+        final FTPPath ftpPath = generatePathForRequest(req, true, false);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path specified");
+            return;
+        }
+
+        // Check that the rename is on the same share
+
+        if (m_renameFrom.getShareName().compareTo(ftpPath.getShareName()) != 0) {
+            sendFTPResponse(550, "Cannot rename across shares");
+            return;
+        }
+
+        // Rename the file
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Check if the session has the required access to the filesystem
+
+            if (tree == null || tree.hasWriteAccess() == false) {
+
+                // Session does not have write access to the filesystem
+
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+
+            // Check if the file exists and it is a file
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+
+            if ((sts == FileStatus.NotExist) ||
+                    // Special condition where we are changing case of file name but the search above is case insensitive
+                    ((sts == FileStatus.FileExists) & m_renameFrom.getSharePath().equalsIgnoreCase(ftpPath.getSharePath()))) {
+
+                // Rename the file/directory
+
+                disk.renameFile(this, tree, m_renameFrom.getSharePath(), ftpPath.getSharePath());
+
+                // Check if there are any file/directory change notify requests active
+
+                final DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
+                if (diskCtx.hasChangeHandler()) {
+                    diskCtx.getChangeHandler().notifyRename(m_renameFrom.getSharePath(), ftpPath.getSharePath());
+                }
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                    LOGGER.info("RenameTo ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+                }
+            } else {
+
+                // Destination file already exists or is a directory
+                sendFTPResponse(550, "File " + req.getArgument() + (sts == FileStatus.FileExists ? " already exists" : " is a directory"));
+                return;
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error rename to, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(450, "File action not taken");
+            return;
+        } finally {
+
+            // Clear the rename details
+
+            m_renameFrom = null;
+        }
+
+        // Return a success status
+
+        sendFTPResponse(250, "File renamed OK");
+    }
+
+    /**
+     * Process a create directory command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procCreateDirectory(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Check if the new directory contains multiple directories
+
+        final FTPPath ftpPath = generatePathForRequest(req, false, false);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path " + req.getArgument());
+            return;
+        }
+
+        // Create the new directory
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Check if the session has the required access to the filesystem
+
+            if (tree == null || tree.hasWriteAccess() == false) {
+
+                // Session does not have write access to the filesystem
+
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+
+            // Check if the directory exists
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+
+            if (sts == FileStatus.NotExist) {
+
+                // Create the new directory
+
+                final FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), FileAction.CreateNotExist, AccessMode.ReadWrite,
+                        FileAttribute.NTDirectory, 0);
+
+                disk.createDirectory(this, tree, params);
+
+                // Notify change listeners that a new directory has been created
+
+                final DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
+
+                if (diskCtx.hasChangeHandler()) {
+                    diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionAdded, ftpPath.getSharePath());
+                }
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY)) {
+                    LOGGER.info("CreateDir ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+                }
+            } else {
+
+                // File/directory already exists with that name, return an error
+
+                sendFTPResponse(450, sts == FileStatus.FileExists ? "File exists with that name" : "Directory already exists");
+                return;
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error creating directory, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(450, "Failed to create directory");
+            return;
+        }
+
+        // Return the FTP path to the client
+
+        sendFTPResponse(257, ftpPath.getFTPPath());
+    }
+
+    /**
+     * Process a delete directory command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procRemoveDirectory(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Check if the directory path contains multiple directories
+
+        final FTPPath ftpPath = generatePathForRequest(req, false);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path " + req.getArgument());
+            return;
+        }
+
+        // Check if the path is the root directory, cannot delete directories from the root
+        // directory
+        // as it maps to the list of available disk shares.
+
+        if (ftpPath.isRootPath() || ftpPath.isRootSharePath()) {
+            sendFTPResponse(550, "Access denied, cannot delete directory in root");
+            return;
+        }
+
+        // Delete the directory
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Check if the session has the required access to the filesystem
+
+            if (tree == null || tree.hasWriteAccess() == false) {
+
+                // Session does not have write access to the filesystem
+
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+
+            // Check if the directory exists
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+            final int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+
+            if (sts == FileStatus.DirectoryExists) {
+
+                // Delete the new directory
+
+                disk.deleteDirectory(this, tree, ftpPath.getSharePath());
+
+                // Check if there are any file/directory change notify requests active
+
+                final DiskDeviceContext diskCtx = (DiskDeviceContext) tree.getContext();
+                if (diskCtx.hasChangeHandler()) {
+                    diskCtx.getChangeHandler().notifyFileChanged(NotifyChange.ActionRemoved, ftpPath.getSharePath());
+                }
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_DIRECTORY)) {
+                    LOGGER.info("DeleteDir ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", path=" + ftpPath.getSharePath());
+                }
+            } else {
+
+                // File already exists with that name or directory does not exist return an error
+
+                sendFTPResponse(550, sts == FileStatus.FileExists ? "File exists with that name" : "Directory does not exist");
+                return;
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error deleting directory, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(550, "Failed to delete directory");
+            return;
+        }
+
+        // Return a success status
+
+        sendFTPResponse(250, "Directory deleted OK");
+    }
+
+    /**
+     * Process a machine listing request, single folder
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procMachineListing(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPResponse(530, "Not logged in");
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Create the path to be listed
+
+        final FTPPath ftpPath = generatePathForRequest(req, false, true);
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
+
+        // Get the file information
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Access the virtual filesystem driver
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+
+            // Get the file information
+
+            final FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
+
+            if (finfo == null) {
+                sendFTPResponse(550, "Path " + req.getArgument() + " not available");
+                return;
+            } else if (finfo.isDirectory() == false) {
+                sendFTPResponse(501, "Path " + req.getArgument() + " is not a directory");
+                return;
+            }
+
+            // Return the folder details
+
+            sendFTPResponse("250- Listing " + req.getArgument());
+
+            final StringBuffer mlstStr = new StringBuffer(80);
+            mlstStr.append(" ");
+
+            generateMlstString(finfo, m_mlstFacts, mlstStr, true);
+            mlstStr.append(CRLF);
+
+            sendFTPResponse(mlstStr.toString());
+            sendFTPResponse("250 End");
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                LOGGER.info("Mlst ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", info=" + finfo);
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error retrieving file information, " + ex.getMessage(), ex);
+            }
+            sendFTPResponse(550, "Error retrieving file information");
+        }
+    }
+
+    /**
+     * Process a machine listing request, folder contents
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procMachineListingContents(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if the request has an argument, if not then use the current working directory
+
+        if (req.hasArgument() == false) {
+            req.updateArgument(".");
+        }
+
+        // Create the path for the file listing
+
+        FTPPath ftpPath = m_cwd;
+        if (req.hasArgument()) {
+            ftpPath = generatePathForRequest(req, true);
+        }
+
+        if (ftpPath == null) {
+            sendFTPResponse(500, "Invalid path");
+            return;
+        }
+
+        // Check if the session has the required access
+
+        if (ftpPath.isRootPath() == false) {
+
+            // Check if the session has access to the filesystem
+
+            final TreeConnection tree = getTreeConnection(ftpPath.getSharedDevice());
+            if (tree == null || tree.hasReadAccess() == false) {
+
+                // Session does not have access to the filesystem
+
+                sendFTPResponse(550, "Access denied");
+                return;
+            }
+        }
+
+        // Send the intermediate response
+
+        sendFTPResponse(150, "File status okay, about to open data connection");
+
+        // Check if there is an active data session
+
+        if (m_dataSess == null) {
+            sendFTPResponse(425, "Can't open data connection");
+            return;
+        }
+
+        // Get the data connection socket
+
+        Socket dataSock = null;
+
+        try {
+            dataSock = m_dataSess.getSocket();
+        } catch (final Exception ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
+
+        if (dataSock == null) {
+            sendFTPResponse(426, "Connection closed; transfer aborted");
+            return;
+        }
+
+        // Output the directory listing to the client
+
+        Writer dataWrt = null;
+
+        try {
+
+            // Open an output stream to the client
+
+            if (isUTF8Enabled()) {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream(), "UTF-8");
+            } else {
+                dataWrt = new OutputStreamWriter(dataSock.getOutputStream());
+            }
+
+            // Get a list of file information objects for the current directory
+
+            Vector<Object> files = null;
+
+            files = listFilesForPath(ftpPath, false, false);
+
+            // Output the file list to the client
+
+            if (files != null) {
+
+                // DEBUG
+
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_SEARCH)) {
+                    LOGGER.info("MLsd found " + files.size() + " files in " + ftpPath.getFTPPath());
+                }
+
+                // Output the file information to the client
+
+                final StringBuffer str = new StringBuffer(MLSD_BUFFER_SIZE);
+
+                for (int i = 0; i < files.size(); i++) {
+
+                    // Get the current file information
+
+                    final FileInfo finfo = (FileInfo) files.elementAt(i);
+
+                    generateMlstString(finfo, m_mlstFacts, str, false);
+                    str.append(CRLF);
+
+                    // Output the file information record when the buffer is full
+
+                    if (str.length() >= MLSD_BUFFER_SIZE) {
+
+                        // Output the file data records
+
+                        dataWrt.write(str.toString());
+
+                        // Reset the buffer
+
+                        str.setLength(0);
+                    }
+                }
+
+                // Flush any remaining file record data
+
+                if (str.length() > 0) {
+                    dataWrt.write(str.toString());
+                }
+            }
+
+            // End of file list transmission
+
+            sendFTPResponse(226, "Closing data connection");
+        } catch (final Exception ex) {
+
+            // Failed to send file listing
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error reading file list, " + ex.getMessage(), ex);
+            }
+
+            sendFTPResponse(451, "Error reading file list");
+        } finally {
+
+            // Close the data stream to the client
+
+            if (dataWrt != null) {
+                dataWrt.close();
+            }
+
+            // Close the data connection to the client
+
+            if (m_dataSess != null) {
+                getFTPServer().releaseDataSession(m_dataSess);
+                m_dataSess = null;
+            }
+        }
+    }
+
+    /**
+     * Process a get modification date/time command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procGetModifyDateTime(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Create the path for the file request
+
+        final FTPPath ftpPath = generatePathForRequest(req, true);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path");
+            return;
+        }
+
+        // Get the file information
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Access the virtual filesystem driver
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+
+            // Get the file information
+
+            final FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
+
+            if (finfo == null) {
+                sendFTPResponse(550, "File " + req.getArgument() + " not available");
+                return;
+            }
+
+            // Return the file modification date/time
+
+            if (finfo.hasModifyDateTime()) {
+                sendFTPResponse(213, FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
+            } else {
+                sendFTPResponse(550, "Modification date/time not available for " + finfo.getFileName());
+            }
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                LOGGER.info(
+                        "File modify date/time ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", modified=" + finfo.getModifyDateTime());
+            }
+        } catch (final Exception ex) {
+            sendFTPResponse(550, "Error retrieving file modification date/time");
+        }
+    }
+
+    /**
+     * Process a modify date/time command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procModifyDateTime(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Check the format of the argument to detemine if this is a get or set modify date/time
+        // request
+        //
+        // Get format is just the filename/path
+        // Set format is YYYYMMDDHHMMSS <path>
+
+        String path = req.getArgument();
+        long modifyDateTime = 0L;
+
+        if (path.length() > MDTM_DATETIME_MINLEN && path.indexOf(' ') != -1) {
+
+            // Check if the first argument looks like a date/time value
+
+            boolean settime = true;
+            for (int i = 0; i < MDTM_DATETIME_MINLEN; i++) {
+                if (Character.isDigit(path.charAt(i)) == false) {
+                    settime = false;
+                }
+            }
+
+            // Looks like a date/time value
+
+            if (settime == true) {
+
+                try {
+
+                    // Parse the various fields
+
+                    final int year = Integer.valueOf(path.substring(0, 4)).intValue();
+                    final int month = Integer.valueOf(path.substring(4, 6)).intValue();
+                    final int day = Integer.valueOf(path.substring(6, 8)).intValue();
+
+                    final int hours = Integer.valueOf(path.substring(8, 10)).intValue();
+                    final int mins = Integer.valueOf(path.substring(10, 12)).intValue();
+                    final int secs = Integer.valueOf(path.substring(12, 14)).intValue();
+
+                    // Check if the date/time includes milliseconds
+
+                    int millis = 0;
+                    final int sep = path.indexOf(' ', MDTM_DATETIME_MINLEN);
+
+                    if (path.charAt(MDTM_DATETIME_MINLEN) == '.') {
+
+                        // Find the seperator between the date/time and path
+
+                        millis = Integer.valueOf(path.substring(MDTM_DATETIME_MINLEN + 1, sep)).intValue();
+                    }
+
+                    // Create the modify date/time, month is zero based
+
+                    final Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+
+                    cal.set(year, month - 1, day, hours, mins, secs);
+                    if (millis != 0) {
+                        cal.set(Calendar.MILLISECOND, millis);
+                    }
+
+                    // Get the modify date/time
+
+                    modifyDateTime = cal.getTimeInMillis();
+
+                    // Remove the date/time from the request argument
+
+                    path = path.substring(sep + 1);
+                    req.updateArgument(path);
+
+                    // DEBUG
+
+                    if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                        LOGGER.info("Modify date/time arg=" + path + ", utcTime=" + modifyDateTime);
+                    }
+                } catch (final NumberFormatException ex) {
+                }
+            }
+        }
+
+        // Create the path for the file request
+
+        final FTPPath ftpPath = generatePathForRequest(req, true);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path");
+            return;
+        }
+
+        // Get the file information
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Access the virtual filesystem driver
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+
+            // Check if the modify date/time should be set
+
+            if (modifyDateTime != 0L) {
+
+                // Set the file/folder modification date/time
+
+                final FileInfo finfo = new FileInfo();
+                finfo.setModifyDateTime(modifyDateTime);
+                finfo.setFileInformationFlags(FileInfo.SetModifyDate);
+
+                disk.setFileInformation(this, tree, ftpPath.getSharePath(), finfo);
+            }
+
+            // Get the file information
+
+            final FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
+
+            if (finfo == null) {
+                sendFTPResponse(550, "File " + req.getArgument() + " not available");
+                return;
+            }
+
+            // Return the file modification date/time
+
+            if (finfo.hasModifyDateTime()) {
+                sendFTPResponse(213, FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
+            } else {
+                sendFTPResponse(550, "Modification date/time not available for " + finfo.getFileName());
+            }
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                LOGGER.info(
+                        "File modify date/time ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", modified=" + finfo.getModifyDateTime());
+            }
+        } catch (final Exception ex) {
+            sendFTPResponse(550, "Error retrieving file modification date/time");
+        }
+    }
+
+    /**
+     * Process a server features request
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procFeatures(final FTPRequest req) throws IOException {
+
+        // Return the list of supported server features
+
+        sendFTPResponse("211-Features supported");
+
+        // Modify date/time and size commands supported
+
+        if (FeatureMFMT) {
+            sendFTPResponse(" MFMT");
+        }
+
+        if (FeatureSIZE) {
+            sendFTPResponse(" SIZE");
+        }
+
+        if (FeatureUTF8) {
+            sendFTPResponse(" UTF8");
+        }
+
+        // Machine listing supported, build the fact list
+
+        if (FeatureMLST) {
+            final StringBuffer mlstStr = new StringBuffer();
+
+            mlstStr.append(" MLST ");
+
+            for (int i = 0; i < _factNames.length; i++) {
+
+                // Output the fact name
+
+                mlstStr.append(_factNames[i]);
+
+                // Check if the fact is enabled by default
+
+                if ((MLST_DEFAULT & (1 << i)) != 0) {
+                    mlstStr.append("*");
+                }
+                mlstStr.append(";");
+            }
+
+            sendFTPResponse(mlstStr.toString());
+            sendFTPResponse(" MLSD");
+        }
+
+        if (FeatureAUTH) {
+            sendFTPResponse(" AUTH TLS");
+        }
+
+        sendFTPResponse(211, "END");
+    }
+
+    /**
+     * Process a file size command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procFileSize(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if an argument has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Syntax error, parameter required");
+            return;
+        }
+
+        // Create the path for the file listing
+
+        final FTPPath ftpPath = generatePathForRequest(req, true);
+        if (ftpPath == null) {
+            sendFTPResponse(550, "Invalid path");
+            return;
+        }
+
+        // Get the file information
+
+        DiskInterface disk = null;
+        TreeConnection tree = null;
+
+        try {
+
+            // Create a temporary tree connection
+
+            tree = getTreeConnection(ftpPath.getSharedDevice());
+
+            // Access the virtual filesystem driver
+
+            disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
+
+            // Get the file information
+
+            final FileInfo finfo = disk.getFileInformation(this, tree, ftpPath.getSharePath());
+
+            if (finfo == null) {
+                sendFTPResponse(550, "File " + req.getArgument() + " not available");
+                return;
+            }
+
+            // Return the file size
+
+            sendFTPResponse(213, "" + finfo.getSize());
+
+            // DEBUG
+
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_FILE)) {
+                LOGGER.info("File size ftp=" + ftpPath.getFTPPath() + ", share=" + ftpPath.getShareName() + ", size=" + finfo.getSize());
+            }
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Error retriving file size, " + ex.getMessage(), ex);
+            }
+
+            sendFTPResponse(550, "Error retrieving file size");
+        }
+    }
+
+    /**
+     * Process a site specific command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procSite(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if the FTP server has a site interface
+
+        if (getFTPServer().hasSiteInterface()) {
+
+            // Pass the request to the site interface
+
+            final FTPSiteInterface siteInterface = getFTPServer().getSiteInterface();
+
+            siteInterface.processFTPSiteCommand(this, req);
+        } else {
+
+            // SITE command not implemented
+
+            sendFTPResponse(501, "SITE commands not implemented");
+        }
+    }
+
+    /**
+     * Process a structure command. This command is obsolete.
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procStructure(final FTPRequest req) throws IOException {
+
+        // Check for the file structure argument
+
+        if (req.hasArgument() && req.getArgument().equalsIgnoreCase("F")) {
+
+            // Return a success status
+
+            sendFTPResponse(200, "OK");
+        } else {
+
+            // Return an error response
+
+            sendFTPResponse(504, "Obsolete");
+        }
+    }
+
+    /**
+     * Process a mode command. This command is obsolete.
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procMode(final FTPRequest req) throws IOException {
+
+        // Check for the stream transfer mode argument
+
+        if (req.hasArgument() && req.getArgument().equalsIgnoreCase("S")) {
+
+            // Return a success status
+
+            sendFTPResponse(200, "OK");
+        } else {
+
+            // Return an error response
+
+            sendFTPResponse(504, "Obsolete");
+        }
+    }
+
+    /**
+     * Process an allocate command. This command is obsolete.
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procAllocate(final FTPRequest req) throws IOException {
+
+        // Return a response
+
+        sendFTPResponse(202, "Obsolete");
+    }
+
+    /**
+     * Process an abort command. The main abort processing is done in the store/return file handling during an active file transfer.
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procAbort(final FTPRequest req) throws IOException {
+
+        // Return a success response
+
+        sendFTPResponse(226, "No active transfer to abort");
+    }
+
+    /**
+     * Process an authentication command for SSL/TLS.
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procAuth(final FTPRequest req) throws IOException {
+
+        // Check if SSL/TLS sessions are enabled
+
+        if (getFTPServer().getFTPConfiguration().isFTPSEnabled() == false) {
+            sendFTPResponse(534, "SSL/TLS sessions not available");
+            return;
+        }
+
+        // Switch the control session into SSL/TLS mode
 
         try {
 
             // Check for SSL or TLS type
 
-            if ( req.hasArgument()) {
+            if (req.hasArgument()) {
 
-                String engineTyp = req.getArgument().toUpperCase();
-                if ( engineTyp.equals( "SSL") || engineTyp.equals( "TLS")) {
+                final String engineTyp = req.getArgument().toUpperCase();
+                if (engineTyp.equals("SSL") || engineTyp.equals("TLS")) {
 
                     // Initialize the SSL engine
 
-                    setupSSLEngine( engineTyp);
+                    setupSSLEngine(engineTyp);
 
                     // Send a response to indicate the socket is ready to switch to SSL/TLS mode
 
                     sendUnencryptedFTPResponse(234, "Switching to " + engineTyp + " secure session");
                 }
-            }
-            else {
+            } else {
 
                 // Type not specified
 
-                sendFTPResponse( 421, "Failed to negotiate SSL/TLS, type not specified");
+                sendFTPResponse(421, "Failed to negotiate SSL/TLS, type not specified");
             }
-        }
-        catch (Exception ex) {
-            if ( LOGGER.isInfoEnabled() && hasDebug(DBG_ERROR)){
-                debugPrintln(" Faile to negotiate SSL/TLS, " + ex.toString());
+        } catch (final Exception ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error(" Faile to negotiate SSL/TLS, " + ex.getMessage(), ex);
             }
-                debugPrintln(ex);
 
             m_sslEngine = null;
-            sendFTPResponse( 421, "Failed to negotiate SSL/TLS");
+            sendFTPResponse(421, "Failed to negotiate SSL/TLS");
         }
-	}
+    }
 
     /**
      * Process a protected buffer size command.
      *
-     * @param req FTPRequest
+     * @param req
+     *            FTPRequest
      * @exception IOException
      */
-    protected final void procProtectedBufferSize(FTPRequest req)
-        throws IOException {
+    protected final void procProtectedBufferSize(final FTPRequest req) throws IOException {
 
         // Check if the control session is using SSL/TLS
 
-        if ( m_sslEngine == null) {
-            sendFTPResponse( 503, "Not using secure connection");
+        if (m_sslEngine == null) {
+            sendFTPResponse(503, "Not using secure connection");
             return;
         }
 
         // Convert the buffer size argument
 
-        String arg = req.getArgument();
-        if ( arg == null || arg.length() == 0) {
-            sendFTPResponse( 501, "Empty buffer size argument");
+        final String arg = req.getArgument();
+        if (arg == null || arg.length() == 0) {
+            sendFTPResponse(501, "Empty buffer size argument");
             return;
         }
 
         // Parse the buffer size argument
 
         try {
-            m_pbSize = Integer.parseInt( arg);
-        }
-        catch ( NumberFormatException ex) {
-            sendFTPResponse( 501, "Invalid buffer size argument");
+            m_pbSize = Integer.parseInt(arg);
+        } catch (final NumberFormatException ex) {
+            sendFTPResponse(501, "Invalid buffer size argument");
             return;
         }
 
         // Return a success status
 
-        sendFTPResponse( 200, "Buffer size ok");
+        sendFTPResponse(200, "Buffer size ok");
     }
 
     /**
      * Process a data channel protection level command.
      *
-     * @param req FTPRequest
+     * @param req
+     *            FTPRequest
      * @exception IOException
      */
-    protected final void procDataChannelProtection(FTPRequest req)
-        throws IOException {
+    protected final void procDataChannelProtection(final FTPRequest req) throws IOException {
 
         // Check that the protected buffer size has been negotiated
 
-        if ( m_pbSize == -1) {
-            sendFTPResponse( 503, "Protected buffer size not negotiated");
+        if (m_pbSize == -1) {
+            sendFTPResponse(503, "Protected buffer size not negotiated");
             return;
         }
 
         // Validate the protection level
 
-        String arg = req.getArgument().toUpperCase();
+        final String arg = req.getArgument().toUpperCase();
 
-        if ( arg == null || ProtLevels.indexOf( arg) == -1) {
-            sendFTPResponse( 504, "Invalid protection level, " + arg);
+        if (arg == null || ProtLevels.indexOf(arg) == -1) {
+            sendFTPResponse(504, "Invalid protection level, " + arg);
             return;
         }
 
         // Only accept the 'clear' protection level
 
-        if ( arg.equals( ProtLevelClear)) {
+        if (arg.equals(ProtLevelClear)) {
 
-        	// Accept the clear protection level, data connections sent in clear text
+            // Accept the clear protection level, data connections sent in clear text
 
-        	sendFTPResponse( 200, "Protection level accepted");
-        }
-        else {
+            sendFTPResponse(200, "Protection level accepted");
+        } else {
 
-	        // Reject the protection level for now, we do not support protected data connections
+            // Reject the protection level for now, we do not support protected data connections
 
-	        sendFTPResponse( 534, "Protected data connections not supported");
+            sendFTPResponse(534, "Protected data connections not supported");
         }
     }
 
     /**
      * Process a clear command channel command
      *
-     * @param ftpReq FTPRequest
+     * @param ftpReq
+     *            FTPRequest
      * @exception IOException
      */
-    protected final void procClearCommandChannel( FTPRequest ftpReq)
-    	throws IOException {
+    protected final void procClearCommandChannel(final FTPRequest ftpReq) throws IOException {
 
         // Check if the control session is using SSL/TLS
 
-        if ( m_sslEngine == null) {
-            sendFTPResponse( 533, "Not using secure connection");
+        if (m_sslEngine == null) {
+            sendFTPResponse(533, "Not using secure connection");
             return;
         }
 
         // Send the response over the protected session
 
-        sendFTPResponse( 200, "Secure connection closed");
+        sendFTPResponse(200, "Secure connection closed");
 
-    	// Close the SSL engine
+        // Close the SSL engine
 
         m_sslEngine.closeOutbound();
-    	getSSLCommand( m_inbuf, 0);
+        getSSLCommand(m_inbuf, 0);
 
         // Release resources used by the secure connection
 
-        m_sslEngine  = null;
+        m_sslEngine = null;
         m_sslContext = null;
 
-        m_sslIn  = null;
+        m_sslIn = null;
         m_sslOut = null;
     }
 
-	/**
-	 * Process an extended port command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procExtendedPort(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Check if the parameter has been specified
-
-		if ( req.hasArgument() == false) {
-			sendFTPResponse(501, "Required argument missing");
-			return;
-		}
-
-		// Parse the client address
-
-		InetSocketAddress clientAddr;
-		try {
-		    clientAddr = parseExtendedAddress( req.getArgument());
-		} catch (Exception ex) {
-		    sendFTPResponse(501, ex.getMessage());
-			return;
-		}
-
-		// DEBUG
-
-		if ( LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT))
-			debugPrintln("Opening data socket addr=" + clientAddr.getAddress() + ", port=" + clientAddr.getPort());
-
-		// Create an active data session, the actual socket connection will be made later
-
-		m_dataSess = getFTPServer().allocateDataSession(this, clientAddr.getAddress(), clientAddr.getPort());
-
-		// Return a success response to the client
-
-		sendFTPResponse(200, "Port OK");
-
-		// DEBUG
-
-		if ( LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT))
-			debugPrintln("Extended port open addr=" + clientAddr.getAddress() + ", port=" + clientAddr.getPort());
-	}
-
-	/**
-	 * Process an extended passive command
-	 *
-	 * @param req FTPRequest
-	 * @exception IOException
-	 */
-	protected final void procExtendedPassive(FTPRequest req)
-		throws IOException {
-
-		// Check if the user is logged in
-
-		if ( isLoggedOn() == false) {
-			sendFTPNotLoggedOnResponse();
-			return;
-		}
-
-		// Create a passive data session
-
-		try {
-			m_dataSess = getFTPServer().allocatePassiveDataSession(this, m_sock.getLocalAddress());
-		}
-		catch (IOException ex) {
-			m_dataSess = null;
-		}
-
-		// Check if the data session is valid
-
-		if ( m_dataSess == null) {
-			sendFTPResponse(550, "Requested action not taken");
-			return;
-		}
-
-		// Get the passive connection address/port and return to the client
-
-		int pasvPort = m_dataSess.getPassivePort();
-
-		StringBuffer msg = new StringBuffer();
-
-		msg.append("229 Entering Extended Passive Mode (|||");
-		msg.append(pasvPort);
-		msg.append("|)");
-
-		sendFTPResponse(msg);
-
-		// DEBUG
-
-		if ( LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT))
-			debugPrintln("Extended passive open addr=" + m_sock.getLocalAddress() + ", port=" + pasvPort);
-	}
-
-	/**
-	 * Parse the extended network address string
-	 *
-     * Comments for ALF-684
-     * RFC 2428:
+    /**
+     * Process an extended port command
      *
-     *   AF Number   Protocol
-     *   ---------   --------
-     *   1           Internet Protocol, Version 4 [Pos81a]
-     *   2           Internet Protocol, Version 6 [DH96]
-     *
-     *  AF Number   Address Format      Example
-     *   ---------   --------------      -------
-     *   1           dotted decimal      132.235.1.2
-     *   2           IPv6 string         1080::8:800:200C:417A
-     *               representations
-     *               defined in [HD96]
-     *
-     *  The following are sample EPRT commands:
-     *
-     *   EPRT |1|132.235.1.2|6275|
-     *   EPRT |2|1080::8:800:200C:417A|5282|
-     *
-     *   So, we need to parse the InternetAddress according to AF Number.
-     *   That means we don't need to do any 'instanceof', just check the address
-     *   validity and raise the error, e.g. 501 (IP Address is not valid) if the
-     *   address is not convenient to AF Number.
-     *
-	 * @param extAddr String
-	 * @return InetSocketAddress
-	 */
-	private final InetSocketAddress parseExtendedAddress( String extAddr) {
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procExtendedPort(final FTPRequest req) throws IOException {
 
-		// Make sure the string is valid
-		if ( extAddr == null || extAddr.length() < 7)
-                    throw new IllegalArgumentException("Invalid argument");
-		// Split the string into network type, network address and port strings
-		StringTokenizer tokens = new StringTokenizer( extAddr, extAddr.substring(0, 1));
-		if ( tokens.countTokens() < 3)
-                    throw new IllegalArgumentException("Invalid argument");
-		String netType = tokens.nextToken();
-		String netAddr = tokens.nextToken();
-		String netPort = tokens.nextToken();
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Check if the parameter has been specified
+
+        if (req.hasArgument() == false) {
+            sendFTPResponse(501, "Required argument missing");
+            return;
+        }
+
+        // Parse the client address
+
+        InetSocketAddress clientAddr;
+        try {
+            clientAddr = parseExtendedAddress(req.getArgument());
+        } catch (final Exception ex) {
+            sendFTPResponse(501, ex.getMessage());
+            return;
+        }
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
+            LOGGER.info("Opening data socket addr=" + clientAddr.getAddress() + ", port=" + clientAddr.getPort());
+        }
+
+        // Create an active data session, the actual socket connection will be made later
+
+        m_dataSess = getFTPServer().allocateDataSession(this, clientAddr.getAddress(), clientAddr.getPort());
+
+        // Return a success response to the client
+
+        sendFTPResponse(200, "Port OK");
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
+            LOGGER.info("Extended port open addr=" + clientAddr.getAddress() + ", port=" + clientAddr.getPort());
+        }
+    }
+
+    /**
+     * Process an extended passive command
+     *
+     * @param req
+     *            FTPRequest
+     * @exception IOException
+     */
+    protected final void procExtendedPassive(final FTPRequest req) throws IOException {
+
+        // Check if the user is logged in
+
+        if (isLoggedOn() == false) {
+            sendFTPNotLoggedOnResponse();
+            return;
+        }
+
+        // Create a passive data session
+
+        try {
+            m_dataSess = getFTPServer().allocatePassiveDataSession(this, m_sock.getLocalAddress());
+        } catch (final IOException ex) {
+            m_dataSess = null;
+        }
+
+        // Check if the data session is valid
+
+        if (m_dataSess == null) {
+            sendFTPResponse(550, "Requested action not taken");
+            return;
+        }
+
+        // Get the passive connection address/port and return to the client
+
+        final int pasvPort = m_dataSess.getPassivePort();
+
+        final StringBuffer msg = new StringBuffer();
+
+        msg.append("229 Entering Extended Passive Mode (|||");
+        msg.append(pasvPort);
+        msg.append("|)");
+
+        sendFTPResponse(msg);
+
+        // DEBUG
+
+        if (LOGGER.isInfoEnabled() && hasDebug(DBG_DATAPORT)) {
+            LOGGER.info("Extended passive open addr=" + m_sock.getLocalAddress() + ", port=" + pasvPort);
+        }
+    }
+
+    /**
+     * Parse the extended network address string
+     *
+     * Comments for ALF-684 RFC 2428:
+     *
+     * AF Number Protocol --------- -------- 1 Internet Protocol, Version 4 [Pos81a] 2 Internet Protocol, Version 6 [DH96]
+     *
+     * AF Number Address Format Example --------- -------------- ------- 1 dotted decimal 132.235.1.2 2 IPv6 string 1080::8:800:200C:417A representations
+     * defined in [HD96]
+     *
+     * The following are sample EPRT commands:
+     *
+     * EPRT |1|132.235.1.2|6275| EPRT |2|1080::8:800:200C:417A|5282|
+     *
+     * So, we need to parse the InternetAddress according to AF Number. That means we don't need to do any 'instanceof', just check the address validity and
+     * raise the error, e.g. 501 (IP Address is not valid) if the address is not convenient to AF Number.
+     *
+     * @param extAddr
+     *            String
+     * @return InetSocketAddress
+     */
+    private final InetSocketAddress parseExtendedAddress(final String extAddr) {
+
+        // Make sure the string is valid
+        if (extAddr == null || extAddr.length() < 7) {
+            throw new IllegalArgumentException("Invalid argument");
+        }
+        // Split the string into network type, network address and port strings
+        final StringTokenizer tokens = new StringTokenizer(extAddr, extAddr.substring(0, 1));
+        if (tokens.countTokens() < 3) {
+            throw new IllegalArgumentException("Invalid argument");
+        }
+        final String netType = tokens.nextToken();
+        final String netAddr = tokens.nextToken();
+        final String netPort = tokens.nextToken();
 
         int afNumber = 0;
         try {
-            afNumber = Integer.parseInt( netType);
+            afNumber = Integer.parseInt(netType);
+        } catch (final NumberFormatException ex) {
         }
-        catch ( NumberFormatException ex) {}
 
-        if (afNumber == TypeIPv4 || afNumber == TypeIPv6)
-        {
+        if (afNumber == TypeIPv4 || afNumber == TypeIPv6) {
 
-	        InetSocketAddress sockAddr = null;
+            InetSocketAddress sockAddr = null;
 
-	        // Since Java handles IPv4/IPv6 addresses transparenly as it is saying in
-	        // http://download.oracle.com/javase/1.5.0/docs/guide/net/ipv6_guide/index.html
-	        // We don't care about AF Number and Address Format, but just checking a validity
-	        // of the IP.
-	        InetAddress addr = null;
+            // Since Java handles IPv4/IPv6 addresses transparenly as it is saying in
+            // http://download.oracle.com/javase/1.5.0/docs/guide/net/ipv6_guide/index.html
+            // We don't care about AF Number and Address Format, but just checking a validity
+            // of the IP.
+            InetAddress addr = null;
 
             try {
-                addr = InetAddress.getByName( netAddr);
+                addr = InetAddress.getByName(netAddr);
+            } catch (final UnknownHostException ex) {
             }
-            catch ( UnknownHostException ex) {}
 
-            InetAddress remoteAddr = m_sock.getInetAddress();
+            final InetAddress remoteAddr = m_sock.getInetAddress();
             if (!addr.equals(remoteAddr)) {
-                if (LOGGER.isWarnEnabled() && hasDebug(DBG_DATAPORT))
-                    debugPrintln("EPRT address [" + addr + "] is not equals to client address [" + remoteAddr + "]. For security purposes client address is used for data transmition.");
+                if (LOGGER.isWarnEnabled() && hasDebug(DBG_DATAPORT)) {
+                    LOGGER.warn("EPRT address [" + addr + "] is not equals to client address [" + remoteAddr
+                            + "]. For security purposes client address is used for data transmition.");
+                }
                 addr = remoteAddr;
             }
 
@@ -3931,8 +3892,8 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             // I.e. fe80:0:0:0:a00:27ff:fe42:94f7%eth1
             if (addr != null && addr instanceof Inet6Address) {
                 try {
-                    addr = InetAddress.getByAddress( addr.getAddress());
-                } catch (UnknownHostException ex) {
+                    addr = InetAddress.getByAddress(addr.getAddress());
+                } catch (final UnknownHostException ex) {
                     throw new IllegalArgumentException("Unknown host");
                 }
             }
@@ -3940,462 +3901,471 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             int port = -1;
 
             try {
-                port = Integer.parseInt( netPort);
+                port = Integer.parseInt(netPort);
+            } catch (final NumberFormatException ex) {
             }
-            catch ( NumberFormatException ex) {}
 
-            if (port != -1)
-                sockAddr = new InetSocketAddress( addr, port);
+            if (port != -1) {
+                sockAddr = new InetSocketAddress(addr, port);
+            }
 
-	        return sockAddr;
+            return sockAddr;
         }
 
         throw new IllegalArgumentException("Invalid address/port argument");
     }
 
-	/**
-	 * Build a list of file name or file information objects for the specified server path
-	 *
-	 * @param path FTPPath
-	 * @param nameOnly boolean
-	 * @param hidden boolean
-	 * @return Vector<Object>
-	 */
-	protected final Vector<Object> listFilesForPath(FTPPath path, boolean nameOnly, boolean hidden) {
+    /**
+     * Build a list of file name or file information objects for the specified server path
+     *
+     * @param path
+     *            FTPPath
+     * @param nameOnly
+     *            boolean
+     * @param hidden
+     *            boolean
+     * @return Vector<Object>
+     */
+    protected final Vector<Object> listFilesForPath(final FTPPath path, final boolean nameOnly, final boolean hidden) {
 
-		// Check if the path is valid
+        // Check if the path is valid
 
-		if ( path == null)
-			return null;
+        if (path == null) {
+            return null;
+        }
 
-		// Check if the path is the root path
+        // Check if the path is the root path
 
-		Vector<Object> files = new Vector<Object>();
+        final Vector<Object> files = new Vector<Object>();
 
-		if ( path.hasSharedDevice() == false) {
+        if (path.hasSharedDevice() == false) {
 
-			// The first level of directories are mapped to the available shares
+            // The first level of directories are mapped to the available shares
 
-			SharedDeviceList shares = getShareList();
-			if ( shares != null) {
+            final SharedDeviceList shares = getShareList();
+            if (shares != null) {
 
-				// Search for disk shares
+                // Search for disk shares
 
-				Enumeration<SharedDevice> enm = shares.enumerateShares();
+                final Enumeration<SharedDevice> enm = shares.enumerateShares();
 
-				while (enm.hasMoreElements()) {
+                while (enm.hasMoreElements()) {
 
-					// Get the current shared device
+                    // Get the current shared device
 
-					SharedDevice shr = enm.nextElement();
+                    final SharedDevice shr = enm.nextElement();
 
-					// Add the share name or full information to the list
+                    // Add the share name or full information to the list
 
-					if ( nameOnly == false) {
+                    if (nameOnly == false) {
 
-						// Create a file information object for the top level directory details
+                        // Create a file information object for the top level directory details
 
-						FileInfo finfo = new FileInfo(shr.getName(), 0L, FileAttribute.Directory);
-						files.add(finfo);
-					}
-					else
-						files.add(shr.getName());
-				}
-			}
-		}
-		else {
+                        final FileInfo finfo = new FileInfo(shr.getName(), 0L, FileAttribute.Directory);
+                        files.add(finfo);
+                    } else {
+                        files.add(shr.getName());
+                    }
+                }
+            }
+        } else {
 
-			// Append a wildcard to the search path
+            // Append a wildcard to the search path
 
-			String searchPath = path.getSharePath();
+            String searchPath = path.getSharePath();
 
-			if ( path.isDirectory())
-				searchPath = path.makeSharePathToFile("*.*");
+            if (path.isDirectory()) {
+                searchPath = path.makeSharePathToFile("*.*");
+            }
 
-			// Create a temporary tree connection
+            // Create a temporary tree connection
 
-			TreeConnection tree = new TreeConnection(path.getSharedDevice());
+            final TreeConnection tree = new TreeConnection(path.getSharedDevice());
 
-			// Start a search on the specified disk share
+            // Start a search on the specified disk share
 
-			DiskInterface disk = null;
-			SearchContext ctx = null;
+            DiskInterface disk = null;
+            SearchContext ctx = null;
 
-			int searchAttr = FileAttribute.Directory + FileAttribute.Normal;
-			if ( hidden)
-				searchAttr += FileAttribute.Hidden;
+            int searchAttr = FileAttribute.Directory + FileAttribute.Normal;
+            if (hidden) {
+                searchAttr += FileAttribute.Hidden;
+            }
 
-			try {
-				disk = (DiskInterface) path.getSharedDevice().getInterface();
-				ctx = disk.startSearch(this, tree, searchPath, searchAttr);
-			}
-			catch (Exception ex) {
-			}
+            try {
+                disk = (DiskInterface) path.getSharedDevice().getInterface();
+                ctx = disk.startSearch(this, tree, searchPath, searchAttr);
+            } catch (final Exception ex) {
+            }
 
-			// Add the files to the list
+            // Add the files to the list
 
-			if ( ctx != null) {
+            if (ctx != null) {
 
-				// Get the file names/information
+                // Get the file names/information
 
-				while (ctx.hasMoreFiles()) {
+                while (ctx.hasMoreFiles()) {
 
-					// Check if a file name or file information is required
+                    // Check if a file name or file information is required
 
-					if ( nameOnly) {
+                    if (nameOnly) {
 
-						// Add a file name to the list
+                        // Add a file name to the list
 
-						files.addElement(ctx.nextFileName());
-					}
-					else {
+                        files.addElement(ctx.nextFileName());
+                    } else {
 
-						// Create a file information object
+                        // Create a file information object
 
-						FileInfo finfo = new FileInfo();
+                        final FileInfo finfo = new FileInfo();
 
-						if ( ctx.nextFileInfo(finfo) == false)
-							break;
-						if ( finfo.getFileName() != null)
-							files.addElement(finfo);
-					}
-				}
-			}
-		}
+                        if (ctx.nextFileInfo(finfo) == false) {
+                            break;
+                        }
+                        if (finfo.getFileName() != null) {
+                            files.addElement(finfo);
+                        }
+                    }
+                }
+            }
+        }
 
-		// Return the list of file names/information
+        // Return the list of file names/information
 
-		return files;
-	}
+        return files;
+    }
 
-	/**
-	 * Get the list of filtered shares that are available to this session
-	 *
-	 * @return SharedDeviceList
-	 */
-	protected final SharedDeviceList getShareList() {
+    /**
+     * Get the list of filtered shares that are available to this session
+     *
+     * @return SharedDeviceList
+     */
+    protected final SharedDeviceList getShareList() {
 
-		// Check if the filtered share list has been initialized
+        // Check if the filtered share list has been initialized
 
-		if ( m_shares == null) {
+        if (m_shares == null) {
 
-			// Get a list of shared filesystems
+            // Get a list of shared filesystems
 
-			SharedDeviceList shares = getFTPServer().getShareMapper().getShareList(getFTPServer().getServerName(), this, false);
+            final SharedDeviceList shares = getFTPServer().getShareMapper().getShareList(getFTPServer().getServerName(), this, false);
 
-			// Search for disk shares
+            // Search for disk shares
 
-			m_shares = new SharedDeviceList();
-			Enumeration<SharedDevice> enm = shares.enumerateShares();
+            m_shares = new SharedDeviceList();
+            final Enumeration<SharedDevice> enm = shares.enumerateShares();
 
-			while (enm.hasMoreElements()) {
+            while (enm.hasMoreElements()) {
 
-				// Get the current shared device
+                // Get the current shared device
 
-				SharedDevice shr = enm.nextElement();
+                final SharedDevice shr = enm.nextElement();
 
-				// Check if the share is a disk share
+                // Check if the share is a disk share
 
-				if ( shr instanceof DiskSharedDevice)
-					m_shares.addShare(shr);
-			}
+                if (shr instanceof DiskSharedDevice) {
+                    m_shares.addShare(shr);
+                }
+            }
 
-			// Check if there is an access control manager available, if so then filter the list of
-			// shared filesystems
+            // Check if there is an access control manager available, if so then filter the list of
+            // shared filesystems
 
-			if ( getServer().hasAccessControlManager()) {
+            if (getServer().hasAccessControlManager()) {
 
-				// Get the access control manager
+                // Get the access control manager
 
-				AccessControlManager aclMgr = getServer().getAccessControlManager();
+                final AccessControlManager aclMgr = getServer().getAccessControlManager();
 
-				// Filter the list of shared filesystems
+                // Filter the list of shared filesystems
 
-				m_shares = aclMgr.filterShareList(this, m_shares);
-			}
-		}
+                m_shares = aclMgr.filterShareList(this, m_shares);
+            }
+        }
 
-		// Return the filtered shared filesystem list
+        // Return the filtered shared filesystem list
 
-		return m_shares;
-	}
+        return m_shares;
+    }
 
-	/**
-	 * Get a tree connection for the specified shared device. Creates and caches a new tree
-	 * connection if required.
-	 *
-	 * @param share SharedDevice
-	 * @return TreeConnection
-	 */
-	protected final TreeConnection getTreeConnection(SharedDevice share) {
+    /**
+     * Get a tree connection for the specified shared device. Creates and caches a new tree connection if required.
+     *
+     * @param share
+     *            SharedDevice
+     * @return TreeConnection
+     */
+    protected final TreeConnection getTreeConnection(final SharedDevice share) {
 
-		// Check if the share is valid
+        // Check if the share is valid
 
-		if ( share == null)
-			return null;
+        if (share == null) {
+            return null;
+        }
 
-		// Check if there is a tree connection in the cache
+        // Check if there is a tree connection in the cache
 
-		TreeConnection tree = m_connections.findConnection(share.getName());
-		if ( tree == null) {
+        TreeConnection tree = m_connections.findConnection(share.getName());
+        if (tree == null) {
 
-			// Create a new tree connection
+            // Create a new tree connection
 
-			tree = new TreeConnection(share);
-			m_connections.addConnection(tree);
+            tree = new TreeConnection(share);
+            m_connections.addConnection(tree);
 
-			// Set the access permission for the shared filesystem
+            // Set the access permission for the shared filesystem
 
-			if ( getServer().hasAccessControlManager()) {
+            if (getServer().hasAccessControlManager()) {
 
-				// Set the access permission to the shared filesystem
+                // Set the access permission to the shared filesystem
 
-				AccessControlManager aclMgr = getServer().getAccessControlManager();
+                final AccessControlManager aclMgr = getServer().getAccessControlManager();
 
-				int access = aclMgr.checkAccessControl(this, share);
-				if ( access != AccessControl.Default)
-					tree.setPermission(access);
-			}
-			else {
+                final int access = aclMgr.checkAccessControl(this, share);
+                if (access != AccessControl.Default) {
+                    tree.setPermission(access);
+                }
+            } else {
 
-				// Allow full access to the filesystem
+                // Allow full access to the filesystem
 
-				tree.setPermission(AccessControl.ReadWrite);
-			}
-		}
+                tree.setPermission(AccessControl.ReadWrite);
+            }
+        }
 
-		// Return the connection
+        // Return the connection
 
-		return tree;
-	}
+        return tree;
+    }
 
-	/**
-	 * Check if an abort command has been sent by the client
-	 *
-	 * @return boolean
-	 */
-	private final boolean checkForAbort() {
+    /**
+     * Check if an abort command has been sent by the client
+     *
+     * @return boolean
+     */
+    private final boolean checkForAbort() {
 
-		try {
+        try {
 
-			// Check if there is any pending data on the command socket
+            // Check if there is any pending data on the command socket
 
-			if ( m_in.available() > 0) {
+            if (m_in.available() > 0) {
 
-				// Read the next request
+                // Read the next request
 
-				FTPRequest ftpReq = getNextCommand(false);
-				if ( ftpReq != null) {
+                final FTPRequest ftpReq = getNextCommand(false);
+                if (ftpReq != null) {
 
-					// Check for an abort command
+                    // Check for an abort command
 
-					if ( ftpReq.isCommand() == FTPCommand.Abor) {
-						if (LOGGER.isDebugEnabled() && hasDebug(DBG_FILEIO))
-							debugPrintln("Transfer aborted by client");
+                    if (ftpReq.isCommand() == FTPCommand.Abor) {
+                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_FILEIO)) {
+                            LOGGER.debug("Transfer aborted by client");
+                        }
 
-						// Indicate an abort has been received
+                        // Indicate an abort has been received
 
-						return true;
-					}
-					else {
+                        return true;
+                    } else {
 
-						// Queue the request for processing later
+                        // Queue the request for processing later
 
-						m_ftpCmdList.add(ftpReq);
-					}
-				}
-			}
-		}
-		catch (IOException ex) {
-			if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR))
-				debugPrintln("Error during check for abort, " + ex.toString());
-		}
+                        m_ftpCmdList.add(ftpReq);
+                    }
+                }
+            }
+        } catch (final IOException ex) {
+            if (LOGGER.isErrorEnabled() && hasDebug(DBG_ERROR)) {
+                LOGGER.error("Error during check for abort, " + ex.getMessage(), ex);
+            }
+        }
 
-		// No command, or not an abort command
+        // No command, or not an abort command
 
-		return false;
-	}
+        return false;
+    }
 
-	/**
-	 * Read the next FTP command from the command socket, or get a command from the list of queued
-	 * requests
-	 *
-	 * @param checkQueue boolean
-	 * @return FTPRequest
-	 * @exception SocketException
-	 * @exception IOException
-	 */
-	private final FTPRequest getNextCommand(boolean checkQueue)
-		throws SocketException, IOException {
+    /**
+     * Read the next FTP command from the command socket, or get a command from the list of queued requests
+     *
+     * @param checkQueue
+     *            boolean
+     * @return FTPRequest
+     * @exception SocketException
+     * @exception IOException
+     */
+    private final FTPRequest getNextCommand(final boolean checkQueue) throws SocketException, IOException {
 
-		// Check if there are any queued requests
+        // Check if there are any queued requests
 
-		FTPRequest nextReq = null;
+        FTPRequest nextReq = null;
 
-		if ( checkQueue == true && m_ftpCmdList.size() > 0) {
+        if (checkQueue == true && m_ftpCmdList.size() > 0) {
 
-			// Get the next queued request
+            // Get the next queued request
 
-			nextReq = m_ftpCmdList.remove(0);
-		}
-		else {
+            nextReq = m_ftpCmdList.remove(0);
+        } else {
 
-		    // Loop until a valid request is received, or the connection is closed
+            // Loop until a valid request is received, or the connection is closed
 
-		    while ( nextReq == null) {
+            while (nextReq == null) {
 
-    			// Wait for an incoming request
+                // Wait for an incoming request
 
-    			int rdlen = m_in.read(m_inbuf);
+                int rdlen = m_in.read(m_inbuf);
 
-    			// Check if there is no more data, the other side has dropped the connection
+                // Check if there is no more data, the other side has dropped the connection
 
-    			if ( rdlen == -1) {
-    				closeSession();
-    				return null;
-    			}
-    			else if ( rdlen == m_inbuf.length) {
+                if (rdlen == -1) {
+                    closeSession();
+                    return null;
+                } else if (rdlen == m_inbuf.length) {
 
-    				// Looks like there is more data to be read for the current command, we need to extend the buffer
-    				//
-    				// Check if the command buffer has already been extended to the maximum size
+                    // Looks like there is more data to be read for the current command, we need to extend the buffer
+                    //
+                    // Check if the command buffer has already been extended to the maximum size
 
-    				if ( m_inbuf.length < MaxCommandBufSize) {
+                    if (m_inbuf.length < MaxCommandBufSize) {
 
-    					// Extend the command buffer
+                        // Extend the command buffer
 
-    					int curLen = m_inbuf.length;
-    					int availLen = m_in.available();
-    					int newLen = Math.max( m_inbuf.length * 2, curLen + availLen + 50);
+                        final int curLen = m_inbuf.length;
+                        final int availLen = m_in.available();
+                        int newLen = Math.max(m_inbuf.length * 2, curLen + availLen + 50);
 
-    					if ( newLen > MaxCommandBufSize)
-    						newLen = MaxCommandBufSize;
+                        if (newLen > MaxCommandBufSize) {
+                            newLen = MaxCommandBufSize;
+                        }
 
-    					// Check if the new buffer size is large enough for the current command
+                        // Check if the new buffer size is large enough for the current command
 
-    					if ( newLen > (curLen + availLen)) {
+                        if (newLen > (curLen + availLen)) {
 
-    						// Allocate a new buffer and copy the existing data over to it
+                            // Allocate a new buffer and copy the existing data over to it
 
-    						byte[] newbuf = new byte[newLen];
-    						System.arraycopy( m_inbuf, 0, newbuf, 0, m_inbuf.length);
+                            final byte[] newbuf = new byte[newLen];
+                            System.arraycopy(m_inbuf, 0, newbuf, 0, m_inbuf.length);
 
-    						// Move the new command buffer into place
+                            // Move the new command buffer into place
 
-    						m_inbuf = newbuf;
+                            m_inbuf = newbuf;
 
-        					// DEBUG
+                            // DEBUG
 
-        					if ( LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA))
-        						debugPrintln("Extended command buffer to " + m_inbuf.length + " bytes");
+                            if (LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA)) {
+                                LOGGER.info("Extended command buffer to " + m_inbuf.length + " bytes");
+                            }
 
-    						// Read the remaining data
+                            // Read the remaining data
 
-    						int rdlen2 = m_in.read( m_inbuf, curLen, m_inbuf.length - curLen);
-    						if ( rdlen2 == -1) {
-    		    				closeSession();
-    		    				return null;
-    		    			}
-    						else {
+                            final int rdlen2 = m_in.read(m_inbuf, curLen, m_inbuf.length - curLen);
+                            if (rdlen2 == -1) {
+                                closeSession();
+                                return null;
+                            } else {
 
-    							// Calculate the total read length
+                                // Calculate the total read length
 
-    							rdlen = rdlen + rdlen2;
+                                rdlen = rdlen + rdlen2;
 
-    							// DEBUG
+                                // DEBUG
 
-            					if ( LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA))
-            						debugPrintln("Secondary read " + rdlen2 + " bytes, total bytes read " + rdlen);
-    						}
-    					}
-    				}
-    				else {
+                                if (LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA)) {
+                                    LOGGER.info("Secondary read " + rdlen2 + " bytes, total bytes read " + rdlen);
+                                }
+                            }
+                        }
+                    } else {
 
-    					// Command is too large, clear any pending data on the command socket and ignore it
+                        // Command is too large, clear any pending data on the command socket and ignore it
 
-    					clearCommandSocket();
+                        clearCommandSocket();
 
-    					// DEBUG
+                        // DEBUG
 
-    					if ( LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA))
-    						debugPrintln("Received command too large, ignored");
+                        if (LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA)) {
+                            LOGGER.info("Received command too large, ignored");
+                        }
 
-    					return null;
-    				}
+                        return null;
+                    }
 
-    			}
+                }
 
-    			// If there is an SSL engine associated with this session then decrypt the received data
+                // If there is an SSL engine associated with this session then decrypt the received data
 
-    			if ( m_sslEngine != null)
-    			    rdlen = getSSLCommand( m_inbuf, rdlen);
+                if (m_sslEngine != null) {
+                    rdlen = getSSLCommand(m_inbuf, rdlen);
+                }
 
-    			// Trim the trailing <CR><LF>
+                // Trim the trailing <CR><LF>
 
-    			if ( rdlen > 0) {
-    				while (rdlen > 0 && m_inbuf[rdlen - 1] == '\r' || m_inbuf[rdlen - 1] == '\n')
-    					rdlen--;
+                if (rdlen > 0) {
+                    while (rdlen > 0 && m_inbuf[rdlen - 1] == '\r' || m_inbuf[rdlen - 1] == '\n') {
+                        rdlen--;
+                    }
 
-        			// Get the command string, create the new request
+                    // Get the command string, create the new request
 
-        			String cmd = null;
+                    String cmd = null;
 
-        			if ( isUTF8Enabled()) {
-        				cmd = m_normalizer.normalize(new String(m_inbuf, 0, rdlen, "UTF8"));
-        			}
-        			else
-        				cmd = new String(m_inbuf, 0, rdlen);
+                    if (isUTF8Enabled()) {
+                        cmd = m_normalizer.normalize(new String(m_inbuf, 0, rdlen, "UTF8"));
+                    } else {
+                        cmd = new String(m_inbuf, 0, rdlen);
+                    }
 
-        			nextReq = new FTPRequest(cmd);
-    			}
-		    }
-		}
+                    nextReq = new FTPRequest(cmd);
+                }
+            }
+        }
 
-		// Return the request
+        // Return the request
 
-		return nextReq;
-	}
+        return nextReq;
+    }
 
-	/**
-	 * Clear the command socket of pending data
-	 *
-	 * @exception IOException
-	 */
-	protected void clearCommandSocket()
-		throws IOException {
+    /**
+     * Clear the command socket of pending data
+     *
+     * @exception IOException
+     */
+    protected void clearCommandSocket() throws IOException {
 
-		// Loop until all data has been cleared from the command socket or the socket is closed
+        // Loop until all data has been cleared from the command socket or the socket is closed
 
-		int rdlen = 0;
+        int rdlen = 0;
 
-		while ( m_in.available() > 0 && rdlen >= 0) {
+        while (m_in.available() > 0 && rdlen >= 0) {
 
-			// Read a block of data from the command socket
+            // Read a block of data from the command socket
 
-			rdlen = m_in.read( m_inbuf);
-			if ( rdlen == -1)
-				closeSession();
-		}
-	}
+            rdlen = m_in.read(m_inbuf);
+            if (rdlen == -1) {
+                closeSession();
+            }
+        }
+    }
 
-	/**
-	 * Get the next command data on an SSL/TLS encrypted connection
-	 *
-	 * @param buf byte[]
-	 * @param len int
-	 * @return int
-	 * @exception SocketException
-	 * @exception IOException
-	 */
-	protected final int getSSLCommand( byte[] buf, int len)
-	    throws SocketException, IOException {
+    /**
+     * Get the next command data on an SSL/TLS encrypted connection
+     *
+     * @param buf
+     *            byte[]
+     * @param len
+     *            int
+     * @return int
+     * @exception SocketException
+     * @exception IOException
+     */
+    protected final int getSSLCommand(final byte[] buf, final int len) throws SocketException, IOException {
 
+        m_sslIn.limit(m_sslIn.capacity());
+        m_sslIn.position(len);
+        m_sslIn.flip();
 
-	    m_sslIn.limit( m_sslIn.capacity());
-	    m_sslIn.position( len);
-	    m_sslIn.flip();
-
-	    m_sslOut.clear();
+        m_sslOut.clear();
 
         // Get the SSL engine status
 
@@ -4404,8 +4374,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
             sslRes = m_sslEngine.unwrap(m_sslIn, m_sslOut);
         }
 
-        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-            debugPrintln("SSL unwrap() len=" + len + ", returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+            LOGGER.debug("SSL unwrap() len=" + len + ", returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+        }
 
         int unwrapLen = sslRes.bytesProduced();
         boolean loopDone = false;
@@ -4416,8 +4387,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
             switch (m_sslEngine.getHandshakeStatus()) {
                 case NEED_TASK:
-                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                        debugPrintln("SSL engine status=NEED_TASK");
+                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                        LOGGER.debug("SSL engine status=NEED_TASK");
+                    }
 
                     // Run the SSL engine task in the current thread
                     while ((task = m_sslEngine.getDelegatedTask()) != null) {
@@ -4425,8 +4397,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                     }
                     break;
                 case NEED_WRAP:
-                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                        debugPrintln("SSL engine status=NEED_WRAP");
+                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                        LOGGER.debug("SSL engine status=NEED_WRAP");
+                    }
 
                     m_sslIn.limit(m_sslIn.capacity());
                     m_sslIn.flip();
@@ -4435,39 +4408,43 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
                     while (m_sslEngine.getHandshakeStatus() == HandshakeStatus.NEED_WRAP) {
                         sslRes = m_sslEngine.wrap(m_sslIn, m_sslOut);
-                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                            debugPrintln("  wrap() returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                            LOGGER.debug("  wrap() returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+                        }
                     }
 
                     // Send the output to the client
                     m_sslOut.flip();
 
-                    if ( m_sslOut.remaining() > 0) {
-                		if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                			debugPrintln("  Send data to client = " + m_sslOut.remaining());
+                    if (m_sslOut.remaining() > 0) {
+                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                            LOGGER.debug("  Send data to client = " + m_sslOut.remaining());
+                        }
 
-                		// Send the encrypted data to the client
+                        // Send the encrypted data to the client
 
-                        m_sock.getOutputStream().write( m_sslOut.array(), 0, m_sslOut.remaining());
+                        m_sock.getOutputStream().write(m_sslOut.array(), 0, m_sslOut.remaining());
                         m_sock.getOutputStream().flush();
                     }
                     break;
                 case NEED_UNWRAP:
-            		if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-            			debugPrintln("SSL engine status=NEED_UNWRAP");
+                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                        LOGGER.debug("SSL engine status=NEED_UNWRAP");
+                    }
 
                     // Read more data from the socket
 
-                    int rdlen = m_in.read(m_inbuf);
+                    final int rdlen = m_in.read(m_inbuf);
 
                     // Check if there is no more data, the other side has dropped the connection
 
-                    if ( rdlen == -1) {
+                    if (rdlen == -1) {
 
                         // DEBUG
 
-                        if (LOGGER.isDebugEnabled()&& hasDebug(DBG_SSL))
-                        	debugPrintln("  Socket read returned -1, closing session");
+                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                            LOGGER.debug("  Socket read returned -1, closing session");
+                        }
 
                         // Close the FTP session
 
@@ -4475,67 +4452,71 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                         return 0;
                     }
 
-                    m_sslIn.limit( m_sslIn.capacity());
-                    m_sslIn.position( rdlen);
+                    m_sslIn.limit(m_sslIn.capacity());
+                    m_sslIn.position(rdlen);
                     m_sslIn.flip();
 
-                    while ( m_sslEngine.getHandshakeStatus() == HandshakeStatus.NEED_UNWRAP && m_sslIn.remaining() > 0) {
-                        m_sslOut.limit( m_sslOut.capacity());
-                        sslRes = m_sslEngine.unwrap( m_sslIn, m_sslOut);
+                    while (m_sslEngine.getHandshakeStatus() == HandshakeStatus.NEED_UNWRAP && m_sslIn.remaining() > 0) {
+                        m_sslOut.limit(m_sslOut.capacity());
+                        sslRes = m_sslEngine.unwrap(m_sslIn, m_sslOut);
 
                         // DEBUG
 
-                        if ( LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                        	debugPrintln("  unwrap() len=" + rdlen + ",returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+                        if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                            LOGGER.debug("  unwrap() len=" + rdlen + ",returned " + sslRes.bytesProduced() + " bytes, res=" + sslRes);
+                        }
 
                         // Run the SSL engine task in the current thread
 
-                        if ( m_sslEngine.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
-	                        while ((task = m_sslEngine.getDelegatedTask()) != null) {
-	                            task.run();
+                        if (m_sslEngine.getHandshakeStatus() == HandshakeStatus.NEED_TASK) {
+                            while ((task = m_sslEngine.getDelegatedTask()) != null) {
+                                task.run();
 
-	                            // DEBUG
+                                // DEBUG
 
-	                            if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-	                            	debugPrintln("  task during unwrap");
-	                        }
+                                if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                                    LOGGER.debug("  task during unwrap");
+                                }
+                            }
                         }
                     }
 
                     m_sslOut.flip();
-                    if ( m_sslOut.remaining() > 0) {
-                        if ( m_sslEngine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
+                    if (m_sslOut.remaining() > 0) {
+                        if (m_sslEngine.getHandshakeStatus() == HandshakeStatus.NOT_HANDSHAKING) {
                             unwrapLen = m_sslOut.remaining();
                             loopDone = true;
-                        }
-                        else {
+                        } else {
 
-                        	// DEBUG
+                            // DEBUG
 
-                    		if ( LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-                    			debugPrintln("  Send data to client = " + m_sslOut.remaining());
+                            if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                                LOGGER.debug("  Send data to client = " + m_sslOut.remaining());
+                            }
 
-                    		// Send the encrypted data to the client
+                            // Send the encrypted data to the client
 
-                            m_sock.getOutputStream().write( m_sslOut.array(), 0, m_sslOut.remaining());
+                            m_sock.getOutputStream().write(m_sslOut.array(), 0, m_sslOut.remaining());
                             m_sock.getOutputStream().flush();
                         }
                     }
                     break;
                 case NOT_HANDSHAKING:
 
-                	// DEBUG
+                    // DEBUG
 
-            		if ( LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-            			debugPrintln("SSL engine status=NOT_HANDSHAKING");
+                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                        LOGGER.debug("SSL engine status=NOT_HANDSHAKING");
+                    }
                     loopDone = true;
                     break;
                 case FINISHED:
 
-                	// DEBUG
+                    // DEBUG
 
-            		if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL))
-            			debugPrintln("SSL engine status=FINISHED");
+                    if (LOGGER.isDebugEnabled() && hasDebug(DBG_SSL)) {
+                        LOGGER.debug("SSL engine status=FINISHED");
+                    }
                     loopDone = true;
                     break;
             }
@@ -4543,572 +4524,581 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
         // Move decrypted data to the input buffer
 
-        if ( unwrapLen > 0)
-            System.arraycopy( m_sslOut.array(), 0, m_inbuf, 0, unwrapLen);
+        if (unwrapLen > 0) {
+            System.arraycopy(m_sslOut.array(), 0, m_inbuf, 0, unwrapLen);
+        }
 
         // Return the decrypted data length
 
         return unwrapLen;
-	}
+    }
 
-	/**
-	 * Initialize the SSL engine when SSL mode is enabled on the command socket
-	 *
-	 * @param engineTyp String
-	 * @exception IOException
-	 * @exception NoSuchAlgorithmException
-	 * @exception CertificateException
-	 * @exception KeyStoreException
-	 * @exception UnrecoverableKeyException
-	 * @exception KeyManagementException
-	 */
-	protected final void setupSSLEngine( String engineTyp)
-	    throws IOException, NoSuchAlgorithmException, CertificateException,
-	        KeyStoreException, UnrecoverableKeyException, KeyManagementException {
+    /**
+     * Initialize the SSL engine when SSL mode is enabled on the command socket
+     *
+     * @param engineTyp
+     *            String
+     * @exception IOException
+     * @exception NoSuchAlgorithmException
+     * @exception CertificateException
+     * @exception KeyStoreException
+     * @exception UnrecoverableKeyException
+     * @exception KeyManagementException
+     */
+    protected final void setupSSLEngine(final String engineTyp)
+            throws IOException, NoSuchAlgorithmException, CertificateException, KeyStoreException, UnrecoverableKeyException, KeyManagementException {
 
-		// Get the FTP configuration
+        // Get the FTP configuration
 
-		FTPConfigSection ftpConfig = getFTPServer().getFTPConfiguration();
+        final FTPConfigSection ftpConfig = getFTPServer().getFTPConfiguration();
 
-	    // Load the key store and trust store
+        // Load the key store and trust store
 
-        KeyStore keyStore   = KeyStore.getInstance( ftpConfig.getKeyStoreType());
+        final KeyStore keyStore = KeyStore.getInstance(ftpConfig.getKeyStoreType());
 
-        keyStore.load(new FileInputStream( ftpConfig.getKeyStorePath()), ftpConfig.getKeyStorePassphrase());
+        keyStore.load(new FileInputStream(ftpConfig.getKeyStorePath()), ftpConfig.getKeyStorePassphrase());
 
         String defaultAlgorithm = KeyManagerFactory.getDefaultAlgorithm();
 
-        KeyManagerFactory keyFactory = KeyManagerFactory.getInstance(defaultAlgorithm);
+        final KeyManagerFactory keyFactory = KeyManagerFactory.getInstance(defaultAlgorithm);
 
         keyFactory.init(keyStore, ftpConfig.getKeyStorePassphrase());
 
         defaultAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
 
-        m_sslContext = SSLContext.getInstance( engineTyp);
+        m_sslContext = SSLContext.getInstance(engineTyp);
 
         // MNT-7301 FTPS server requires unnecessarly to have a trustStore while a keyStore should be sufficient
         TrustManager[] trManager = null;
 
-        if (ftpConfig.getTrustStorePath() != null)
-        {
-            KeyStore trustStore = KeyStore.getInstance( ftpConfig.getTrustStoreType());
-            trustStore.load(new FileInputStream( ftpConfig.getTrustStorePath()), ftpConfig.getTrustStorePassphrase());
-            TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(defaultAlgorithm);
-            trustFactory.init( trustStore);
+        if (ftpConfig.getTrustStorePath() != null) {
+            final KeyStore trustStore = KeyStore.getInstance(ftpConfig.getTrustStoreType());
+            trustStore.load(new FileInputStream(ftpConfig.getTrustStorePath()), ftpConfig.getTrustStorePassphrase());
+            final TrustManagerFactory trustFactory = TrustManagerFactory.getInstance(defaultAlgorithm);
+            trustFactory.init(trustStore);
             trManager = trustFactory.getTrustManagers();
         }
 
-        m_sslContext.init( keyFactory.getKeyManagers(), trManager, null);
+        m_sslContext.init(keyFactory.getKeyManagers(), trManager, null);
 
         m_sslEngine = m_sslContext.createSSLEngine();
-        m_sslEngine.setUseClientMode( false);
-        m_sslEngine.setWantClientAuth( true);
+        m_sslEngine.setUseClientMode(false);
+        m_sslEngine.setWantClientAuth(true);
 
-        SSLSession sslSess = m_sslEngine.getSession();
-        m_sslOut = ByteBuffer.allocate( sslSess.getApplicationBufferSize() + 50);
+        final SSLSession sslSess = m_sslEngine.getSession();
+        m_sslOut = ByteBuffer.allocate(sslSess.getApplicationBufferSize() + 50);
 
-        if ( m_inbuf.length < sslSess.getApplicationBufferSize())
+        if (m_inbuf.length < sslSess.getApplicationBufferSize()) {
             m_inbuf = new byte[sslSess.getApplicationBufferSize()];
-        m_sslIn = ByteBuffer.wrap( m_inbuf);
-	}
-
-	/**
-	 * Check if the session is in SSL/TLS mode
-	 *
-	 * @return boolean
-	 */
-	protected final boolean isSecureSession() {
-		return m_sslEngine != null ? true : false;
-	}
-
-	/**
-	 * Generate a machine listing string for the specified file/folder information
-	 *
-	 * @param finfo FileInfo
-	 * @param mlstFlags int
-	 * @param buf StringBuffer
-	 * @param isMlsd boolean
-	 */
-	protected final void generateMlstString(FileInfo finfo, int mlstFlags, StringBuffer buf, boolean isMlsd) {
-
-		// Create the machine listing record
-
-		for (int i = 0; i < _factNames.length; i++) {
-
-			// Check if the current fact is enabled
-
-			int curFact = 1 << i;
-
-			if ( (mlstFlags & curFact) != 0) {
-
-				// Output the fact value
-
-				switch (curFact) {
-
-					// File size
-
-					case MLST_SIZE:
-						buf.append(_factNames[i]);
-						buf.append("=");
-						buf.append(finfo.getSize());
-						buf.append(";");
-						break;
-
-					// Modify date/time
-
-					case MLST_MODIFY:
-						if ( finfo.hasModifyDateTime()) {
-							buf.append(_factNames[i]);
-							buf.append("=");
-							buf.append(FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
-							buf.append(";");
-						}
-						break;
-
-					// Creation date/time
-
-					case MLST_CREATE:
-						if ( finfo.hasCreationDateTime()) {
-							buf.append(_factNames[i]);
-							buf.append("=");
-							buf.append(FTPDate.packMlstDateTime(finfo.getCreationDateTime()));
-							buf.append(";");
-						}
-						break;
-
-					// Type
-
-					case MLST_TYPE:
-						buf.append(_factNames[i]);
-
-						if ( finfo.isDirectory() == false) {
-							buf.append("=file;");
-						}
-						else {
-							buf.append("=dir;");
-						}
-						break;
-
-					// Unique identifier
-
-					case MLST_UNIQUE:
-						if ( finfo.getFileId() != -1) {
-							buf.append(_factNames[i]);
-							buf.append("=");
-							buf.append(finfo.getFileId());
-							buf.append(";");
-						}
-						break;
-
-					// Permissions
+        }
+        m_sslIn = ByteBuffer.wrap(m_inbuf);
+    }
+
+    /**
+     * Check if the session is in SSL/TLS mode
+     *
+     * @return boolean
+     */
+    protected final boolean isSecureSession() {
+        return m_sslEngine != null ? true : false;
+    }
+
+    /**
+     * Generate a machine listing string for the specified file/folder information
+     *
+     * @param finfo
+     *            FileInfo
+     * @param mlstFlags
+     *            int
+     * @param buf
+     *            StringBuffer
+     * @param isMlsd
+     *            boolean
+     */
+    protected final void generateMlstString(final FileInfo finfo, final int mlstFlags, final StringBuffer buf, final boolean isMlsd) {
+
+        // Create the machine listing record
+
+        for (int i = 0; i < _factNames.length; i++) {
+
+            // Check if the current fact is enabled
+
+            final int curFact = 1 << i;
+
+            if ((mlstFlags & curFact) != 0) {
+
+                // Output the fact value
+
+                switch (curFact) {
+
+                    // File size
+
+                    case MLST_SIZE:
+                        buf.append(_factNames[i]);
+                        buf.append("=");
+                        buf.append(finfo.getSize());
+                        buf.append(";");
+                        break;
+
+                    // Modify date/time
+
+                    case MLST_MODIFY:
+                        if (finfo.hasModifyDateTime()) {
+                            buf.append(_factNames[i]);
+                            buf.append("=");
+                            buf.append(FTPDate.packMlstDateTime(finfo.getModifyDateTime()));
+                            buf.append(";");
+                        }
+                        break;
+
+                    // Creation date/time
+
+                    case MLST_CREATE:
+                        if (finfo.hasCreationDateTime()) {
+                            buf.append(_factNames[i]);
+                            buf.append("=");
+                            buf.append(FTPDate.packMlstDateTime(finfo.getCreationDateTime()));
+                            buf.append(";");
+                        }
+                        break;
+
+                    // Type
+
+                    case MLST_TYPE:
+                        buf.append(_factNames[i]);
+
+                        if (finfo.isDirectory() == false) {
+                            buf.append("=file;");
+                        } else {
+                            buf.append("=dir;");
+                        }
+                        break;
+
+                    // Unique identifier
+
+                    case MLST_UNIQUE:
+                        if (finfo.getFileId() != -1) {
+                            buf.append(_factNames[i]);
+                            buf.append("=");
+                            buf.append(finfo.getFileId());
+                            buf.append(";");
+                        }
+                        break;
+
+                    // Permissions
+
+                    case MLST_PERM:
+                        buf.append(_factNames[i]);
+                        buf.append("=");
+                        if (finfo.isDirectory()) {
+                            buf.append(finfo.isReadOnly() ? "el" : "ceflmp");
+                        } else {
+                            buf.append(finfo.isReadOnly() ? "r" : "rwadf");
+                        }
+                        buf.append(";");
+                        break;
 
-					case MLST_PERM:
-						buf.append(_factNames[i]);
-						buf.append("=");
-						if ( finfo.isDirectory()) {
-							buf.append(finfo.isReadOnly() ? "el" : "ceflmp");
-						}
-						else {
-							buf.append(finfo.isReadOnly() ? "r" : "rwadf");
-						}
-						buf.append(";");
-						break;
+                    // Media-type
 
-					// Media-type
+                    case MLST_MEDIATYPE:
+                        break;
+                }
+            }
+        }
 
-					case MLST_MEDIATYPE:
-						break;
-				}
-			}
-		}
+        // Add the file name
 
-		// Add the file name
+        buf.append(" ");
+        buf.append(finfo.getFileName());
+    }
 
-		buf.append(" ");
-		buf.append(finfo.getFileName());
-	}
+    /**
+     * Return the local IP address as a string in 'n,n,n,n' format
+     *
+     * @return String
+     */
+    private final String getLocalFTPAddressString() {
+        return m_sock.getLocalAddress().getHostAddress().replace('.', ',');
+    }
 
-	/**
-	 * Return the local IP address as a string in 'n,n,n,n' format
-	 *
-	 * @return String
-	 */
-	private final String getLocalFTPAddressString() {
-		return m_sock.getLocalAddress().getHostAddress().replace('.', ',');
-	}
+    /**
+     * Return a not logged status
+     *
+     * @throws IOException
+     */
+    protected final void sendFTPNotLoggedOnResponse() throws IOException {
+        sendFTPResponse(530, "Not logged on");
+    }
 
-	/**
-	 * Return a not logged status
-	 *
-	 * @throws IOException
-	 */
-	protected final void sendFTPNotLoggedOnResponse()
-		throws IOException {
-		sendFTPResponse(530, "Not logged on");
-	}
+    /**
+     * Indicate that FTP filesystem searches are case sensitive
+     *
+     * @return boolean
+     */
+    @Override
+    public boolean useCaseSensitiveSearch() {
+        return true;
+    }
 
-	/**
-	 * Indicate that FTP filesystem searches are case sensitive
-	 *
-	 * @return boolean
-	 */
-	public boolean useCaseSensitiveSearch() {
-		return true;
-	}
+    /**
+     * Start the FTP session in a seperate thread
+     */
+    @Override
+    public void run() {
 
-	/**
-	 * Start the FTP session in a seperate thread
-	 */
-	public void run() {
+        try {
 
-		try {
+            // Debug
 
-			// Debug
+            if (LOGGER.isInfoEnabled() && hasDebug(DBG_STATE)) {
+                LOGGER.info("FTP session started");
+            }
 
-			if ( LOGGER.isInfoEnabled() && hasDebug(DBG_STATE))
-				debugPrintln("FTP session started");
+            // Create the input/output streams
 
-			// Create the input/output streams
+            m_in = m_sock.getInputStream();
+            m_out = new OutputStreamWriter(m_sock.getOutputStream());
 
-			m_in = m_sock.getInputStream();
-			m_out = new OutputStreamWriter(m_sock.getOutputStream());
+            m_inbuf = new byte[DefCommandBufSize];
 
-			m_inbuf = new byte[DefCommandBufSize];
+            // Return the initial response
 
-			// Return the initial response
+            sendFTPResponse(220, "FTP server ready");
 
-			sendFTPResponse(220, "FTP server ready");
+            // Start/end times if timing debug is enabled
 
-			// Start/end times if timing debug is enabled
+            long startTime = 0L;
+            long endTime = 0L;
 
-			long startTime = 0L;
-			long endTime = 0L;
+            // The server session loops until the NetBIOS hangup state is set.
 
-			// The server session loops until the NetBIOS hangup state is set.
+            FTPRequest ftpReq = null;
 
-			FTPRequest ftpReq = null;
+            while (m_sock != null) {
 
-			while (m_sock != null) {
+                // Wait for a request
 
-				// Wait for a request
+                ftpReq = getNextCommand(true);
+                if (ftpReq == null) {
+                    continue;
+                }
 
-				ftpReq = getNextCommand(true);
-				if ( ftpReq == null)
-					continue;
+                // Debug
 
-				// Debug
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_TIMING)) {
+                    startTime = System.currentTimeMillis();
+                }
 
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_TIMING))
-					startTime = System.currentTimeMillis();
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA)) {
+                    LOGGER.info("Rx cmd=" + ftpReq);
+                }
 
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_RXDATA))
-					debugPrintln("Rx cmd=" + ftpReq);
+                // Parse the received command, and validate
 
-				// Parse the received command, and validate
+                switch (ftpReq.isCommand()) {
 
-				switch (ftpReq.isCommand()) {
+                    // User command
 
-					// User command
+                    case FTPCommand.User:
+                        procUser(ftpReq);
+                        break;
 
-					case FTPCommand.User:
-						procUser(ftpReq);
-						break;
+                    // Password command
 
-					// Password command
+                    case FTPCommand.Pass:
+                        procPassword(ftpReq);
+                        break;
 
-					case FTPCommand.Pass:
-						procPassword(ftpReq);
-						break;
+                    // Quit command
 
-					// Quit command
+                    case FTPCommand.Quit:
+                        procQuit(ftpReq);
+                        break;
 
-					case FTPCommand.Quit:
-						procQuit(ftpReq);
-						break;
+                    // Type command
 
-					// Type command
+                    case FTPCommand.Type:
+                        procType(ftpReq);
+                        break;
 
-					case FTPCommand.Type:
-						procType(ftpReq);
-						break;
+                    // Port command
 
-					// Port command
+                    case FTPCommand.Port:
+                        procPort(ftpReq);
+                        break;
 
-					case FTPCommand.Port:
-						procPort(ftpReq);
-						break;
+                    // Passive command
 
-					// Passive command
+                    case FTPCommand.Pasv:
+                        procPassive(ftpReq);
+                        break;
 
-					case FTPCommand.Pasv:
-						procPassive(ftpReq);
-						break;
+                    // Restart position command
 
-					// Restart position command
+                    case FTPCommand.Rest:
+                        procRestart(ftpReq);
+                        break;
 
-					case FTPCommand.Rest:
-						procRestart(ftpReq);
-						break;
+                    // Return file command
 
-					// Return file command
+                    case FTPCommand.Retr:
+                        procReturnFile(ftpReq);
 
-					case FTPCommand.Retr:
-						procReturnFile(ftpReq);
+                        // Reset the restart position
 
-						// Reset the restart position
+                        m_restartPos = 0;
+                        break;
 
-						m_restartPos = 0;
-						break;
+                    // Store file command
 
-					// Store file command
+                    case FTPCommand.Stor:
+                        procStoreFile(ftpReq, false);
+                        break;
 
-					case FTPCommand.Stor:
-						procStoreFile(ftpReq, false);
-						break;
+                    // Append file command
 
-					// Append file command
+                    case FTPCommand.Appe:
+                        procStoreFile(ftpReq, true);
+                        break;
 
-					case FTPCommand.Appe:
-						procStoreFile(ftpReq, true);
-						break;
+                    // Print working directory command
 
-					// Print working directory command
+                    case FTPCommand.Pwd:
+                    case FTPCommand.XPwd:
+                        procPrintWorkDir(ftpReq);
+                        break;
 
-					case FTPCommand.Pwd:
-					case FTPCommand.XPwd:
-						procPrintWorkDir(ftpReq);
-						break;
+                    // Change working directory command
 
-					// Change working directory command
+                    case FTPCommand.Cwd:
+                    case FTPCommand.XCwd:
+                        procChangeWorkDir(ftpReq);
+                        break;
 
-					case FTPCommand.Cwd:
-					case FTPCommand.XCwd:
-						procChangeWorkDir(ftpReq);
-						break;
+                    // Change to previous directory command
 
-					// Change to previous directory command
+                    case FTPCommand.Cdup:
+                    case FTPCommand.XCup:
+                        procCdup(ftpReq);
+                        break;
 
-					case FTPCommand.Cdup:
-					case FTPCommand.XCup:
-						procCdup(ftpReq);
-						break;
+                    // Full directory listing command
 
-					// Full directory listing command
+                    case FTPCommand.List:
+                        procList(ftpReq);
+                        break;
 
-					case FTPCommand.List:
-						procList(ftpReq);
-						break;
+                    // Short directory listing command
 
-					// Short directory listing command
+                    case FTPCommand.Nlst:
+                        procNList(ftpReq);
+                        break;
 
-					case FTPCommand.Nlst:
-						procNList(ftpReq);
-						break;
+                    // Delete file command
 
-					// Delete file command
+                    case FTPCommand.Dele:
+                        procDeleteFile(ftpReq);
+                        break;
 
-					case FTPCommand.Dele:
-						procDeleteFile(ftpReq);
-						break;
+                    // Rename file from command
 
-					// Rename file from command
+                    case FTPCommand.Rnfr:
+                        procRenameFrom(ftpReq);
+                        break;
 
-					case FTPCommand.Rnfr:
-						procRenameFrom(ftpReq);
-						break;
+                    // Rename file to comand
 
-					// Rename file to comand
+                    case FTPCommand.Rnto:
+                        procRenameTo(ftpReq);
+                        break;
 
-					case FTPCommand.Rnto:
-						procRenameTo(ftpReq);
-						break;
+                    // Create new directory command
 
-					// Create new directory command
+                    case FTPCommand.Mkd:
+                    case FTPCommand.XMkd:
+                        procCreateDirectory(ftpReq);
+                        break;
 
-					case FTPCommand.Mkd:
-					case FTPCommand.XMkd:
-						procCreateDirectory(ftpReq);
-						break;
+                    // Delete directory command
 
-					// Delete directory command
+                    case FTPCommand.Rmd:
+                    case FTPCommand.XRmd:
+                        procRemoveDirectory(ftpReq);
+                        break;
 
-					case FTPCommand.Rmd:
-					case FTPCommand.XRmd:
-						procRemoveDirectory(ftpReq);
-						break;
+                    // Return file size command
 
-					// Return file size command
+                    case FTPCommand.Size:
+                        procFileSize(ftpReq);
+                        break;
 
-					case FTPCommand.Size:
-						procFileSize(ftpReq);
-						break;
+                    // Return the modification date/time
 
-					// Return the modification date/time
+                    case FTPCommand.Mdtm:
+                        procGetModifyDateTime(ftpReq);
+                        break;
 
-					case FTPCommand.Mdtm:
-						procGetModifyDateTime(ftpReq);
-						break;
+                    // Set modify date/time command
 
-					// Set modify date/time command
+                    case FTPCommand.Mfmt:
+                        procModifyDateTime(ftpReq);
+                        break;
 
-					case FTPCommand.Mfmt:
-						procModifyDateTime(ftpReq);
-						break;
+                    // System status command
 
-					// System status command
+                    case FTPCommand.Syst:
+                        procSystemStatus(ftpReq);
+                        break;
 
-					case FTPCommand.Syst:
-						procSystemStatus(ftpReq);
-						break;
+                    // Server status command
 
-					// Server status command
+                    case FTPCommand.Stat:
+                        procServerStatus(ftpReq);
+                        break;
 
-					case FTPCommand.Stat:
-						procServerStatus(ftpReq);
-						break;
+                    // Help command
 
-					// Help command
+                    case FTPCommand.Help:
+                        procHelp(ftpReq);
+                        break;
 
-					case FTPCommand.Help:
-						procHelp(ftpReq);
-						break;
+                    // No-op command
 
-					// No-op command
+                    case FTPCommand.Noop:
+                        procNoop(ftpReq);
+                        break;
 
-					case FTPCommand.Noop:
-						procNoop(ftpReq);
-						break;
+                    // Abort command
 
-					// Abort command
+                    case FTPCommand.Abor:
+                        procAbort(ftpReq);
+                        break;
 
-					case FTPCommand.Abor:
-						procAbort(ftpReq);
-						break;
+                    // Server features command
 
-					// Server features command
+                    case FTPCommand.Feat:
+                        procFeatures(ftpReq);
+                        break;
 
-					case FTPCommand.Feat:
-						procFeatures(ftpReq);
-						break;
+                    // Options command
 
-					// Options command
+                    case FTPCommand.Opts:
+                        procOptions(ftpReq);
+                        break;
 
-					case FTPCommand.Opts:
-						procOptions(ftpReq);
-						break;
+                    // Machine listing, single folder
 
-					// Machine listing, single folder
+                    case FTPCommand.MLst:
+                        procMachineListing(ftpReq);
+                        break;
 
-					case FTPCommand.MLst:
-						procMachineListing(ftpReq);
-						break;
+                    // Machine listing, folder contents
 
-					// Machine listing, folder contents
+                    case FTPCommand.MLsd:
+                        procMachineListingContents(ftpReq);
+                        break;
 
-					case FTPCommand.MLsd:
-						procMachineListingContents(ftpReq);
-						break;
+                    // Site specific commands
 
-					// Site specific commands
+                    case FTPCommand.Site:
+                        procSite(ftpReq);
+                        break;
 
-					case FTPCommand.Site:
-						procSite(ftpReq);
-						break;
+                    // Structure command (obsolete)
 
-					// Structure command (obsolete)
+                    case FTPCommand.Stru:
+                        procStructure(ftpReq);
+                        break;
 
-					case FTPCommand.Stru:
-						procStructure(ftpReq);
-						break;
+                    // Mode command (obsolete)
 
-					// Mode command (obsolete)
+                    case FTPCommand.Mode:
+                        procMode(ftpReq);
+                        break;
 
-					case FTPCommand.Mode:
-						procMode(ftpReq);
-						break;
+                    // Allocate command (obsolete)
 
-					// Allocate command (obsolete)
+                    case FTPCommand.Allo:
+                        procAllocate(ftpReq);
+                        break;
 
-					case FTPCommand.Allo:
-						procAllocate(ftpReq);
-						break;
+                    // Extended Port command
 
-					// Extended Port command
+                    case FTPCommand.EPrt:
+                        procExtendedPort(ftpReq);
+                        break;
 
-					case FTPCommand.EPrt:
-						procExtendedPort(ftpReq);
-						break;
+                    // Extended Passive command
 
-					// Extended Passive command
+                    case FTPCommand.EPsv:
+                        procExtendedPassive(ftpReq);
+                        break;
 
-					case FTPCommand.EPsv:
-						procExtendedPassive(ftpReq);
-						break;
+                    // SSL/TLS authentication
 
-					// SSL/TLS authentication
+                    case FTPCommand.Auth:
+                        procAuth(ftpReq);
+                        break;
 
-					case FTPCommand.Auth:
-						procAuth(ftpReq);
-						break;
+                    // Protected buffer size
 
-					// Protected buffer size
+                    case FTPCommand.Pbsz:
+                        procProtectedBufferSize(ftpReq);
+                        break;
 
-					case FTPCommand.Pbsz:
-					    procProtectedBufferSize( ftpReq);
-					    break;
+                    // Data channel protection level
 
-					// Data channel protection level
+                    case FTPCommand.Prot:
+                        procDataChannelProtection(ftpReq);
+                        break;
 
-					case FTPCommand.Prot:
-					    procDataChannelProtection( ftpReq);
-					    break;
+                    // Clear command channel
 
-					// Clear command channel
+                    case FTPCommand.Ccc:
+                        procClearCommandChannel(ftpReq);
+                        break;
 
-					case FTPCommand.Ccc:
-						procClearCommandChannel( ftpReq);
-						break;
+                    // Unknown/unimplemented command
 
-					// Unknown/unimplemented command
+                    default:
+                        if (ftpReq.isCommand() != FTPCommand.InvalidCmd) {
+                            sendFTPResponse(502, "Command " + FTPCommand.getCommandName(ftpReq.isCommand()) + " not implemented");
+                        } else {
+                            sendFTPResponse(502, "Command not implemented");
+                        }
+                        break;
+                }
 
-					default:
-						if ( ftpReq.isCommand() != FTPCommand.InvalidCmd)
-							sendFTPResponse(502, "Command " + FTPCommand.getCommandName(ftpReq.isCommand()) + " not implemented");
-						else
-							sendFTPResponse(502, "Command not implemented");
-						break;
-				}
+                if (LOGGER.isInfoEnabled() && hasDebug(DBG_TIMING)) {
+                    endTime = System.currentTimeMillis();
+                    final long duration = endTime - startTime;
+                    if (duration > 20) {
+                        LOGGER.info("Processed cmd " + FTPCommand.getCommandName(ftpReq.isCommand()) + " in " + duration + "ms");
+                    }
+                }
 
-				// Debug
+                // Commit/rollback a transaction that the filesystem driver may have stored in the
+                // session
 
-				if ( LOGGER.isInfoEnabled() && hasDebug(DBG_TIMING)) {
-					endTime = System.currentTimeMillis();
-					long duration = endTime - startTime;
-					if ( duration > 20)
-						debugPrintln("Processed cmd " + FTPCommand.getCommandName(ftpReq.isCommand()) + " in " + duration + "ms");
-				}
+                endTransaction();
 
-				// Commit/rollback a transaction that the filesystem driver may have stored in the
-				// session
+            } // end while state
+        } catch (final SocketException ex) {
+            if (LOGGER.isWarnEnabled() && hasDebug(DBG_STATE)) {
+                LOGGER.warn("Socket closed by remote client");
+            }
+        } catch (final Exception ex) {
+            // Output the exception details
+            if (isShutdown() == false) {
+                LOGGER.error(ex.getMessage(), ex);
+            }
+        }
 
-				endTransaction();
+        // Cleanup the session, make sure all resources are released
+        closeSession();
 
-			} // end while state
-		}
-		catch (SocketException ex) {
-			if ( LOGGER.isWarnEnabled() && hasDebug(DBG_STATE))
-				debugPrintln("Socket closed by remote client");
-		} catch (Exception ex) {
-			// Output the exception details
-			if ( isShutdown() == false) {
-				debugPrintln(ex);
-			}
-		}
-
-		// Cleanup the session, make sure all resources are released
-		closeSession();
-
-		if (hasDebug(DBG_STATE))
-			debugPrintln("Server session closed");
-	}
+        if (hasDebug(DBG_STATE)) {
+            LOGGER.debug("Server session closed");
+        }
+    }
 }
