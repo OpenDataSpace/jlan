@@ -41,6 +41,8 @@ import org.alfresco.jlan.smb.util.DriveMappingList;
 import org.alfresco.jlan.util.ConsoleIO;
 import org.alfresco.jlan.util.Platform;
 import org.alfresco.jlan.util.win32.Win32Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JLAN CIFS Server Application
@@ -48,7 +50,7 @@ import org.alfresco.jlan.util.win32.Win32Utils;
  * @author gkspencer
  */
 public class JLANCifsServer implements ServerListener {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(JLANCifsServer.class);
 	// Constants
 	//
 	// Checkpoints
@@ -85,7 +87,7 @@ public class JLANCifsServer implements ServerListener {
 
 	protected static boolean m_allowShutViaConsole = true;
 
-	// Flag to control output of a stacktrace if an error occurs
+	// Flag to control output of a stack trace if an error occurs
 
 	protected static boolean m_dumpStackOnError = true;
 
@@ -112,11 +114,8 @@ public class JLANCifsServer implements ServerListener {
 
 			jlanServer.start(args);
 
-			// DEBUG
-
-			if ( Debug.EnableInfo && m_restart == true) {
-				Debug.println("Restarting server ...");
-				Debug.println("--------------------------------------------------");
+			if (m_restart == true) {
+			    LOGGER.info("Restarting server ...");
 			}
 		}
 	}
@@ -271,8 +270,9 @@ public class JLANCifsServer implements ServerListener {
 
 				// DEBUG
 
-				if ( Debug.EnableInfo && dbgConfig != null && dbgConfig.hasDebug())
-					Debug.println("Starting server " + server.getProtocolName() + " ...");
+                if (dbgConfig != null) {
+                    LOGGER.info("Starting server {} ...", server.getProtocolName());
+                }
 
 				// Start the server
 
@@ -351,8 +351,9 @@ public class JLANCifsServer implements ServerListener {
 
 				// DEBUG
 
-				if ( Debug.EnableInfo && dbgConfig != null && dbgConfig.hasDebug())
-					Debug.println("Shutting server " + server.getProtocolName() + " ...");
+				if (dbgConfig != null) {
+				    LOGGER.info("Shutting server {} ...", server.getProtocolName());
+				}
 
 				// Stop the server
 
@@ -601,12 +602,8 @@ public class JLANCifsServer implements ServerListener {
 					// Get the current drive mapping
 
 					DriveMapping driveMap = mapList.getMappingAt(i);
-
-					// DEBUG
-
-					if ( Debug.EnableInfo && mapConfig.hasDebug())
-						Debug.println("Mapping drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath() + " ...");
-
+					LOGGER.info("Mapping drive {} to {} ...", driveMap.getLocalDrive(), driveMap.getRemotePath());
+					
 					// Create a local mapped drive to the JLAN Server
 
 					int sts = Win32Utils.MapNetworkDrive(driveMap.getRemotePath(), driveMap.getLocalDrive(), driveMap
@@ -614,9 +611,10 @@ public class JLANCifsServer implements ServerListener {
 
 					// Check if the drive was mapped successfully
 
-					if ( sts != 0)
-						Debug.println("Failed to map drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath()
-								+ ", status = " + SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    if (sts != 0) {
+                        LOGGER.warn("Failed to map drive {} to {}, status = {}", driveMap.getLocalDrive(), driveMap.getRemotePath(),
+                                SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    }
 				}
 			}
 			else if ( event == ServerListener.ServerShutdown) {
@@ -633,11 +631,7 @@ public class JLANCifsServer implements ServerListener {
 
 					DriveMapping driveMap = mapList.getMappingAt(i);
 
-					// DEBUG
-
-					if ( Debug.EnableInfo && mapConfig.hasDebug())
-						Debug.println("Removing mapped drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath()
-								+ " ...");
+					LOGGER.info("Removing mapped drive {} to {} ...", driveMap.getLocalDrive(), driveMap.getRemotePath());
 
 					// Remove a mapped drive
 
@@ -645,9 +639,10 @@ public class JLANCifsServer implements ServerListener {
 
 					// Check if the drive was unmapped successfully
 
-					if ( sts != 0)
-						Debug.println("Failed to delete mapped drive " + driveMap.getLocalDrive() + " from "
-								+ driveMap.getRemotePath() + ", status = " + SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    if (sts != 0) {
+                        LOGGER.warn("Failed to delete mapped drive {} from {}, status = {}", driveMap.getLocalDrive(), driveMap.getRemotePath(),
+                                SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    }
 				}
 			}
 			// else if (( event & 0xFF) == SMBServer.CIFSNetBIOSNamesAdded)

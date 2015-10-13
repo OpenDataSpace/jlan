@@ -43,6 +43,8 @@ import org.alfresco.jlan.smb.util.DriveMappingList;
 import org.alfresco.jlan.util.ConsoleIO;
 import org.alfresco.jlan.util.Platform;
 import org.alfresco.jlan.util.win32.Win32Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * JLAN File Server Application
@@ -50,6 +52,7 @@ import org.alfresco.jlan.util.win32.Win32Utils;
  * @author gkspencer
  */
 public class JLANServer implements ServerListener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(JLANServer.class);
 
 	// Constants
 	//
@@ -97,33 +100,24 @@ public class JLANServer implements ServerListener {
 
 	private ServerConfiguration m_srvConfig;
 
-	/**
-	 * Start the JLAN Server
-	 *
-	 * @param args an array of command-line arguments
-	 */
-	public static void main(String[] args) {
-
-		// Create the main JLAN server object
-
-		JLANServer jlanServer = new JLANServer();
-
-		// Loop until shutdown
-
-		while (m_shutdown == false) {
-
-			// Start the server
-
-			jlanServer.start(args);
-
-			// DEBUG
-
-			if ( Debug.EnableInfo && m_restart == true) {
-				Debug.println("Restarting server ...");
-				Debug.println("--------------------------------------------------");
-			}
-		}
-	}
+    /**
+     * Start the JLAN Server
+     *
+     * @param args
+     *            an array of command-line arguments
+     */
+    public static void main(String[] args) {
+        // Create the main JLAN server object
+        JLANServer jlanServer = new JLANServer();
+        // Loop until shutdown
+        while (m_shutdown == false) {
+            // Start the server
+            jlanServer.start(args);
+            if (m_restart) {
+                LOGGER.info("Restarting server ...");
+            }
+        }
+    }
 
 	/**
 	 * Class constructor
@@ -300,10 +294,6 @@ public class JLANServer implements ServerListener {
 
 			checkPoint(out, CheckPointServersStart);
 
-			// Get the debug configuration
-
-			DebugConfigSection dbgConfig = (DebugConfigSection) m_srvConfig.getConfigSection(DebugConfigSection.SectionName);
-
 			// Start the configured servers
 
 			for (int i = 0; i < m_srvConfig.numberOfServers(); i++) {
@@ -312,10 +302,7 @@ public class JLANServer implements ServerListener {
 
 				NetworkServer server = m_srvConfig.getServer(i);
 
-				// DEBUG
-
-				if ( Debug.EnableInfo && dbgConfig != null && dbgConfig.hasDebug())
-					Debug.println("Starting server " + server.getProtocolName() + " ...");
+				LOGGER.info("Starting server {} ...", server.getProtocolName());
 
 				// Start the server
 
@@ -356,8 +343,8 @@ public class JLANServer implements ServerListener {
 					else if ( inChar == 'r' || inChar == 'R')
 						m_restart = true;
 					else if ( inChar == 'g' || inChar == 'G') {
-						Debug.println( "Running garbage collection ...");
-						System.gc();
+                        LOGGER.info("Running garbage collection ...");
+                        System.gc();
 					}
 					else if ( inChar == -1) {
 
@@ -396,10 +383,7 @@ public class JLANServer implements ServerListener {
 
 				NetworkServer server = m_srvConfig.getServer(idx--);
 
-				// DEBUG
-
-				if ( Debug.EnableInfo && dbgConfig != null && dbgConfig.hasDebug())
-					Debug.println("Shutting server " + server.getProtocolName() + " ...");
+                LOGGER.info("Shutting server {} ...", server.getProtocolName());
 
 				// Stop the server
 
@@ -708,10 +692,7 @@ public class JLANServer implements ServerListener {
 
 					DriveMapping driveMap = mapList.getMappingAt(i);
 
-					// DEBUG
-
-					if ( Debug.EnableInfo && mapConfig.hasDebug())
-						Debug.println("Mapping drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath() + " ...");
+					LOGGER.info("Mapping drive {} to {} ...", driveMap.getLocalDrive(), driveMap.getRemotePath());
 
 					// Create a local mapped drive to the JLAN Server
 
@@ -720,12 +701,12 @@ public class JLANServer implements ServerListener {
 
 					// Check if the drive was mapped successfully
 
-					if ( sts != 0)
-						Debug.println("Failed to map drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath()
-								+ ", status = " + SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    if (sts != 0) {
+                        LOGGER.warn("Failed to map drive {} to {}, status = {}", driveMap.getLocalDrive(), driveMap.getRemotePath(),
+                                SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    }
 				}
-			}
-			else if ( event == ServerListener.ServerShutdown) {
+            } else if (event == ServerListener.ServerShutdown) {
 
 				// Get the mapped drives list
 
@@ -739,11 +720,8 @@ public class JLANServer implements ServerListener {
 
 					DriveMapping driveMap = mapList.getMappingAt(i);
 
-					// DEBUG
+                   LOGGER.info("Removing mapped drive {} to {} ...", driveMap.getLocalDrive(), driveMap.getRemotePath());
 
-					if ( Debug.EnableInfo && mapConfig.hasDebug())
-						Debug.println("Removing mapped drive " + driveMap.getLocalDrive() + " to " + driveMap.getRemotePath()
-								+ " ...");
 
 					// Remove a mapped drive
 
@@ -751,9 +729,10 @@ public class JLANServer implements ServerListener {
 
 					// Check if the drive was unmapped successfully
 
-					if ( sts != 0)
-						Debug.println("Failed to delete mapped drive " + driveMap.getLocalDrive() + " from "
-								+ driveMap.getRemotePath() + ", status = " + SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    if (sts != 0) {
+                        LOGGER.warn("Failed to delete mapped drive {} from {}, status = {}", driveMap.getLocalDrive(), driveMap.getRemotePath(),
+                                SMBErrorText.ErrorString(SMBStatus.Win32Err, sts));
+                    }
 				}
 			}
 		}

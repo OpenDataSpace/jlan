@@ -19,11 +19,12 @@
 
 package org.alfresco.jlan.app;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.oncrpc.nfs.NFSConfigSection;
 import org.alfresco.jlan.oncrpc.portmap.PortMapperServer;
 import org.alfresco.jlan.server.config.ServerConfiguration;
 import org.alfresco.jlan.util.ConsoleIO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Portmapper service class
@@ -31,6 +32,7 @@ import org.alfresco.jlan.util.ConsoleIO;
  * @author gkspencer
  */
 public class Portmap {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Portmap.class);
 
 	/**
 	 * Main application
@@ -38,52 +40,39 @@ public class Portmap {
 	 * @param args String[]
 	 */
 	public static void main(String[] args) {
-
 		try {
-
 			// Create the default configuration
-
 			ServerConfiguration srvConfig = new ServerConfiguration( "PORTMAP");
 			NFSConfigSection nfsConfig = new NFSConfigSection(srvConfig);
-
 			nfsConfig.setPortMapperDebug( true);
-
-			// Create the portmapper service
-
+			
+			// Create the port mapper service
 			PortMapperServer portMapper = new PortMapperServer( srvConfig);
 
-			// Start the portmapper
-
+			// Start the port mapper
 			portMapper.startServer();
 
 			//  Wait while the server runs, user may stop server by typing a key
-
 			boolean shutdown = false;
 
 			while (shutdown == false) {
-
 				//	Check if the user has requested a shutdown, if running interactively
-
 				int inChar = ConsoleIO.readCharacter();
-
-				if ( inChar == 'x' || inChar == 'X')
+				if ( inChar == 'x' || inChar == 'X') {
 					shutdown = true;
-
+				}
+				
 				//	Sleep for a short while
-
 				try {
 					Thread.sleep(500);
-				}
-				catch (InterruptedException ex) {
+				} catch (InterruptedException ex) {
 				}
 			}
 
-			// Shutdown the portmapper service
-
+			// Shutdown the port mapper service
 			portMapper.shutdownServer( false);
-		}
-		catch (Exception ex) {
-			Debug.println( ex);
+		} catch (Exception ex) {
+			LOGGER.error(ex.getMessage(), ex);
 		}
 	}
 }

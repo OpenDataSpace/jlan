@@ -75,11 +75,14 @@ import org.alfresco.jlan.smb.server.SMBSrvSession;
 import org.alfresco.jlan.smb.server.VirtualCircuitList;
 import org.alfresco.jlan.smb.util.DriveMapping;
 import org.alfresco.jlan.smb.util.DriveMappingList;
+import org.alfresco.jlan.test.server.CifsServer;
 import org.alfresco.jlan.util.IPAddress;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.Platform;
 import org.alfresco.jlan.util.StringList;
 import org.alfresco.jlan.util.X64;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 import org.springframework.extensions.config.element.GenericConfigElement;
 import org.w3c.dom.Document;
@@ -98,7 +101,7 @@ import org.xml.sax.InputSource;
  * @author gkspencer
  */
 public class CifsOnlyXMLServerConfiguration extends ServerConfiguration {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(CifsOnlyXMLServerConfiguration.class);
 	// Constants
 	//
 	// Node type for an Element
@@ -1272,7 +1275,7 @@ public class CifsOnlyXMLServerConfiguration extends ServerConfiguration {
 
 				// Log a warning
 
-				Debug.println("Using older Netbios() API code, Winsock NetBIOS not available on x64");
+				LOGGER.info("Using older Netbios() API code, Winsock NetBIOS not available on x64");
 
 				// Use the older NetBIOS API code
 

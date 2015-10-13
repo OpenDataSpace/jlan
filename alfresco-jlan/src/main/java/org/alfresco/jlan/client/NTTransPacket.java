@@ -28,6 +28,8 @@ import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.TransactBuffer;
 import org.alfresco.jlan.util.DataBuffer;
 import org.alfresco.jlan.util.DataPacker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * NT Transaction Packet Class
@@ -35,6 +37,7 @@ import org.alfresco.jlan.util.DataPacker;
  * @author gkspencer
  */
 public class NTTransPacket extends SMBPacket {
+    private static final Logger LOGGER = LoggerFactory.getLogger(NTTransPacket.class);
 
 	//  Define the number of standard parameter words/bytes
 
@@ -87,48 +90,40 @@ public class NTTransPacket extends SMBPacket {
 		return getNTParameter(7) + RFCNetBIOSProtocol.HEADER_LEN;
 	}
 
-	/**
-	 * Unpack the parameter block
-	 *
-	 * @return int[]
-	 */
-	public final int[] getParameterBlock() {
+    /**
+     * Unpack the parameter block
+     *
+     * @return int[]
+     */
+    public final int[] getParameterBlock() {
+        // Get the parameter count and allocate the parameter buffer
+        int prmcnt = getParameterBlockCount() / 4; // convert to number of ints
+        if (prmcnt <= 0)
+            return null;
+        int[] prmblk = new int[prmcnt];
 
-		// Get the parameter count and allocate the parameter buffer
+        // Get the offset to the parameter words, add the NetBIOS header length
+        // to the offset.
+        int pos = getParameterBlockOffset();
 
-		int prmcnt = getParameterBlockCount() / 4; // convert to number of ints
-		if ( prmcnt <= 0)
-			return null;
-		int[] prmblk = new int[prmcnt];
+        // Unpack the parameter ints
+        setBytePointer(pos, getByteCount());
 
-		// Get the offset to the parameter words, add the NetBIOS header length
-		// to the offset.
+        for (int idx = 0; idx < prmcnt; idx++) {
+            // Unpack the current parameter value
+            prmblk[idx] = unpackInt();
+        }
 
-		int pos = getParameterBlockOffset();
+        if (LOGGER.isInfoEnabled() && Session.hasDebugOption(Session.DBGDumpPacket)) {
+            LOGGER.info("NT Transaction parameter dump - {} params :-", prmcnt);
+            for (int i = 0; i < prmcnt; i++) {
+                LOGGER.info(" {}. = {}, 0x{}", i, prmblk[i], Integer.toHexString(prmblk[i]));
+            }
+        }
 
-		// Unpack the parameter ints
-
-		setBytePointer(pos, getByteCount());
-
-		for (int idx = 0; idx < prmcnt; idx++) {
-
-			// Unpack the current parameter value
-
-			prmblk[idx] = unpackInt();
-		}
-
-		// Debug mode
-
-		if ( Debug.EnableInfo && Session.hasDebugOption(Session.DBGDumpPacket)) {
-			Debug.println("NT Transaction parameter dump - " + prmcnt + " params :-");
-			for (int i = 0; i < prmcnt; i++)
-				Debug.println(" " + i + ". = " + prmblk[i] + ", 0x" + Integer.toHexString(prmblk[i]));
-		}
-
-		// Return the parameter block
-
-		return prmblk;
-	}
+        // Return the parameter block
+        return prmblk;
+    }
 
 	/**
 	 * Return the total parameter count
