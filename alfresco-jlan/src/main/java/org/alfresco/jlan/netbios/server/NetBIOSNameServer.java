@@ -1382,7 +1382,9 @@ public class NetBIOSNameServer extends NetworkServer implements Runnable, Config
                         // Dump the received packet
                         LOGGER.info("%% NetBIOS Name Server Rx Datagram from " + pkt.getAddress().getHostAddress() + ", opCode=" + nbPkt.getOpcode());
                         // Dump the raw packet details
-                        HexDump.Dump(buf, pkt.getLength(), 0, Debug.getDebugInterface());
+                        if (LOGGER.isDebugEnabled()) {
+                            LOGGER.debug(HexDump.DumpToString(buf, pkt.getLength(), 0));
+                        }
                     }
 
                     // Check for a zero length datagram
