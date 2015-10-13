@@ -19,200 +19,182 @@
 
 package org.alfresco.jlan.oncrpc;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.server.auth.ClientInfo;
 import org.alfresco.jlan.server.config.InvalidConfigurationException;
 import org.alfresco.jlan.server.config.ServerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 
 /**
  * Default RPC Authenticator Class
  *
- * <p>RPC authenticator implementation that allows any client to access the RPC servers.
+ * <p>
+ * RPC authenticator implementation that allows any client to access the RPC servers.
  *
  * @author gkspencer
  */
 public class DefaultRpcAuthenticator implements RpcAuthenticator {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DefaultRpcAuthenticator.class);
+    // Authentication types aupported by this implementation
+    private final int[] _authTypes = {AuthType.Null, AuthType.Unix};
 
-  //	Authentication types aupported by this implementation
+    private boolean m_debug;
 
-  private int[] _authTypes = {AuthType.Null, AuthType.Unix };
+    /**
+     * Authenticate an RPC client and create a unique session id key.
+     *
+     * @param authType
+     *            int
+     * @param rpc
+     *            RpcPacket
+     * @return Object
+     * @throws RpcAuthenticationException
+     */
+    @Override
+    public Object authenticateRpcClient(final int authType, final RpcPacket rpc) throws RpcAuthenticationException {
+        // Create a unique session key depending on the authentication type
+        Object sessKey = null;
+        switch (authType) {
+            // Null authentication
+            case AuthType.Null:
+                sessKey = new Integer(rpc.getClientAddress().hashCode());
+                break;
 
-  //	Debug enable
+            // Unix authentication
+            case AuthType.Unix:
+                // Get the gid and uid from the credentials data in the request
+                rpc.positionAtCredentialsData();
+                rpc.skipBytes(4);
+                final int nameLen = rpc.unpackInt();
+                rpc.skipBytes(nameLen);
 
-  private boolean m_debug;
+                final int uid = rpc.unpackInt();
+                final int gid = rpc.unpackInt();
 
-  /**
-   * Authenticate an RPC client and create a unique session id key.
-   *
-   * @param authType int
-   * @param rpc RpcPacket
-   * @return Object
-   * @throws RpcAuthenticationException
-   */
-  public Object authenticateRpcClient(int authType, RpcPacket rpc)
-  	throws RpcAuthenticationException {
+                // Check if the Unix authentication session table is valid
+                sessKey = new Long((((long) rpc.getClientAddress().hashCode()) << 32) + (gid << 16) + uid);
+                break;
+        }
 
-    //	Create a unique session key depending on the authentication type
+        // Check if the session key is valid, if not then the authentication type is unsupported
+        if (sessKey == null) {
+            throw new RpcAuthenticationException(Rpc.AuthBadCred, "Unsupported auth type, " + authType);
+        }
 
-    Object sessKey = null;
+        if (LOGGER.isInfoEnabled() && hasDebug()) {
+            LOGGER.info("RpcAuth: RPC from " + rpc.getClientDetails() + ", authType=" + AuthType.getTypeAsString(authType) + ", sessKey=" + sessKey);
+        }
 
-    switch ( authType) {
-
-    	//	Null authentication
-
-    	case AuthType.Null:
-    	  sessKey = new Integer(rpc.getClientAddress().hashCode());
-    	  break;
-
-    	//	Unix authentication
-
-    	case AuthType.Unix:
-
-    	  //	Get the gid and uid from the credentials data in the request
-
-        rpc.positionAtCredentialsData();
-        rpc.skipBytes(4);
-        int nameLen = rpc.unpackInt();
-        rpc.skipBytes(nameLen);
-
-        int uid = rpc.unpackInt();
-        int gid = rpc.unpackInt();
-
-        //	Check if the Unix authentication session table is valid
-
-        sessKey = new Long((((long) rpc.getClientAddress().hashCode()) << 32) + (gid << 16) + uid);
-    	  break;
+        // Return the session key
+        return sessKey;
     }
 
-    //	Check if the session key is valid, if not then the authentication type is unsupported
-
-    if ( sessKey == null)
-      throw new RpcAuthenticationException(Rpc.AuthBadCred, "Unsupported auth type, " + authType);
-
-    //	DEBUG
-
-    if ( Debug.EnableInfo && hasDebug())
-      Debug.println("RpcAuth: RPC from " + rpc.getClientDetails() + ", authType=" + AuthType.getTypeAsString(authType) +
-          					", sessKey=" + sessKey);
-
-    //	Return the session key
-
-    return sessKey;
-  }
-
-  /**
-   * Determine if debug output is enabled
-   *
-   * @return boolean
-   */
-  public final boolean hasDebug() {
-    return m_debug;
-  }
-
-  /**
-   * Return the authentication types that are supported by this implementation.
-   *
-   * @return int[]
-   */
-  public int[] getRpcAuthenticationTypes() {
-    return _authTypes;
-  }
-
-  /**
-   * Return the client information for the specified RPC request
-   *
-   * @param sessKey Object
-   * @param rpc RpcPacket
-   * @return ClientInfo
-   */
-  public ClientInfo getRpcClientInformation(Object sessKey, RpcPacket rpc) {
-
-    //	Create a client information object to hold the client details
-
-    ClientInfo cInfo = ClientInfo.createInfo("", null);
-
-    //	Get the authentication type
-
-    int authType = rpc.getCredentialsType();
-    cInfo.setNFSAuthenticationType(authType);
-
-    //	Unpack the client details from the RPC request
-
-    switch ( authType) {
-
-    	//	Null authentication
-
-  		case AuthType.Null:
-  		  cInfo.setClientAddress(rpc.getClientAddress().getHostAddress());
-
-  			//	DEBUG
-
-  			if ( Debug.EnableInfo && hasDebug())
-  			  Debug.println("RpcAuth: Client info, type=" + AuthType.getTypeAsString(authType) + ", addr=" + rpc.getClientAddress().getHostAddress());
-  		  break;
-
-  		//	Unix authentication
-
-  		case AuthType.Unix:
-
-  		  //	Unpack the credentials data
-
-  		  rpc.positionAtCredentialsData();
-  			rpc.skipBytes(4);		//	stamp id
-
-  			cInfo.setClientAddress(rpc.unpackString());
-  			cInfo.setUid(rpc.unpackInt());
-  			cInfo.setGid(rpc.unpackInt());
-
-  			//	Check for an additional groups list
-
-  			int grpLen = rpc.unpackInt();
-  			if ( grpLen > 0) {
-  			  int[] groups = new int[grpLen];
-  			  rpc.unpackIntArray(groups);
-
-  			  cInfo.setGroupsList(groups);
-  			}
-
-  			//	DEBUG
-
-  			if ( Debug.EnableInfo && hasDebug())
-  			  Debug.println("RpcAuth: Client info, type=" + AuthType.getTypeAsString(authType) + ", name=" + cInfo.getClientAddress() +
-  			      					", uid=" + cInfo.getUid() + ", gid=" + cInfo.getGid() + ", groups=" + grpLen);
-  		  break;
+    /**
+     * Determine if debug output is enabled
+     *
+     * @return boolean
+     */
+    public final boolean hasDebug() {
+        return m_debug;
     }
 
-    //	Return the client information
+    /**
+     * Return the authentication types that are supported by this implementation.
+     *
+     * @return int[]
+     */
+    @Override
+    public int[] getRpcAuthenticationTypes() {
+        return _authTypes;
+    }
 
-    return cInfo;
-  }
+    /**
+     * Return the client information for the specified RPC request
+     *
+     * @param sessKey
+     *            Object
+     * @param rpc
+     *            RpcPacket
+     * @return ClientInfo
+     */
+    @Override
+    public ClientInfo getRpcClientInformation(final Object sessKey, final RpcPacket rpc) {
+        // Create a client information object to hold the client details
+        final ClientInfo cInfo = ClientInfo.createInfo("", null);
 
-  /**
-   * Initialize the RPC authenticator
-   *
-   * @param config ServerConfiguration
-   * @param params ConfigElement
-   * @throws InvalidConfigurationException
-   */
-  public void initialize(ServerConfiguration config, ConfigElement params)
-  	throws InvalidConfigurationException {
+        // Get the authentication type
+        final int authType = rpc.getCredentialsType();
+        cInfo.setNFSAuthenticationType(authType);
 
-    //	Check if debug output is enabled
+        // Unpack the client details from the RPC request
+        switch (authType) {
+            // Null authentication
+            case AuthType.Null:
+                cInfo.setClientAddress(rpc.getClientAddress().getHostAddress());
+                if (LOGGER.isInfoEnabled() && hasDebug()) {
+                    LOGGER.info("RpcAuth: Client info, type=" + AuthType.getTypeAsString(authType) + ", addr=" + rpc.getClientAddress().getHostAddress());
+                }
+                break;
 
-    if ( params.getChild( "Debug") != null)
-      m_debug = true;
-  }
+            // Unix authentication
+            case AuthType.Unix:
+                // Unpack the credentials data
+                rpc.positionAtCredentialsData();
+                rpc.skipBytes(4); // stamp id
 
-  /**
-   * Set the current authenticated user context for processing of the current RPC request
-   *
-   * @param sess SrvSession
-   * @param client ClientInfo
-   */
-  public void setCurrentUser( SrvSession sess, ClientInfo client) {
+                cInfo.setClientAddress(rpc.unpackString());
+                cInfo.setUid(rpc.unpackInt());
+                cInfo.setGid(rpc.unpackInt());
 
-    // Nothing to do
-  }
+                // Check for an additional groups list
+                final int grpLen = rpc.unpackInt();
+                if (grpLen > 0) {
+                    final int[] groups = new int[grpLen];
+                    rpc.unpackIntArray(groups);
+
+                    cInfo.setGroupsList(groups);
+                }
+
+                if (LOGGER.isInfoEnabled() && hasDebug()) {
+                    LOGGER.info("RpcAuth: Client info, type=" + AuthType.getTypeAsString(authType) + ", name=" + cInfo.getClientAddress() + ", uid="
+                            + cInfo.getUid() + ", gid=" + cInfo.getGid() + ", groups=" + grpLen);
+                }
+                break;
+        }
+
+        // Return the client information
+        return cInfo;
+    }
+
+    /**
+     * Initialize the RPC authenticator
+     *
+     * @param config
+     *            ServerConfiguration
+     * @param params
+     *            ConfigElement
+     * @throws InvalidConfigurationException
+     */
+    @Override
+    public void initialize(final ServerConfiguration config, final ConfigElement params) throws InvalidConfigurationException {
+        // Check if debug output is enabled
+        if (params.getChild("Debug") != null) {
+            m_debug = true;
+        }
+    }
+
+    /**
+     * Set the current authenticated user context for processing of the current RPC request
+     *
+     * @param sess
+     *            SrvSession
+     * @param client
+     *            ClientInfo
+     */
+    @Override
+    public void setCurrentUser(final SrvSession sess, final ClientInfo client) {
+        // Nothing to do
+    }
 }
