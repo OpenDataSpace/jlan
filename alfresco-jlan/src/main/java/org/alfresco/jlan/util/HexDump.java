@@ -19,6 +19,7 @@
 
 package org.alfresco.jlan.util;
 
+import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
 import org.alfresco.jlan.debug.DebugInterface;
@@ -31,6 +32,20 @@ import org.alfresco.jlan.debug.DebugInterface;
  */
 public final class HexDump {
 
+    /**
+     * Hex dump to a string
+     * 
+     * @param byt
+     * @param len
+     * @param offset
+     * @return
+     */
+    public static final String DumpToString(byte[] byt, int len, int offset) {
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final PrintStream ps = new PrintStream(baos);
+        HexDump.Dump(byt, len, 0, ps);
+        return baos.toString();
+    }
   /**
    * Hex dump a byte array
    *
