@@ -1057,7 +1057,7 @@ public final class NetBIOSSession extends NetworkSession {
 
         // Create a vector to store the remote host addresses
 
-        final Vector addrList = new Vector();
+        final Vector<InetAddress> addrList = new Vector<>();
 
         // Calculate the end time, to stop receiving datagrams
 
