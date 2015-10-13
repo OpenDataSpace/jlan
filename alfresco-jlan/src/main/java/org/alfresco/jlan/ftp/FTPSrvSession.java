@@ -84,6 +84,8 @@ import org.alfresco.jlan.server.filesys.TreeConnection;
 import org.alfresco.jlan.server.filesys.TreeConnectionHash;
 import org.alfresco.jlan.util.UTF8Normalizer;
 import org.alfresco.jlan.util.WildCard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * FTP Server Session Class
@@ -91,6 +93,7 @@ import org.alfresco.jlan.util.WildCard;
  * @author gkspencer
  */
 public class FTPSrvSession extends SrvSession implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FTPSrvSession.class);
 
 	// Constants
 	//
@@ -1091,10 +1094,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
 		sendFTPResponse(200, "Port OK");
 
-		// DEBUG
-
-		if ( Debug.EnableInfo && hasDebug(DBG_DATAPORT))
+		if (LOGGER.isDebugEnabled() && hasDebug(DBG_DATAPORT)) {
 			debugPrintln("Port open addr=" + addr + ", port=" + port);
+		}
 	}
 
 	/**

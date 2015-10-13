@@ -88,7 +88,7 @@ import org.slf4j.LoggerFactory;
  * @author gkspencer
  */
 public final class SessionFactory {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Session.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(SessionFactory.class);
 
 	//	Constants
 	private static final int BROADCAST_LOOKUP_TIMEOUT		= 4000;	// ms

@@ -28,6 +28,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.Enumeration;
 
+import org.alfresco.jlan.client.TransPacket;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.ServerListener;
 import org.alfresco.jlan.server.SrvSession;
@@ -39,6 +40,8 @@ import org.alfresco.jlan.server.config.ServerConfiguration;
 import org.alfresco.jlan.server.core.SharedDeviceList;
 import org.alfresco.jlan.server.filesys.NetworkFileServer;
 import org.alfresco.jlan.util.UTF8Normalizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +50,7 @@ import org.alfresco.jlan.util.UTF8Normalizer;
  * @author gkspencer
  */
 public class FTPServer extends NetworkFileServer implements Runnable, ConfigurationListener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FTPServer.class);
 
 	//	Constants
 	//
@@ -153,7 +157,7 @@ public class FTPServer extends NetworkFileServer implements Runnable, Configurat
 	  				m_rootPath = new FTPPath(getFTPConfiguration().getFTPRootPath());
 	  			}
 	  			catch (InvalidPathException ex) {
-	  				Debug.println(ex);
+	  				LOGGER.warn(ex.getMessage(), ex);
 	  			}
 	  		}
 
@@ -260,10 +264,9 @@ public class FTPServer extends NetworkFileServer implements Runnable, Configurat
 
 	  m_dataSessions.addSession(dataPort, dataSess);
 
-	  //	DEBUG
-
-	  if ( Debug.EnableInfo && sess.hasDebug(FTPSrvSession.DBG_DATAPORT))
-	    Debug.println("[FTP] Allocated data port " + dataPort + " to session " + sess.getSessionId());
+	  if (LOGGER.isDebugEnabled() && sess.hasDebug(FTPSrvSession.DBG_DATAPORT)) {
+	      LOGGER.debug("[FTP] Allocated data port {} to session {}", dataPort, sess.getSessionId());
+	  }
 
 	  //	Return the data session
 
@@ -318,10 +321,9 @@ public class FTPServer extends NetworkFileServer implements Runnable, Configurat
 
 	  m_dataSessions.addSession(dataPort, dataSess);
 
-	  //	DEBUG
-
-	  if ( Debug.EnableInfo && sess.hasDebug(FTPSrvSession.DBG_DATAPORT))
-	    Debug.println("[FTP] Allocated passive data port " + dataPort + " to session " + sess.getSessionId());
+	  if (LOGGER.isDebugEnabled() && sess.hasDebug(FTPSrvSession.DBG_DATAPORT)) {
+	    LOGGER.debug("[FTP] Allocated passive data port {} to session {}",dataPort, sess.getSessionId());
+	  }
 
 	  //	Return the data session
 
@@ -348,10 +350,9 @@ public class FTPServer extends NetworkFileServer implements Runnable, Configurat
 
 	  m_dataSessions.removeSession(dataSess);
 
-	  //	DEBUG
-
-	  if ( Debug.EnableInfo && dataSess.getCommandSession().hasDebug(FTPSrvSession.DBG_DATAPORT))
-	    Debug.println("[FTP] Released data port " + dataSess.getAllocatedPort() + " for session " + dataSess.getCommandSession().getSessionId());
+	  if (LOGGER.isDebugEnabled() && dataSess.getCommandSession().hasDebug(FTPSrvSession.DBG_DATAPORT)) {
+	    LOGGER.debug("[FTP] Released data port {} for session {}", dataSess.getAllocatedPort(), dataSess.getCommandSession().getSessionId());
+	  }
 	}
 
 	/**
@@ -529,208 +530,160 @@ public class FTPServer extends NetworkFileServer implements Runnable, Configurat
   /**
    * Start the SMB server.
    */
-  public void run() {
+    public void run() {
+        if (LOGGER.isInfoEnabled()) {
+            LOGGER.info("[FTP] FTP Server starting on port {}", getPort());
+            LOGGER.info("[FTP] Version {}", isVersion());
+        }
 
-    //  Debug
+        // Create a server socket to listen for incoming FTP session requests
+        try {
+            // Create the server socket to listen for incoming FTP session requests
+            if (hasBindAddress()) {
+                m_srvSock = new ServerSocket(getPort(), LISTEN_BACKLOG, getBindAddress());
+            } else {
+                // See http://download.oracle.com/javase/1.5.0/docs/guide/net/ipv6_guide/index.html
+                // and Inet6AddressImpl#anyLocalAddress() for details
+                // We are binding to any local address here.
+                m_srvSock = new ServerSocket(getPort(), LISTEN_BACKLOG);
+            }
 
-    if (Debug.EnableInfo && hasDebug()) {
-      Debug.println("[FTP] FTP Server starting on port " + getPort());
-      Debug.println("[FTP] Version " + isVersion());
+            if (LOGGER.isInfoEnabled()) {
+                InetAddress localSocketAddress = ((InetSocketAddress) m_srvSock.getLocalSocketAddress()).getAddress();
+                LOGGER.info("[FTP] Listening on {}", localSocketAddress);
+            }
+
+            // Check if the FTP server is using a limited data port range
+            if (LOGGER.isInfoEnabled() && getFTPConfiguration().hasFTPDataPortRange()) {
+                LOGGER.info("[FTP] Data ports restricted to range {} - {}", getFTPConfiguration().getFTPDataPortLow(),
+                        getFTPConfiguration().getFTPDataPortHigh());
+            }
+
+            // Check if FTPS support is enabled/required
+            if (LOGGER.isInfoEnabled() && getFTPConfiguration().isFTPSEnabled()) {
+                LOGGER.info("[FTP] FTPS support enabled (" + (getFTPConfiguration().requireSecureSession() ? "required" : "optional") + ")");
+            }
+
+            // Indicate that the server is active
+            setActive(true);
+            fireServerEvent(ServerListener.ServerActive);
+
+            // Wait for incoming connection requests
+            while (hasShutdown() == false) {
+
+                // Wait for a connection
+                Socket sessSock = getSocket().accept();
+
+                // Set socket options
+                sessSock.setTcpNoDelay(true);
+
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("[FTP] FTP session request received from {}", sessSock.getInetAddress().getHostAddress());
+                }
+
+                // Create a server session for the new request, and set the session id.
+                FTPSrvSession srvSess = new FTPSrvSession(sessSock, this);
+                srvSess.setSessionId(getNextSessionId());
+                srvSess.setUniqueId("FTP" + srvSess.getSessionId());
+                srvSess.setDebugPrefix("[FTP" + srvSess.getSessionId() + "] ");
+
+                // Initialize the root path for the new session, if configured
+                if (hasRootPath())
+                    srvSess.setRootPath(getRootPath());
+
+                // Add the session to the active session list
+                addSession(srvSess);
+
+                // Inform listeners that a new session has been created
+                fireSessionOpenEvent(srvSess);
+
+                // Start the new session in a seperate thread
+                Thread srvThread = new Thread(FTPThreadGroup, srvSess);
+                srvThread.setDaemon(true);
+                srvThread.setName("Sess_FTP" + srvSess.getSessionId() + "_" + sessSock.getInetAddress().getHostAddress());
+                srvThread.start();
+
+                // Sleep for a while
+                try {
+                    Thread.sleep(1000L);
+                } catch (InterruptedException ex) {
+                }
+            }
+        } catch (SocketException ex) {
+            // Do not report an error if the server has shutdown, closing the server socket
+            // causes an exception to be thrown.
+            if (hasShutdown() == false) {
+                LOGGER.error("[FTP] FTP Socket error : ", ex);
+
+                // Inform listeners of the error, store the exception
+                setException(ex);
+                fireServerEvent(ServerListener.ServerError);
+            }
+        } catch (Exception ex) {
+            // Do not report an error if the server has shutdown, closing the server socket
+            // causes an exception to be thrown.
+            if (hasShutdown() == false) {
+                LOGGER.error("[FTP] FTP Server error : ", ex);
+            }
+
+            // Inform listeners of the error, store the exception
+            setException(ex);
+            fireServerEvent(ServerListener.ServerError);
+        }
+
+        // Close the active sessions
+        Enumeration<Integer> enm = m_sessions.enumerate();
+        while (enm.hasMoreElements()) {
+            // Get the session id and associated session
+            Integer sessId = enm.nextElement();
+            FTPSrvSession sess = m_sessions.findSession(sessId);
+
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("[FTP] FTP Close session, id = {}", sess.getSessionId());
+            }
+
+            // Close the session
+            sess.closeSession();
+        }
+
+        LOGGER.info("[FTP] FTP Server shutting down ...");
+
+        // Indicate that the server has shutdown, inform listeners
+        setActive(false);
+        fireServerEvent(ServerListener.ServerShutdown);
     }
 
-    //  Create a server socket to listen for incoming FTP session requests
+    /**
+     * Shutdown the FTP server
+     *
+     * @param immediate
+     *            boolean
+     */
+    public void shutdownServer(boolean immediate) {
+        // Set the shutdown flag
+        setShutdown(true);
 
-    try {
+        // Close the FTP server listening socket to wakeup the main FTP server thread
+        try {
+            if (getSocket() != null)
+                getSocket().close();
+        } catch (IOException ex) {
+        }
 
-			//	Create the server socket to listen for incoming FTP session requests
+        // Wait for the main server thread to close
+        if (m_srvThread != null) {
+            try {
+                m_srvThread.join(3000);
+            } catch (Exception ex) {
+            }
+        }
 
-			if ( hasBindAddress())
-				m_srvSock = new ServerSocket(getPort(), LISTEN_BACKLOG, getBindAddress());
-			else {
+        // Close the authenticator
+        m_configSection.closeConfig();
 
-			    // See http://download.oracle.com/javase/1.5.0/docs/guide/net/ipv6_guide/index.html
-			    // and Inet6AddressImpl#anyLocalAddress() for details
-			    // We are binding to any local address here.
-			    m_srvSock = new ServerSocket(getPort(), LISTEN_BACKLOG);
-			}
-
-			//	DEBUG
-
-			if ( Debug.EnableInfo && hasDebug()) {
-				InetAddress localSocketAddress = ((InetSocketAddress)m_srvSock.getLocalSocketAddress()).getAddress();
-				Debug.println("[FTP] Listening on " + localSocketAddress);
-			}
-
-			//	Check if the FTP server is using a limited data port range
-
-			if ( Debug.EnableInfo && hasDebug() && getFTPConfiguration().hasFTPDataPortRange())
-			  Debug.println("[FTP] Data ports restricted to range " + getFTPConfiguration().getFTPDataPortLow() + " - " + getFTPConfiguration().getFTPDataPortHigh());
-
-			// Check if FTPS support is enabled/required
-
-			if ( Debug.EnableInfo && hasDebug() && getFTPConfiguration().isFTPSEnabled())
-				Debug.println("[FTP] FTPS support enabled (" + (getFTPConfiguration().requireSecureSession() ? "required" : "optional") + ")");
-
-			//	Indicate that the server is active
-
-			setActive(true);
-			fireServerEvent(ServerListener.ServerActive);
-
-      //  Wait for incoming connection requests
-
-      while ( hasShutdown() == false) {
-
-		    //  Wait for a connection
-
-		    Socket sessSock = getSocket().accept();
-
-			//	Set socket options
-
-			sessSock.setTcpNoDelay(true);
-
-		    //  Debug
-
-		    if (Debug.EnableInfo && hasDebug())
-		      Debug.println("[FTP] FTP session request received from " + sessSock.getInetAddress().getHostAddress());
-
-		    //  Create a server session for the new request, and set the session id.
-
-		    FTPSrvSession srvSess = new FTPSrvSession(sessSock, this);
-		    srvSess.setSessionId(getNextSessionId());
-		    srvSess.setUniqueId("FTP" + srvSess.getSessionId());
-		    srvSess.setDebugPrefix("[FTP" + srvSess.getSessionId() + "] ");
-
-			//	Initialize the root path for the new session, if configured
-
-			if ( hasRootPath())
-				srvSess.setRootPath(getRootPath());
-
-			//	Add the session to the active session list
-
-			addSession(srvSess);
-
-			//	Inform listeners that a new session has been created
-
-			fireSessionOpenEvent(srvSess);
-
-		    //  Start the new session in a seperate thread
-
-		    Thread srvThread = new Thread(FTPThreadGroup, srvSess);
-		    srvThread.setDaemon(true);
-		    srvThread.setName("Sess_FTP" + srvSess.getSessionId() + "_" + sessSock.getInetAddress().getHostAddress());
-		    srvThread.start();
-
-			//	Sleep for a while
-
-			try {
-				Thread.sleep(1000L);
-			}
-			catch (InterruptedException ex) {
-			}
-      }
+        // Fire a shutdown notification event
+        fireServerEvent(ServerListener.ServerShutdown);
     }
-    catch (SocketException ex) {
-
-      //	Do not report an error if the server has shutdown, closing the server socket
-      //	causes an exception to be thrown.
-
-      if (hasShutdown() == false) {
-        Debug.println("[FTP] FTP Socket error : " + ex.toString(), Debug.Error);
-      	Debug.println(ex);
-
-      	//	Inform listeners of the error, store the exception
-
-      	setException(ex);
-      	fireServerEvent(ServerListener.ServerError);
-      }
-    }
-    catch (Exception ex) {
-
-      //	Do not report an error if the server has shutdown, closing the server socket
-      //	causes an exception to be thrown.
-
-			if ( hasShutdown() == false) {
-        Debug.println("[FTP] FTP Server error : " + ex.toString(), Debug.Error);
-        Debug.println(ex);
-			}
-
-			//	Inform listeners of the error, store the exception
-
-			setException(ex);
-			fireServerEvent(ServerListener.ServerError);
-    }
-
-		//	Close the active sessions
-
-		Enumeration<Integer> enm = m_sessions.enumerate();
-
-		while(enm.hasMoreElements()) {
-
-			//	Get the session id and associated session
-
-			Integer sessId = enm.nextElement();
-			FTPSrvSession sess = m_sessions.findSession(sessId);
-
-			//	DEBUG
-
-			if (Debug.EnableInfo && hasDebug())
-				Debug.println("[FTP] FTP Close session, id = " + sess.getSessionId());
-
-			//	Close the session
-
-			sess.closeSession();
-		}
-
-    //  Debug
-
-    if (Debug.EnableInfo && hasDebug())
-      Debug.println("[FTP] FTP Server shutting down ...");
-
-    //	Indicate that the server has shutdown, inform listeners
-
-    setActive(false);
-    fireServerEvent(ServerListener.ServerShutdown);
-  }
-
-	/**
-	 * Shutdown the FTP server
-	 *
-	 * @param immediate boolean
-	 */
-	public void shutdownServer(boolean immediate) {
-
-		//	Set the shutdown flag
-
-		setShutdown(true);
-
-		//	Close the FTP server listening socket to wakeup the main FTP server thread
-
-		try {
-			if ( getSocket() != null)
-				getSocket().close();
-		}
-		catch (IOException ex) {
-		}
-
-		//	Wait for the main server thread to close
-
-		if ( m_srvThread != null) {
-
-			try {
-				m_srvThread.join(3000);
-			}
-			catch (Exception ex) {
-			}
-		}
-
-		// Close the authenticator
-
-		m_configSection.closeConfig();
-
-		//	Fire a shutdown notification event
-
-		fireServerEvent(ServerListener.ServerShutdown);
-	}
 
 	/**
 	 * Start the FTP server in a seperate thread

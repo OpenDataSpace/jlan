@@ -27,6 +27,8 @@ import org.alfresco.jlan.netbios.NetworkSession;
 import org.alfresco.jlan.netbios.RFCNetBIOSProtocol;
 import org.alfresco.jlan.smb.TcpipSMB;
 import org.alfresco.jlan.util.DataPacker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Native TCP/IP SMB Network Session Class
@@ -39,27 +41,20 @@ import org.alfresco.jlan.util.DataPacker;
  * @author gkspencer
  */
 public class TcpipSMBNetworkSession extends NetworkSession {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TcpipSMBNetworkSession.class);
 
 	//  Define the protocol name
-
 	private static final String ProtocolName = "Native SMB (port 445)";
 
 	//  Socket used to connect and read/write to remote host
-
 	private Socket m_socket;
 
 	//  Input and output data streams, from the socket network connection
-
 	private DataInputStream m_in;
 	private DataOutputStream m_out;
 
 	//  Session port
-
 	private int m_sessPort = TcpipSMB.PORT;
-
-	//  Debug enable flag and debug output stream
-
-	private static boolean m_debug = false;
 
 	/**
 	 * Default constructor
@@ -100,19 +95,15 @@ public class TcpipSMBNetworkSession extends NetworkSession {
 	 */
 	public void Open(String toName, String fromName, String toAddr)
 		throws IOException, UnknownHostException {
-
 		// Create the socket
-
 		m_socket = new Socket();
 		m_socket.connect(new InetSocketAddress(toName, m_sessPort), getTimeout());
 
 		// Enable the timeout on the socket, disable the Nagle algorithm
-
 		m_socket.setSoTimeout(getTimeout());
 		m_socket.setTcpNoDelay(true);
 
 		// Attach input/output streams to the socket
-
 		m_in = new DataInputStream(m_socket.getInputStream());
 		m_out = new DataOutputStream(m_socket.getOutputStream());
 	}
@@ -134,14 +125,12 @@ public class TcpipSMBNetworkSession extends NetworkSession {
 	 */
 	public final boolean hasData()
 		throws IOException {
-
 		// Check if the connection is active
-
-		if ( m_socket == null || m_in == null)
+		if ( m_socket == null || m_in == null) {
 			return false;
+		}
 
 		// Check if there is data available
-
 		return m_in.available() > 0 ? true : false;
 	}
 
@@ -168,15 +157,14 @@ public class TcpipSMBNetworkSession extends NetworkSession {
 
 		int pktlen = DataPacker.getInt(buf, 0);
 
-		// Debug mode
-
-		if ( m_debug)
-			Debug.println("TcpSMB: Rx " + pktlen + " bytes");
+		if (LOGGER.isDebugEnabled()) {
+		    LOGGER.debug("TcpSMB: Rx {} bytes", pktlen);
+		}
 
 		// Check that the packet size is within the valid range for a CIFS request
-
-		if ( pktlen > (buf.length - RFCNetBIOSProtocol.HEADER_LEN) || pktlen > RFCNetBIOSProtocol.MaxPacketSize)
+		if ( pktlen > (buf.length - RFCNetBIOSProtocol.HEADER_LEN) || pktlen > RFCNetBIOSProtocol.MaxPacketSize) {
 			throw new IOException("TCP/IP SMB Long Read");
+		}
 
 		// Read the data part of the packet into the users buffer, this may take
 		// several reads
@@ -277,14 +265,5 @@ public class TcpipSMBNetworkSession extends NetworkSession {
 			catch (SocketException ex) {
 			}
 		}
-	}
-
-	/**
-	 * Enable/disable session debugging output
-	 *
-	 * @param dbg true to enable debugging, else false
-	 */
-	public static void setDebug(boolean dbg) {
-		m_debug = dbg;
 	}
 }

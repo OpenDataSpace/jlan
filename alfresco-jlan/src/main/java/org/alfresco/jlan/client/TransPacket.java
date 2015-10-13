@@ -28,6 +28,8 @@ import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.TransactBuffer;
 import org.alfresco.jlan.util.DataBuffer;
 import org.alfresco.jlan.util.DataPacker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SMB transact packet class
@@ -35,22 +37,19 @@ import org.alfresco.jlan.util.DataPacker;
  * @author gkspencer
  */
 public class TransPacket extends SMBPacket {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TransPacket.class);
 
 	// Define the number of standard parameters sent/received
-
 	protected static final int StandardParams = 14;
 	protected static final int RxStandardParams = 10;
 
 	// Offset to the setup paramaters, not including the sub-function
-
 	protected static final int SetupOffset = PARAMWORDS + (StandardParams * 2) + 2;
 
 	// Transact name, not used for transact 2
-
 	protected String m_transName;
 
 	// Parameter count for this transaction
-
 	protected int m_paramCnt;
 
 	/**
@@ -123,10 +122,11 @@ public class TransPacket extends SMBPacket {
 
 		// Debug mode
 
-		if ( Debug.EnableInfo && Session.hasDebugOption(Session.DBGDumpPacket)) {
-			Debug.println("Transaction parameter dump - " + prmcnt + " params :-");
-			for (int i = 0; i < prmcnt; i++)
-				Debug.println(" " + i + ". = " + prmblk[i] + ", 0x" + Integer.toHexString(prmblk[i]));
+		if (LOGGER.isInfoEnabled() && Session.hasDebugOption(Session.DBGDumpPacket)) {
+			LOGGER.info("Transaction parameter dump - {} params :-", prmcnt);
+			for (int i = 0; i < prmcnt; i++) {
+				LOGGER.info(" {}. = {}, 0x{}", i, prmblk[i], Integer.toHexString(prmblk[i]));
+			}
 		}
 	}
 
@@ -474,10 +474,9 @@ public class TransPacket extends SMBPacket {
 			if ( setupLen > 0)
 				setupBuf.appendData(getBuffer(), SetupOffset, setupLen);
 
-			// DEBUG
-
-			if ( Debug.EnableInfo && Session.hasDebug())
-				Debug.println("Receive transaction totParamLen=" + totParamLen + ", totDataLen=" + totDataLen);
+			if (LOGGER.isInfoEnabled()) {
+	             LOGGER.info("Receive transaction totParamLen={}, totDataLen={}", totParamLen, totDataLen);
+			}
 
 			// Copy the parameter/data sections to the response transaction buffer and receive
 			// additional response SMBs until all of the response has been processed
@@ -495,10 +494,9 @@ public class TransPacket extends SMBPacket {
 
 					paramBuf.appendData(getBuffer(), getParameterBlockOffset(), plen);
 
-					// DEBUG
-
-					if ( Debug.EnableInfo && Session.hasDebug())
-						Debug.println("  Receive param plen=" + plen + ", poff=" + getParameterBlockOffset());
+					if ( LOGGER.isInfoEnabled()) {
+					    LOGGER.info("  Receive param plen={}, poff={}", plen, getParameterBlockOffset());
+					}
 				}
 
 				// Copy the data from the packet to the response buffer
@@ -511,10 +509,9 @@ public class TransPacket extends SMBPacket {
 
 					dataBuf.appendData(getBuffer(), getDataBlockOffset(), dlen);
 
-					// DEBUG
-
-					if ( Debug.EnableInfo && Session.hasDebug())
-						Debug.println("  Receive data dlen=" + dlen + ", doff=" + getDataBlockOffset());
+					if (LOGGER.isInfoEnabled()) {
+						LOGGER.info("  Receive data dlen={}, doff={}", dlen, getDataBlockOffset());
+					}
 				}
 
 				// Check if we have received all the parameter/data block data
@@ -522,36 +519,32 @@ public class TransPacket extends SMBPacket {
 				if ( (paramBuf != null && paramBuf.getUsedLength() < totParamLen)
 						|| (dataBuf != null && dataBuf.getUsedLength() < totDataLen)) {
 
-					// DEBUG
 
-					if ( Debug.EnableInfo && Session.hasDebug())
-						Debug.println("  Reading secondary trans pkt ...");
+					if (LOGGER.isInfoEnabled()) {
+						LOGGER.info("  Reading secondary trans pkt ...");
+					}
 
 					// Read another packet of transaction response data
-
 					ReceiveSMB(sess, false);
 
 					// Check the receive status
-
 					if ( isValidResponse() == false)
 						checkForError();
 
 					// Get the total parameter/data block lengths as they can change
-
 					totParamLen = getTotalParameterCount();
 					totDataLen = getTotalDataCount();
 				}
 			}
 
-			// DEBUG
-
-			if ( Debug.EnableInfo && Session.hasDebug())
-				Debug.println("  Finished reading trans data respBuf=" + respBuf);
+			if (LOGGER.isInfoEnabled()) {
+			    LOGGER.info("  Finished reading trans data respBuf={}", respBuf);
+			}
 
 			// Reset the receive data buffers to read the data
-
-			if ( respBuf != null)
+			if ( respBuf != null) {
 				respBuf.setEndOfBuffer();
+			}
 		}
 		finally {
 

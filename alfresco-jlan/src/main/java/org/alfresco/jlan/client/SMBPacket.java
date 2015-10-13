@@ -30,6 +30,8 @@ import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
 import org.alfresco.jlan.util.DataPacker;
 import org.alfresco.jlan.util.HexDump;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *  SMB packet type class
@@ -42,9 +44,8 @@ import org.alfresco.jlan.util.HexDump;
  * @author gkspencer
  */
 public class SMBPacket {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(SMBPacket.class);
   //	SMB packet offsets, assuming an RFC NetBIOS transport
-
   public static final int SMBHEADER 		= RFCNetBIOSProtocol.HEADER_LEN;
   public static final int COMMAND 			= 4 + RFCNetBIOSProtocol.HEADER_LEN;
   public static final int ERRORCODE 		= 5 + RFCNetBIOSProtocol.HEADER_LEN;
@@ -183,42 +184,30 @@ public class SMBPacket {
 	 * Dump the SMB packet to the debug stream
 	 */
 	public void DumpPacket() {
-
 		// Dump the command type
-
 		int pCount = getParameterCount();
-		Debug.println("** SMB Packet Type: " + PacketType.getCommandName(getCommand()) + (isResponse() ? " [Response]" : ""));
-
+		LOGGER.debug("** SMB Packet Type: {}{}", PacketType.getCommandName(getCommand()), (isResponse() ? " [Response]" : ""));
 		// Dump flags/secondary flags
-
-		if ( Debug.EnableInfo && Session.hasDebugOption(Session.DBGDumpPacket)) {
-
+		if (LOGGER.isInfoEnabled() && Session.hasDebugOption(Session.DBGDumpPacket)) {
 			// Dump the packet length
-
-			Debug.println("** SMB Packet Dump");
-			Debug.println("Packet Length : " + getLength());
-			Debug.println("Byte Offset: " + getByteOffset() + ", Byte Count: " + getByteCount());
+			LOGGER.info("** SMB Packet Dump");
+			LOGGER.info("Packet Length : {}", getLength());
+			LOGGER.info("Byte Offset: {}, Byte Count: {}", getByteOffset(), getByteCount());
 
 			// Dump the flags
-
-			Debug.println("Flags: " + getFlagsAsString());
-			Debug.println("Flags2: " + getFlags2AsString());
+			LOGGER.info("Flags: " + getFlagsAsString());
+			LOGGER.info("Flags2: " + getFlags2AsString());
 
 			// Dump the security signature is signing is enabled
-
-			if ( hasSecuritySignature())
-				Debug.println("Signature: " + Long.toHexString(getSignature()));
+			if ( hasSecuritySignature()) {
+			    LOGGER.info("Signature: " + Long.toHexString(getSignature()));
+			}
 
 			// Dump various ids
-
-			Debug.print("TID=" + getTreeId());
-			Debug.print(", PID=" + getProcessId());
-			Debug.print(", UID=" + getUserId());
-			Debug.println(", MID=" + getMultiplexId());
+			LOGGER.info("TID= {}, PID={}, UID={}, MID={}",getTreeId(), getProcessId(), getUserId(), getMultiplexId());
 
 			// Dump parameter words/count
-
-			Debug.println("Parameter Words: " + pCount);
+			LOGGER.info("Parameter Words: " + pCount);
 
 			if ( pCount > 0) {
 				StringBuffer str = new StringBuffer(128);
@@ -248,7 +237,7 @@ public class SMBPacket {
 
 					if ( curCol == 4) {
 						curCol = 1;
-						Debug.println(str.toString());
+						LOGGER.info(str.toString());
 						str.setLength(0);
 					}
 					else
@@ -257,28 +246,24 @@ public class SMBPacket {
 			}
 
 			// Response packet fields
-
 			if ( isResponse()) {
-
 				// Dump the error code
-
-				if ( isLongErrorCode())
-					Debug.println("Long error: 0x" + Integer.toHexString(getLongErrorCode()));
-				else {
-					Debug.print("Error text: ");
-					Debug.println(SMBErrorText.ErrorString(getErrorClass(), getErrorCode()));
+				if ( isLongErrorCode()) {
+					LOGGER.info("Long error: 0x" + Integer.toHexString(getLongErrorCode()));
+				} else {
+					LOGGER.info("Error text: {}", SMBErrorText.ErrorString(getErrorClass(), getErrorCode()));
 				}
 			}
 		}
 
 		// Dump the raw data
 
-		if ( Debug.EnableInfo && Session.hasDebugOption(Session.DBGHexDump)) {
-			Debug.println("********** Raw SMB Data Dump **********");
+		if (LOGGER.isInfoEnabled() && Session.hasDebugOption(Session.DBGHexDump)) {
+			LOGGER.info("********** Raw SMB Data Dump **********");
 			HexDump.Dump(m_smbbuf, getLength(), 4);
 		}
 
-		Debug.println("");
+		LOGGER.info("");
 	}
 
 	/**
@@ -305,47 +290,37 @@ public class SMBPacket {
 	 */
 	protected final synchronized void ExchangeLowLevelSMB(NetworkSession sess, SMBPacket rxPkt, boolean throwerr)
 		throws java.io.IOException, SMBException {
-
 		// Set multiplex id
-
-		if ( getMultiplexId() == 0)
+		if ( getMultiplexId() == 0) {
 			setMultiplexId(1);
+		}
 
-		// DEBUG
-
-		if ( Session.hasDebug())
+		if (LOGGER.isDebugEnabled()) {
 			DumpPacket();
+		}
 
 		// Send the SMB request
-
 		sess.Send(m_smbbuf, getLength());
 
 		// Receive a response
-
 		if ( sess.Receive(rxPkt.getBuffer()) >= MIN_RXLEN) {
-
 			// Check if the response is for the current request
-
 			if ( rxPkt.getCommand() == m_pkttype) {
-
-				// DEBUG
-
-				if ( Session.hasDebug())
+				if (LOGGER.isDebugEnabled()) {
 					rxPkt.DumpPacket();
+				}
 
 				// Check if a valid SMB response has been received
-
-				if ( throwerr == true)
+				if ( throwerr == true) {
 					checkForError();
+				}
 
 				// Valid packet received, return to caller
-
 				return;
 			}
 		}
 
 		// Invalid receive packet
-
 		throw new java.io.IOException("Invalid SMB Receive Packet");
 	}
 
@@ -385,10 +360,9 @@ public class SMBPacket {
 		if ( getMultiplexId() == 0)
 			setMultiplexId(1);
 
-		// DEBUG
-
-		if ( Session.hasDebug())
+		if (LOGGER.isDebugEnabled()) {
 			DumpPacket();
+		}
 
 		// Get the network session
 
@@ -424,10 +398,9 @@ public class SMBPacket {
 					if ( sess.hasSMBSigning() && SessionFactory.isReceivedSMBSigningEnabled())
 						sess.verifyRxPacket(this);
 
-					// DEBUG
-
-					if ( Session.hasDebug())
+					if (LOGGER.isDebugEnabled()) {
 						rxPkt.DumpPacket();
+					}
 
 					// Check if a valid SMB response has been received, done before checking SMB
 					// signatures
@@ -1095,11 +1068,9 @@ public class SMBPacket {
 				// Check if the response is for the current request
 
 				if ( getCommand() == m_pkttype) {
-
-					// DEBUG
-
-					if ( Session.hasDebug())
+					if (LOGGER.isDebugEnabled()) {
 						DumpPacket();
+					}
 
 					// Check if SMB signing is enabled and received packet signatures should be
 					// checked
@@ -1171,10 +1142,9 @@ public class SMBPacket {
 	protected final void SendSMB(Session sess)
 		throws java.io.IOException {
 
-		// DEBUG
-
-		if ( Session.hasDebug())
+		if (LOGGER.isDebugEnabled()) {
 			DumpPacket();
+		}
 
 		// Update the last send time
 
