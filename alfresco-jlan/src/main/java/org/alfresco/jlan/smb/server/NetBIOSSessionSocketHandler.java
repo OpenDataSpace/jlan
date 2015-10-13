@@ -76,7 +76,7 @@ public class NetBIOSSessionSocketHandler extends SocketSessionHandler {
 
 			SMBSrvSession srvSess = SMBSrvSession.createSession(pktHandler, smbServer, getNextSessionId());
 
-			// Start the new session in a seperate thread
+			// Start the new session in a separate thread
 
 			Thread srvThread = new Thread(NetBIOSGroup, srvSess);
 			srvThread.setDaemon(true);
@@ -114,7 +114,7 @@ public class NetBIOSSessionSocketHandler extends SocketSessionHandler {
 
 		sessHandler.initializeSessionHandler( server);
 
-		// Run the NetBIOS session handler in a seperate thread
+		// Run the NetBIOS session handler in a separate thread
 
 		Thread nbThread = new Thread(sessHandler);
 		nbThread.setName("NetBIOS_Handler");
