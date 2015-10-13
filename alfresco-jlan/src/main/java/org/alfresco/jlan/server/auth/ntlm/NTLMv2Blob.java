@@ -31,177 +31,184 @@ import org.alfresco.jlan.util.HexDump;
 /**
  * NTLMv2 Blob Class
  *
- * <P>Contains methods to pack/unpack and calculate the hash of an NTLMv2 blob.
+ * <P>
+ * Contains methods to pack/unpack and calculate the hash of an NTLMv2 blob.
  *
  * @author gkspencer
  */
-public class NTLMv2Blob
-{
-  //  Constants
+public class NTLMv2Blob {
+    // Constants
 
-  public static final int HMAC_LEN        = 16;
-  public static final int CHALLENGE_LEN   = 8;
+    public static final int HMAC_LEN = 16;
+    public static final int CHALLENGE_LEN = 8;
 
-  //  Offsets
+    // Offsets
 
-  public static final int OFFSET_HMAC         = 0;
-  public static final int OFFSET_HEADER       = 16;
-  public static final int OFFSET_RESERVED     = 20;
-  public static final int OFFSET_TIMESTAMP    = 24;
-  public static final int OFFSET_CHALLENGE    = 32;
-  public static final int OFFSET_UNKNOWN      = 36;
-  public static final int OFFSET_TARGETINFO   = 40;
+    public static final int OFFSET_HMAC = 0;
+    public static final int OFFSET_HEADER = 16;
+    public static final int OFFSET_RESERVED = 20;
+    public static final int OFFSET_TIMESTAMP = 24;
+    public static final int OFFSET_CHALLENGE = 32;
+    public static final int OFFSET_UNKNOWN = 36;
+    public static final int OFFSET_TARGETINFO = 40;
 
-  //  NTLMv2 blob
+    // NTLMv2 blob
 
-  private byte[] m_blob;
-  private int m_offset;
-  private int m_len;
+    private final byte[] m_blob;
+    private final int m_offset;
+    private final int m_len;
 
-  /**
-   * Class constructor
-   *
-   * @param buf byte[]
-   */
-  public NTLMv2Blob(byte[] buf) {
-    m_blob = buf;
-    m_offset = 0;
-    m_len = m_blob.length;
-  }
+    /**
+     * Class constructor
+     *
+     * @param buf
+     *            byte[]
+     */
+    public NTLMv2Blob(final byte[] buf) {
+        m_blob = buf;
+        m_offset = 0;
+        m_len = m_blob.length;
+    }
 
-  /**
-   * Class constructor
-   *
-   * @param buf byte[]
-   * @param offset int
-   * @param len int
-   */
-  public NTLMv2Blob(byte[] buf, int offset, int len) {
-    m_blob = buf;
-    m_offset = offset;
-    m_len = len;
-  }
+    /**
+     * Class constructor
+     *
+     * @param buf
+     *            byte[]
+     * @param offset
+     *            int
+     * @param len
+     *            int
+     */
+    public NTLMv2Blob(final byte[] buf, final int offset, final int len) {
+        m_blob = buf;
+        m_offset = offset;
+        m_len = len;
+    }
 
-  /**
-   * Return the buffer
-   *
-   * @return byte[]
-   */
-  public final byte[] getBuffer() {
-    return m_blob;
-  }
+    /**
+     * Return the buffer
+     *
+     * @return byte[]
+     */
+    public final byte[] getBuffer() {
+        return m_blob;
+    }
 
-  /**
-   * Return the offset
-   *
-   * @return int
-   */
-  public final int getOffset() {
-    return m_offset;
-  }
+    /**
+     * Return the offset
+     *
+     * @return int
+     */
+    public final int getOffset() {
+        return m_offset;
+    }
 
-  /**
-   * Return the blob length
-   *
-   * @return int
-   */
-  public final int getLength() {
-    return m_len;
-  }
+    /**
+     * Return the blob length
+     *
+     * @return int
+     */
+    public final int getLength() {
+        return m_len;
+    }
 
-  /**
-   * Return the HMAC from the buffer
-   *
-   * @return byte[]
-   */
-  public final byte[] getHMAC() {
-    byte[] hmac = new byte[HMAC_LEN];
-    System.arraycopy(m_blob, m_offset, hmac, 0, HMAC_LEN);
+    /**
+     * Return the HMAC from the buffer
+     *
+     * @return byte[]
+     */
+    public final byte[] getHMAC() {
+        final byte[] hmac = new byte[HMAC_LEN];
+        System.arraycopy(m_blob, m_offset, hmac, 0, HMAC_LEN);
 
-    return hmac;
-  }
+        return hmac;
+    }
 
-  /**
-   * Return the timestamp from the buffer, in NT 64bit time format
-   *
-   * @return long
-   */
-  public final long getTimeStamp() {
-    return DataPacker.getIntelLong(m_blob, m_offset + OFFSET_TIMESTAMP);
-  }
+    /**
+     * Return the timestamp from the buffer, in NT 64bit time format
+     *
+     * @return long
+     */
+    public final long getTimeStamp() {
+        return DataPacker.getIntelLong(m_blob, m_offset + OFFSET_TIMESTAMP);
+    }
 
-  /**
-   * Return the client challenge
-   *
-   * @return byte[]
-   */
-  public final byte[] getClientChallenge() {
-    byte[] challenge = new byte[CHALLENGE_LEN];
-    System.arraycopy( m_blob, m_offset + OFFSET_CHALLENGE, challenge, 0, CHALLENGE_LEN);
+    /**
+     * Return the client challenge
+     *
+     * @return byte[]
+     */
+    public final byte[] getClientChallenge() {
+        final byte[] challenge = new byte[CHALLENGE_LEN];
+        System.arraycopy(m_blob, m_offset + OFFSET_CHALLENGE, challenge, 0, CHALLENGE_LEN);
 
-    return challenge;
-  }
+        return challenge;
+    }
 
-  /**
-   * Calculate the HMAC of the blob using the specified NTLMv2 hash and challenge
-   *
-   * @param challenge byte[]
-   * @param v2hash byte[]
-   * @return byte[]
-   * @exception Exception
-   */
-  public final byte[] calculateHMAC( byte[] challenge, byte[] v2hash)
-      throws Exception {
+    /**
+     * Calculate the HMAC of the blob using the specified NTLMv2 hash and challenge
+     *
+     * @param challenge
+     *            byte[]
+     * @param v2hash
+     *            byte[]
+     * @return byte[]
+     * @exception Exception
+     */
+    public final byte[] calculateHMAC(final byte[] challenge, final byte[] v2hash) throws Exception {
 
-    // Create a copy of the NTLMv2 blob with room for the challenge
+        // Create a copy of the NTLMv2 blob with room for the challenge
 
-    byte[] blob = new byte[(m_len - HMAC_LEN) + CHALLENGE_LEN];
-    System.arraycopy( challenge, 0, blob, 0, CHALLENGE_LEN);
-    System.arraycopy( m_blob, m_offset + OFFSET_HEADER, blob, CHALLENGE_LEN, m_len - HMAC_LEN);
+        final byte[] blob = new byte[(m_len - HMAC_LEN) + CHALLENGE_LEN];
+        System.arraycopy(challenge, 0, blob, 0, CHALLENGE_LEN);
+        System.arraycopy(m_blob, m_offset + OFFSET_HEADER, blob, CHALLENGE_LEN, m_len - HMAC_LEN);
 
-    // Generate the HMAC of the blob using the v2 hash as the key
+        // Generate the HMAC of the blob using the v2 hash as the key
 
-    Mac hmacMd5 = Mac.getInstance( "HMACMD5");
-    SecretKeySpec blobKey = new SecretKeySpec( v2hash, 0, v2hash.length, "MD5");
+        final Mac hmacMd5 = Mac.getInstance("HMACMD5");
+        final SecretKeySpec blobKey = new SecretKeySpec(v2hash, 0, v2hash.length, "MD5");
 
-    hmacMd5.init( blobKey);
-    return hmacMd5.doFinal( blob);
-  }
+        hmacMd5.init(blobKey);
+        return hmacMd5.doFinal(blob);
+    }
 
-  /**
-   * Calcualte the LMv2 HMAC value
-   *
-   * @param v2hash byte[]
-   * @param srvChallenge byte[]
-   * @param clChallenge byte[]
-   * @return byte[]
-   */
-  public final byte[] calculateLMv2HMAC( byte[] v2hash, byte[] srvChallenge, byte[] clChallenge)
-  	  throws Exception {
+    /**
+     * Calcualte the LMv2 HMAC value
+     *
+     * @param v2hash
+     *            byte[]
+     * @param srvChallenge
+     *            byte[]
+     * @param clChallenge
+     *            byte[]
+     * @return byte[]
+     */
+    public final byte[] calculateLMv2HMAC(final byte[] v2hash, final byte[] srvChallenge, final byte[] clChallenge) throws Exception {
 
-    // Concatenate the server and client challenges
+        // Concatenate the server and client challenges
 
-    byte[] blob = new byte[16];
-    System.arraycopy( srvChallenge, 0, blob, 0, srvChallenge.length);
-    System.arraycopy( clChallenge,  0, blob, 8, clChallenge.length);
+        final byte[] blob = new byte[16];
+        System.arraycopy(srvChallenge, 0, blob, 0, srvChallenge.length);
+        System.arraycopy(clChallenge, 0, blob, 8, clChallenge.length);
 
-    // Generate the LMv2 HMAC of the blob using the v2 hash as the key
+        // Generate the LMv2 HMAC of the blob using the v2 hash as the key
 
-    Mac hmacMd5 = Mac.getInstance( "HMACMD5");
-    SecretKeySpec blobKey = new SecretKeySpec( v2hash, 0, v2hash.length, "MD5");
+        final Mac hmacMd5 = Mac.getInstance("HMACMD5");
+        final SecretKeySpec blobKey = new SecretKeySpec(v2hash, 0, v2hash.length, "MD5");
 
-    hmacMd5.init( blobKey);
-    return hmacMd5.doFinal( blob);
-  }
+        hmacMd5.init(blobKey);
+        return hmacMd5.doFinal(blob);
+    }
 
-  /**
-   * Dump the NTLMv2 blob details
-   */
-  public final void Dump() {
-    System.out.println("NTLMv2 blob :");
-    System.out.println("       HMAC : " + HexDump.hexString( getHMAC()));
-    System.out.println("     Header : 0x" + Integer.toHexString(DataPacker.getIntelInt( m_blob, m_offset + OFFSET_HEADER)));
-    System.out.println("  Timestamp : " + new Date(NTTime.toJavaDate( getTimeStamp())));
-    System.out.println("  Challenge : " + HexDump.hexString( getClientChallenge()));
-  }
+    /**
+     * Dump the NTLMv2 blob details
+     */
+    public final void Dump() {
+        System.out.println("NTLMv2 blob :");
+        System.out.println("       HMAC : " + HexDump.hexString(getHMAC()));
+        System.out.println("     Header : 0x" + Integer.toHexString(DataPacker.getIntelInt(m_blob, m_offset + OFFSET_HEADER)));
+        System.out.println("  Timestamp : " + new Date(NTTime.toJavaDate(getTimeStamp())));
+        System.out.println("  Challenge : " + HexDump.hexString(getClientChallenge()));
+    }
 }

@@ -25,175 +25,195 @@ package org.alfresco.jlan.server.auth.ntlm;
  * @author gkspencer
  */
 public class Type1NTLMMessage extends NTLMMessage {
-  // Minimal type 1 message length
+    // Minimal type 1 message length
 
-  public static final int MinimalMessageLength = 16;
+    public static final int MinimalMessageLength = 16;
 
-  // Type 1 field offsets
+    // Type 1 field offsets
 
-  public static final int OffsetFlags   = 12;
-  public static final int OffsetData    = 16;
+    public static final int OffsetFlags = 12;
+    public static final int OffsetData = 16;
 
-  /**
-   * Default constructor
-   */
-  public Type1NTLMMessage() {
-    super();
-  }
-
-  /**
-   * Class constructor
-   *
-   * @param buf byte[]
-   */
-  public Type1NTLMMessage(byte[] buf) {
-    super(buf, 0, buf.length);
-  }
-
-  /**
-   * Class constructor
-   *
-   * @param buf byte[]
-   * @param offset int
-   * @param len int
-   */
-  public Type1NTLMMessage(byte[] buf, int offset, int len) {
-    super(buf, offset, len);
-  }
-
-  /**
-   * Return the flags value
-   *
-   * @return int
-   */
-  public int getFlags() {
-    return getIntValue(OffsetFlags);
-  }
-
-  /**
-   * Check if the domain security buffer is included
-   *
-   * @return boolean
-   */
-  public final boolean hasDomain() {
-    if (getLength() == MinimalMessageLength || hasFlag(NTLM.FlagDomainSupplied) == false)
-      return false;
-    return true;
-  }
-
-  /**
-   * Return the domain name
-   *
-   * @return String
-   */
-  public final String getDomain() {
-    if (hasFlag(NTLM.FlagDomainSupplied) == false)
-      return null;
-
-    return getStringValue(OffsetData, false);
-  }
-
-  /**
-   * Check if the workstation security buffer is included
-   *
-   * @return boolean
-   */
-  public final boolean hasWorkstation() {
-    if (getLength() == MinimalMessageLength || hasFlag(NTLM.FlagWorkstationSupplied) == false)
-      return false;
-    return true;
-  }
-
-  /**
-   * Return the workstation name
-   *
-   * @return String
-   */
-  public final String getWorkstation() {
-    if (hasFlag(NTLM.FlagWorkstationSupplied) == false)
-      return null;
-
-    int bufPos = OffsetData;
-    if (hasFlag(NTLM.FlagDomainSupplied))
-      bufPos += BufferHeaderLen;
-
-    return getStringValue(bufPos, false);
-  }
-
-  /**
-   * Build a type 1 message
-   *
-   * @param flags int
-   * @param domain String
-   * @param workstation String
-   */
-  public final void buildType1(int flags, String domain, String workstation) {
-
-    int bufPos = OffsetData;
-    int strOff = OffsetData;
-
-    if (domain != null)
-      strOff += BufferHeaderLen;
-    if (workstation != null)
-      strOff += BufferHeaderLen;
-
-    // Pack the domain name
-
-    if (domain != null) {
-      strOff = setStringValue(bufPos, domain, strOff, false);
-      flags |= NTLM.FlagDomainSupplied;
-      bufPos += BufferHeaderLen;
+    /**
+     * Default constructor
+     */
+    public Type1NTLMMessage() {
+        super();
     }
 
-    // Pack the workstation name
-
-    if (workstation != null) {
-      strOff = setStringValue(bufPos, workstation, strOff, false);
-      flags |= NTLM.FlagWorkstationSupplied;
+    /**
+     * Class constructor
+     *
+     * @param buf
+     *            byte[]
+     */
+    public Type1NTLMMessage(final byte[] buf) {
+        super(buf, 0, buf.length);
     }
 
-    // Initialize the header/flags
+    /**
+     * Class constructor
+     *
+     * @param buf
+     *            byte[]
+     * @param offset
+     *            int
+     * @param len
+     *            int
+     */
+    public Type1NTLMMessage(final byte[] buf, final int offset, final int len) {
+        super(buf, offset, len);
+    }
 
-    initializeHeader(NTLM.Type1, flags);
+    /**
+     * Return the flags value
+     *
+     * @return int
+     */
+    @Override
+    public int getFlags() {
+        return getIntValue(OffsetFlags);
+    }
 
-    // Set the message length
+    /**
+     * Check if the domain security buffer is included
+     *
+     * @return boolean
+     */
+    public final boolean hasDomain() {
+        if (getLength() == MinimalMessageLength || hasFlag(NTLM.FlagDomainSupplied) == false) {
+            return false;
+        }
+        return true;
+    }
 
-    setLength(strOff);
-  }
+    /**
+     * Return the domain name
+     *
+     * @return String
+     */
+    public final String getDomain() {
+        if (hasFlag(NTLM.FlagDomainSupplied) == false) {
+            return null;
+        }
 
-  /**
-   * Set the message flags
-   *
-   * @param flags int
-   */
-  protected void setFlags(int flags) {
-    setIntValue(OffsetFlags, flags);
-  }
+        return getStringValue(OffsetData, false);
+    }
 
-  /**
-   * Return the type 1 message as a string
-   *
-   * @return String
-   */
-  public String toString() {
+    /**
+     * Check if the workstation security buffer is included
+     *
+     * @return boolean
+     */
+    public final boolean hasWorkstation() {
+        if (getLength() == MinimalMessageLength || hasFlag(NTLM.FlagWorkstationSupplied) == false) {
+            return false;
+        }
+        return true;
+    }
 
-    StringBuffer str = new StringBuffer();
+    /**
+     * Return the workstation name
+     *
+     * @return String
+     */
+    public final String getWorkstation() {
+        if (hasFlag(NTLM.FlagWorkstationSupplied) == false) {
+            return null;
+        }
 
-    str.append("[Type1:0x");
-    str.append(Integer.toHexString(getFlags()));
-    str.append(",Domain:");
-    if (hasDomain())
-      str.append(getDomain());
-    else
-      str.append("<NotSet>");
-    str.append(",Wks:");
+        int bufPos = OffsetData;
+        if (hasFlag(NTLM.FlagDomainSupplied)) {
+            bufPos += BufferHeaderLen;
+        }
 
-    if (hasWorkstation())
-      str.append(getWorkstation());
-    else
-      str.append("<NotSet>");
-    str.append("]");
+        return getStringValue(bufPos, false);
+    }
 
-    return str.toString();
-  }
+    /**
+     * Build a type 1 message
+     *
+     * @param flags
+     *            int
+     * @param domain
+     *            String
+     * @param workstation
+     *            String
+     */
+    public final void buildType1(int flags, final String domain, final String workstation) {
+
+        int bufPos = OffsetData;
+        int strOff = OffsetData;
+
+        if (domain != null) {
+            strOff += BufferHeaderLen;
+        }
+        if (workstation != null) {
+            strOff += BufferHeaderLen;
+        }
+
+        // Pack the domain name
+
+        if (domain != null) {
+            strOff = setStringValue(bufPos, domain, strOff, false);
+            flags |= NTLM.FlagDomainSupplied;
+            bufPos += BufferHeaderLen;
+        }
+
+        // Pack the workstation name
+
+        if (workstation != null) {
+            strOff = setStringValue(bufPos, workstation, strOff, false);
+            flags |= NTLM.FlagWorkstationSupplied;
+        }
+
+        // Initialize the header/flags
+
+        initializeHeader(NTLM.Type1, flags);
+
+        // Set the message length
+
+        setLength(strOff);
+    }
+
+    /**
+     * Set the message flags
+     *
+     * @param flags
+     *            int
+     */
+    @Override
+    protected void setFlags(final int flags) {
+        setIntValue(OffsetFlags, flags);
+    }
+
+    /**
+     * Return the type 1 message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+
+        final StringBuffer str = new StringBuffer();
+
+        str.append("[Type1:0x");
+        str.append(Integer.toHexString(getFlags()));
+        str.append(",Domain:");
+        if (hasDomain()) {
+            str.append(getDomain());
+        } else {
+            str.append("<NotSet>");
+        }
+        str.append(",Wks:");
+
+        if (hasWorkstation()) {
+            str.append(getWorkstation());
+        } else {
+            str.append("<NotSet>");
+        }
+        str.append("]");
+
+        return str.toString();
+    }
 }
