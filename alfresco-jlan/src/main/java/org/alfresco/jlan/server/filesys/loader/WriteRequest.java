@@ -19,190 +19,182 @@
 
 package org.alfresco.jlan.server.filesys.loader;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.TreeConnection;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Write Request Class
  *
- * <p>Contains the details of a write request to be performed using a background thread.
+ * <p>
+ * Contains the details of a write request to be performed using a background thread.
  *
  * @author gkspencer
  */
 public class WriteRequest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(WriteRequest.class);
 
-	//	Network file to write to
+    // Network file to write to
+    private final NetworkFile m_file;
+    private final TreeConnection m_conn;
+    private final DiskInterface m_disk;
 
-	private NetworkFile m_file;
-	private TreeConnection m_conn;
-	private DiskInterface m_disk;
+    // Write length and offset within the file
+    private final int m_writeLen;
+    private final long m_writeOff;
 
-	//	Write length and offset within the file
+    // Data buffer and offset of data within the buffer
+    private final byte[] m_buffer;
+    private final int m_dataOff;
 
-	private int m_writeLen;
-	private long m_writeOff;
+    /**
+     * Class constructor
+     *
+     * @param file
+     *            NetworkFile
+     * @param tree
+     *            TreeConnection
+     * @param disk
+     *            DiskInterface
+     * @param writeLen
+     *            int
+     * @param writeOff
+     *            long
+     * @param data
+     *            byte[]
+     * @param dataOff
+     *            int
+     */
+    public WriteRequest(final NetworkFile file, final TreeConnection tree, final DiskInterface disk, final int writeLen, final long writeOff, final byte[] data,
+            final int dataOff) {
+        m_file = file;
+        m_conn = tree;
+        m_disk = disk;
 
-	//	Data buffer and offset of data within the buffer
+        m_writeLen = writeLen;
+        m_writeOff = writeOff;
 
-	private byte[] m_buffer;
-	private int m_dataOff;
+        m_buffer = data;
+        m_dataOff = dataOff;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param file NetworkFile
-	 * @param tree TreeConnection
-	 * @param disk DiskInterface
-	 * @param writeLen int
-	 * @param writeOff long
-	 * @param data byte[]
-	 * @param dataOff int
-	 */
-	public WriteRequest(NetworkFile file, TreeConnection tree, DiskInterface disk, int writeLen, long writeOff, byte[] data, int dataOff) {
-		m_file = file;
-		m_conn = tree;
-		m_disk = disk;
+    /**
+     * Return the network file
+     *
+     * @return NetworkFile
+     */
+    public final NetworkFile getFile() {
+        return m_file;
+    }
 
-		m_writeLen = writeLen;
-		m_writeOff = writeOff;
+    /**
+     * Return the tree connection
+     *
+     * @return TreeConnection
+     */
+    public final TreeConnection getConnection() {
+        return m_conn;
+    }
 
-		m_buffer  = data;
-		m_dataOff = dataOff;
-	}
+    /**
+     * Return the disk interface
+     *
+     * @return DiskInterface
+     */
+    public final DiskInterface getDisk() {
+        return m_disk;
+    }
 
-	/**
-	 * Return the network file
-	 *
-	 * @return NetworkFile
-	 */
-	public final NetworkFile getFile() {
-		return m_file;
-	}
+    /**
+     * Return the write length
+     *
+     * @return int
+     */
+    public final int getWriteLength() {
+        return m_writeLen;
+    }
 
-	/**
-	 * Return the tree connection
-	 *
-	 * @return TreeConnection
-	 */
-	public final TreeConnection getConnection() {
-		return m_conn;
-	}
+    /**
+     * Return the file write position
+     *
+     * @return long
+     */
+    public final long getWriteOffset() {
+        return m_writeOff;
+    }
 
-	/**
-	 * Return the disk interface
-	 *
-	 * @return DiskInterface
-	 */
-	public final DiskInterface getDisk() {
-		return m_disk;
-	}
+    /**
+     * Return the data buffer
+     *
+     * @return byte[]
+     */
+    public final byte[] getBuffer() {
+        return m_buffer;
+    }
 
-	/**
-	 * Return the write length
-	 *
-	 * @return int
-	 */
-	public final int getWriteLength() {
-		return m_writeLen;
-	}
+    /**
+     * Return the data buffer offset
+     *
+     * @return int
+     */
+    public final int getDataOffset() {
+        return m_dataOff;
+    }
 
-	/**
-	 * Return the file write position
-	 *
-	 * @return long
-	 */
-	public final long getWriteOffset() {
-		return m_writeOff;
-	}
+    /**
+     * Perform the write request, return the write length or -1 if an error occurs
+     *
+     * @return int
+     */
+    public final int doWrite() {
+        int wlen = -1;
+        try {
+            // Synchronize using the network file
+            synchronized (m_file) {
+                // Open the file
+                m_file.openFile(false);
 
-	/**
-	 * Return the data buffer
-	 *
-	 * @return byte[]
-	 */
-	public final byte[] getBuffer() {
-		return m_buffer;
-	}
+                // Perform the write request
+                wlen = m_disk.writeFile(null, m_conn, m_file, m_buffer, m_dataOff, m_writeLen, m_writeOff);
 
-	/**
-	 * Return the data buffer offset
-	 *
-	 * @return int
-	 */
-	public final int getDataOffset() {
-		return m_dataOff;
-	}
+                // Close the file
+                m_file.closeFile();
+            }
+        } catch (final Exception ex) {
+            LOGGER.error("ThreadedWriter error", ex);
+            wlen = -1;
+        }
 
-	/**
-	 * Perform the write request, return the write length or -1 if an error occurs
-	 *
-	 * @return int
-	 */
-	public final int doWrite() {
+        // Check if there was a write error
+        if (wlen == -1) {
+            m_file.setDelayedWriteError(true);
+        } else {
+            m_file.incrementWriteCount();
+        }
 
-		int wlen = -1;
+        // Return the actual write length
+        return wlen;
+    }
 
-		try {
+    /**
+     * Return the write request as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuffer str = new StringBuffer();
 
-			//	Synchronize using the network file
+        str.append("[");
+        str.append(getFile().getFullName());
+        str.append(":wlen=");
+        str.append(getWriteLength());
+        str.append(",woff=");
+        str.append(getWriteOffset());
+        str.append("]");
 
-			synchronized ( m_file) {
-
-				//	Open the file
-
-				m_file.openFile(false);
-
-				//	Perform the write request
-
-				wlen = m_disk.writeFile(null, m_conn, m_file, m_buffer, m_dataOff, m_writeLen, m_writeOff);
-
-				//	Close the file
-
-				m_file.closeFile();
-			}
-		}
-		catch (Exception ex) {
-
-			//	Debug
-
-			Debug.println("ThreadedWriter error=" + ex.toString());
-
-			//	Indicate that the write failed
-
-			wlen = -1;
-		}
-
-		//	Check if there was a write error
-
-		if ( wlen == -1)
-			m_file.setDelayedWriteError(true);
-		else
-			m_file.incrementWriteCount();
-
-		//	Return the actual write length
-
-		return wlen;
-	}
-
-	/**
-	 * Return the write request as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuffer str = new StringBuffer();
-
-		str.append("[");
-		str.append(getFile().getFullName());
-		str.append(":wlen=");
-		str.append(getWriteLength());
-		str.append(",woff=");
-		str.append(getWriteOffset());
-		str.append("]");
-
-		return str.toString();
-	}
+        return str.toString();
+    }
 }
