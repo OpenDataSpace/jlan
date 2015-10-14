@@ -24,76 +24,82 @@ import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
 /**
  * File Data Update Message Class
  *
- * <p>Contains the details of a file data update start or completion.
+ * <p>
+ * Contains the details of a file data update start or completion.
  *
  * @author gkspencer
  */
 public class DataUpdateMessage extends ClusterMessage {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Updated path and start/completion flag
+    // Updated path and start/completion flag
 
-	private String m_path;
-	private boolean m_startUpdate;
+    private String m_path;
+    private boolean m_startUpdate;
 
-	/**
-	 * Default constructor
-	 */
-	public DataUpdateMessage() {
-	}
+    /**
+     * Default constructor
+     */
+    public DataUpdateMessage() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param fromNode ClusterNode
-	 * @param path String
-	 * @param startUpdate boolean
-	 */
-	public DataUpdateMessage( String targetNode, ClusterNode fromNode, String path, boolean startUpdate) {
-		super ( targetNode, fromNode, ClusterMessageType.DataUpdate);
-		m_path = path;
-		m_startUpdate = startUpdate;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param fromNode
+     *            ClusterNode
+     * @param path
+     *            String
+     * @param startUpdate
+     *            boolean
+     */
+    public DataUpdateMessage(final String targetNode, final ClusterNode fromNode, final String path, final boolean startUpdate) {
+        super(targetNode, fromNode, ClusterMessageType.DataUpdate);
+        m_path = path;
+        m_startUpdate = startUpdate;
+    }
 
-	/**
-	 * Return the normalized path of the file/folder
-	 *
-	 * @return String
-	 */
-	public final String getPath() {
-		return m_path;
-	}
+    /**
+     * Return the normalized path of the file/folder
+     *
+     * @return String
+     */
+    public final String getPath() {
+        return m_path;
+    }
 
-	/**
-	 * Return the start of update flag
-	 *
-	 * @return boolean
-	 */
-	public final boolean isStartOfUpdate() {
-		return m_startUpdate;
-	}
+    /**
+     * Return the start of update flag
+     *
+     * @return boolean
+     */
+    public final boolean isStartOfUpdate() {
+        return m_startUpdate;
+    }
 
-	/**
-	 * Return the file status message as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the file status message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append( "[");
-		str.append( super.toString());
-		str.append( ",path=");
-		str.append( getPath());
-		str.append( ",startUpdate=");
-		str.append( isStartOfUpdate());
-		str.append( "]");
+        str.append("[");
+        str.append(super.toString());
+        str.append(",path=");
+        str.append(getPath());
+        str.append(",startUpdate=");
+        str.append(isStartOfUpdate());
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 
 }

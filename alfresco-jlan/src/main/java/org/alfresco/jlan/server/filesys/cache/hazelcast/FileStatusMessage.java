@@ -24,75 +24,80 @@ import org.alfresco.jlan.server.filesys.FileStatus;
 /**
  * File Status Update Message Class
  *
- * <p>Contains the details of a file status update.
+ * <p>
+ * Contains the details of a file status update.
  *
  * @author gkspencer
  */
 public class FileStatusMessage extends ClusterMessage {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Updated path and file status
+    // Updated path and file status
 
-	private String m_path;
-	private int m_fileStatus;
+    private String m_path;
+    private int m_fileStatus;
 
-	/**
-	 * Default constructor
-	 */
-	public FileStatusMessage() {
-	}
+    /**
+     * Default constructor
+     */
+    public FileStatusMessage() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param path String
-	 * @param fileSts int
-	 */
-	public FileStatusMessage( String targetNode, String path, int fileSts) {
-		super ( targetNode, ClusterMessageType.FileStateUpdate);
-		m_path = path;
-		m_fileStatus = fileSts;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param path
+     *            String
+     * @param fileSts
+     *            int
+     */
+    public FileStatusMessage(final String targetNode, final String path, final int fileSts) {
+        super(targetNode, ClusterMessageType.FileStateUpdate);
+        m_path = path;
+        m_fileStatus = fileSts;
+    }
 
-	/**
-	 * Return the normalized path of the file/folder
-	 *
-	 * @return String
-	 */
-	public final String getPath() {
-		return m_path;
-	}
+    /**
+     * Return the normalized path of the file/folder
+     *
+     * @return String
+     */
+    public final String getPath() {
+        return m_path;
+    }
 
-	/**
-	 * Return the new file status
-	 *
-	 * @return int
-	 */
-	public final int getFileStatus() {
-		return m_fileStatus;
-	}
+    /**
+     * Return the new file status
+     *
+     * @return int
+     */
+    public final int getFileStatus() {
+        return m_fileStatus;
+    }
 
-	/**
-	 * Return the file status message as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the file status message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append( "[");
-		str.append( super.toString());
-		str.append( ",path=");
-		str.append( getPath());
-		str.append( ",fileSts=");
-		str.append( FileStatus.asString( getFileStatus()));
-		str.append( "]");
+        str.append("[");
+        str.append(super.toString());
+        str.append(",path=");
+        str.append(getPath());
+        str.append(",fileSts=");
+        str.append(FileStatus.asString(getFileStatus()));
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 
 }

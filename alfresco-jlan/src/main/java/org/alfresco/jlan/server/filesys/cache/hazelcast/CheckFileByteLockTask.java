@@ -19,97 +19,95 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileLock;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
 /**
  * Check File Byte Range Lock Remote Task Class
  *
- * <p>Used to synchronize checking if an area of a file is readable/writeable by executing on the remote node
- * that owns the file state/key.
+ * <p>
+ * Used to synchronize checking if an area of a file is readable/writeable by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class CheckFileByteLockTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CheckFileByteLockTask.class);
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;
 
-	private static final long serialVersionUID = 1L;
+    // File area details
+    private ClusterFileLock m_lockCheck;
 
-	// File area details
+    // Check write access
+    private boolean m_writeCheck;
 
-	private ClusterFileLock m_lockCheck;
+    /**
+     * Default constructor
+     */
+    public CheckFileByteLockTask() {
+    }
 
-	// Check write access
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param lockCheck
+     *            ClusterFileLock
+     * @param writeCheck
+     *            boolean
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public CheckFileByteLockTask(final String mapName, final String key, final ClusterFileLock lockCheck, final boolean writeCheck, final boolean debug,
+            final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-	private boolean m_writeCheck;
+        m_lockCheck = lockCheck;
+        m_writeCheck = writeCheck;
+    }
 
-	/**
-	 * Default constructor
-	 */
-	public CheckFileByteLockTask() {
-	}
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Boolean
+     * @exception Exception
+     */
+    @Override
+    protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param lockCheck ClusterFileLock
-	 * @param writeCheck boolean
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public CheckFileByteLockTask( String mapName, String key, ClusterFileLock lockCheck, boolean writeCheck, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+        if (hasDebug()) {
+            LOGGER.debug("CheckFileByteLockTask: checkArea={} ({}) on {}", m_lockCheck, m_writeCheck ? "Write" : "Read", fState);
+        }
 
-		m_lockCheck = lockCheck;
-		m_writeCheck = writeCheck;
-	}
+        // Check if there are any locks on the file
+        boolean accessOK = true;
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Boolean
-	 * @exception Exception
-	 */
-	protected Boolean runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+        if (fState.hasActiveLocks() == true) {
+            // Check if the area is readable/writeable by this user
+            if (m_writeCheck == true) {
+                // Check if the file area is writeable
+                accessOK = fState.getLockList().canWriteFile(m_lockCheck);
+            } else {
+                // Check if the file area is readable
+                accessOK = fState.getLockList().canReadFile(m_lockCheck);
+            }
+        }
 
-		// DEBUG
-
-		if ( hasDebug())
-			Debug.println( "CheckFileByteLockTask: checkArea=" + m_lockCheck + ( m_writeCheck ? " (Write)" : " (Read)") + " on " + fState);
-
-		// Check if there are any locks on the file
-
-		boolean accessOK = true;
-
-		if ( fState.hasActiveLocks() == true) {
-
-			// Check if the area is readable/writeable by this user
-
-			if ( m_writeCheck == true) {
-
-				// Check if the file area is writeable
-
-				accessOK = fState.getLockList().canWriteFile( m_lockCheck);
-			}
-			else {
-
-				// Check if the file area is readable
-
-				accessOK = fState.getLockList().canReadFile( m_lockCheck);
-			}
-		}
-
-		// Return the access status
-
-		return accessOK;
-	}
+        // Return the access status
+        return accessOK;
+    }
 }

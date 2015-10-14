@@ -40,98 +40,83 @@ import org.alfresco.jlan.smb.SharingMode;
 /**
  * File State Class
  *
- * <p>Caches information about a file/directory so that the core server does not need
- * to make calls to the shared device driver.
+ * <p>
+ * Caches information about a file/directory so that the core server does not need to make calls to the shared device driver.
  *
  * @author gkspencer
  */
 public abstract class FileState implements Serializable {
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;;
 
-	private static final long serialVersionUID = 1L;;
+    // File state constants
+    public final static long NoTimeout = -1L;
+    public final static long DefTimeout = 2 * 60000L; // 2 minutes
+    public final static long RenameTimeout = 1 * 60000L; // 1 minute
+    public final static long DeleteTimeout = 15000L; // 15 seconds
 
-	//	File state constants
+    public final static int UnknownFileId = -1;
 
-	public final static long NoTimeout		= -1L;
-	public final static long DefTimeout		= 2 * 60000L;	// 2 minutes
-    public final static long RenameTimeout  = 1 * 60000L;   // 1 minute
-    public final static long DeleteTimeout	= 15000L;		// 15 seconds
+    // File data status codes
+    public final static int FILE_LOADWAIT = 0;
+    public final static int FILE_LOADING = 1;
+    public final static int FILE_AVAILABLE = 2;
+    public final static int FILE_UPDATED = 3;
+    public final static int FILE_SAVEWAIT = 4;
+    public final static int FILE_SAVING = 5;
+    public final static int FILE_SAVED = 6;
+    public final static int FILE_DELETED = 7;
+    public final static int FILE_RENAMED = 8;
+    public final static int FILE_DELETEONCLOSE = 9;
 
-	public final static int UnknownFileId		= -1;
+    // File data status names
+    private static final String[] _fileStates = {"LoadWait", "Loading", "Available", "Updated", "SaveWait", "Saving", "Saved", "Deleted", "Renamed",
+            "DeleteOnClose"};
 
-	//	File data status codes
+    // Standard file information keys
+    public static final String FileInformation = "FileInfo";
+    public static final String StreamsList = "StreamsList";
 
-	public final static int FILE_LOADWAIT		= 0;
-	public final static int FILE_LOADING		= 1;
-	public final static int FILE_AVAILABLE		= 2;
-	public final static int FILE_UPDATED		= 3;
-	public final static int FILE_SAVEWAIT		= 4;
-	public final static int FILE_SAVING			= 5;
-	public final static int FILE_SAVED			= 6;
-	public final static int FILE_DELETED		= 7;
-	public final static int FILE_RENAMED		= 8;
-	public final static int FILE_DELETEONCLOSE 	= 9;
+    // File status change reason codes
+    public static final int ReasonNone = 0; // no change
+    public static final int ReasonFileCreated = 1; // file created
+    public static final int ReasonFolderCreated = 2; // folder created
+    public static final int ReasonFileDeleted = 3; // file deleted
+    public static final int ReasonFolderDeleted = 4; // folder deleted
 
-	//	File data status names
+    // File name/path
+    private String m_path;
 
-	private static final String[] _fileStates = { "LoadWait", "Loading", "Available", "Updated", "SaveWait", "Saving", "Saved", "Deleted", "Renamed", "DeleteOnClose" };
+    // File state timeout, -1 indicates no timeout
+    private long m_tmo;
 
-	//	Standard file information keys
+    // File status, indicates if the file/folder exists and if it is a file or folder.
+    // Constants are defined in the FileStatus class.
+    private int m_fileStatus;
 
-	public static final String FileInformation	= "FileInfo";
-	public static final String StreamsList		= "StreamsList";
-
-	// File status change reason codes
-
-	public static final int ReasonNone			= 0;	// no change
-	public static final int ReasonFileCreated	= 1;	// file created
-	public static final int ReasonFolderCreated	= 2;	// folder created
-	public static final int ReasonFileDeleted	= 3;	// file deleted
-	public static final int ReasonFolderDeleted	= 4;	// folder deleted
-
-	//	File name/path
-
-	private String m_path;
-
-	//	File state timeout, -1 indicates no timeout
-
-	private long m_tmo;
-
-	//	File status, indicates if the file/folder exists and if it is a file or folder.
-	//	Constants are defined in the FileStatus class.
-
-	private int m_fileStatus;
-
-	//	Open file count
-
-	private int m_openCount;
+    // Open file count
+    private int m_openCount;
 
     // Sharing mode and PID of first process to open the file
-
     private int m_sharedAccess = SharingMode.READWRITEDELETE;
     private int m_pid = -1;
 
-	//	File lock list, allocated once there are active locks on this file
+    // File lock list, allocated once there are active locks on this file
+    private FileLockList m_lockList;
 
-	private FileLockList m_lockList;
+    // Oplock details
+    private OpLockDetails m_oplock;
 
-	// Oplock details
-
-	private OpLockDetails m_oplock;
-
-	//	Retention period expiry date/time
-
-	private long m_retainUntil = -1L;
+    // Retention period expiry date/time
+    private long m_retainUntil = -1L;
 
     // File timestamps updated only whilst file is open
-
     private long m_accessDate;
     private long m_modifyDate;
     private long m_changeDate;
 
     // File size and allocation size
-
     private long m_fileSize = -1;
     private long m_allocSize;
 
@@ -141,105 +126,105 @@ public abstract class FileState implements Serializable {
     public FileState() {
     }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param fname String
-	 * @param caseSensitive boolean
-	 */
-	public FileState(String fname, boolean caseSensitive) {
+    /**
+     * Class constructor
+     *
+     * @param fname
+     *            String
+     * @param caseSensitive
+     *            boolean
+     */
+    public FileState(final String fname, final boolean caseSensitive) {
+        // Normalize the file path
+        setPath(fname, caseSensitive);
+        setExpiryTime(System.currentTimeMillis() + DefTimeout);
 
-	  //	Normalize the file path
+        // Set the file/folder status
+        m_fileStatus = FileStatus.Unknown;
+    }
 
-	  setPath(fname, caseSensitive);
-	  setExpiryTime(System.currentTimeMillis() + DefTimeout);
+    /**
+     * Class constructor
+     *
+     * @param fname
+     *            String
+     * @param status
+     *            int
+     * @param caseSensitive
+     *            boolean
+     */
+    public FileState(final String fname, final int status, final boolean caseSensitive) {
+        // Normalize the file path
+        setPath(fname, caseSensitive);
+        setExpiryTime(System.currentTimeMillis() + DefTimeout);
 
-	  //	Set the file/folder status
+        // Set the file/folder status
+        m_fileStatus = status;
+    }
 
-	  m_fileStatus = FileStatus.Unknown;
-	}
+    /**
+     * Return the file name/path
+     *
+     * @return String
+     */
+    public final String getPath() {
+        return m_path;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param fname String
-	 * @param status int
-     * @param caseSensitive boolean
-	 */
-	public FileState(String fname, int status, boolean caseSensitive) {
+    /**
+     * Return the file exists state
+     *
+     * @return boolean
+     */
+    public final boolean fileExists() {
+        if (m_fileStatus == FileStatus.FileExists || m_fileStatus == FileStatus.DirectoryExists) {
+            return true;
+        }
+        return false;
+    }
 
-	  //	Normalize the file path
+    /**
+     * Return the file status
+     *
+     * @return int
+     */
+    public final int getFileStatus() {
+        return m_fileStatus;
+    }
 
-	  setPath(fname, caseSensitive);
-	  setExpiryTime(System.currentTimeMillis() + DefTimeout);
+    /**
+     * Return the directory state
+     *
+     * @return boolean
+     */
+    public final boolean isDirectory() {
+        return m_fileStatus == FileStatus.DirectoryExists ? true : false;
+    }
 
-	  //	Set the file/folder status
+    /**
+     * Return the file open count
+     *
+     * @return int
+     */
+    public int getOpenCount() {
+        return m_openCount;
+    }
 
-	  m_fileStatus = status;
-	}
+    /**
+     * Get the file id
+     *
+     * @return int
+     */
+    public abstract int getFileId();
 
-	/**
-	 * Return the file name/path
-	 *
-	 * @return String
-	 */
-	public final String getPath() {
-	  return m_path;
-	}
-
-	/**
-	 * 	Return the file exists state
-	 *
-	 * @return boolean
-	 */
-	public final boolean fileExists() {
-	  if ( m_fileStatus == FileStatus.FileExists || m_fileStatus == FileStatus.DirectoryExists)
-	    return true;
-	  return false;
-	}
-
-	/**
-	 * Return the file status
-	 *
-	 * @return int
-	 */
-	public final int getFileStatus() {
-	  return m_fileStatus;
-	}
-
-	/**
-	 * Return the directory state
-	 *
-	 * @return boolean
-	 */
-	public final boolean isDirectory() {
-	  return m_fileStatus == FileStatus.DirectoryExists ? true : false;
-	}
-
-	/**
-	 * Return the file open count
-	 *
-	 * @return int
-	 */
-	public int getOpenCount() {
-		return m_openCount;
-	}
-
-	/**
-	 * Get the file id
-	 *
-	 * @return int
-	 */
-	public abstract int getFileId();
-
-	/**
-	 * Return the shared access mode
-	 *
-	 * @return int
-	 */
-	public final int getSharedAccess() {
-	  return m_sharedAccess;
-	}
+    /**
+     * Return the shared access mode
+     *
+     * @return int
+     */
+    public final int getSharedAccess() {
+        return m_sharedAccess;
+    }
 
     /**
      * Return the PID of the first process to open the file, or -1 if the file is not open
@@ -247,514 +232,522 @@ public abstract class FileState implements Serializable {
      * @return int
      */
     public final int getProcessId() {
-    	return m_pid;
+        return m_pid;
     }
 
-	/**
-	 * Return the file data status
-	 *
-	 * @return int
-	 */
-	public abstract int getDataStatus();
+    /**
+     * Return the file data status
+     *
+     * @return int
+     */
+    public abstract int getDataStatus();
 
-	/**
-	 * Check if there are active locks on this file
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasActiveLocks() {
-		if ( m_lockList != null && m_lockList.numberOfLocks() > 0)
-			return true;
-		return false;
-	}
+    /**
+     * Check if there are active locks on this file
+     *
+     * @return boolean
+     */
+    public final boolean hasActiveLocks() {
+        if (m_lockList != null && m_lockList.numberOfLocks() > 0) {
+            return true;
+        }
+        return false;
+    }
 
-	/**
-	 * Return the active file locks list
-	 *
-	 * @return FileLockList
-	 */
-	public final FileLockList getLockList() {
-		return m_lockList;
-	}
+    /**
+     * Return the active file locks list
+     *
+     * @return FileLockList
+     */
+    public final FileLockList getLockList() {
+        return m_lockList;
+    }
 
-	/**
-	 * Check if this file state does not expire
-	 *
-	 * @return boolean
-	 */
-	public final boolean isPermanentState() {
-		return m_tmo == NoTimeout ? true : false;
-	}
+    /**
+     * Check if this file state does not expire
+     *
+     * @return boolean
+     */
+    public final boolean isPermanentState() {
+        return m_tmo == NoTimeout ? true : false;
+    }
 
-	/**
-	 * Check if the file/folder is under retention
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasActiveRetentionPeriod() {
-	  if ( m_retainUntil == -1L)
-	    return false;
-	  return System.currentTimeMillis() < m_retainUntil ? true : false;
-	}
+    /**
+     * Check if the file/folder is under retention
+     *
+     * @return boolean
+     */
+    public final boolean hasActiveRetentionPeriod() {
+        if (m_retainUntil == -1L) {
+            return false;
+        }
+        return System.currentTimeMillis() < m_retainUntil ? true : false;
+    }
 
-	/**
-	 * Get the retention period expiry date/time for the file/folder
-	 *
-	 * @return long
-	 */
-	public final long getRetentionExpiryDateTime() {
-	  return m_retainUntil;
-	}
+    /**
+     * Get the retention period expiry date/time for the file/folder
+     *
+     * @return long
+     */
+    public final long getRetentionExpiryDateTime() {
+        return m_retainUntil;
+    }
 
     /**
      * Determine if the file/folder exists
      *
      * @return boolen
      */
-    public final boolean exists()
-    {
-        if ( m_fileStatus == FileStatus.FileExists ||
-                m_fileStatus == FileStatus.DirectoryExists)
+    public final boolean exists() {
+        if (m_fileStatus == FileStatus.FileExists || m_fileStatus == FileStatus.DirectoryExists) {
             return true;
+        }
         return false;
     }
 
-	/**
-	 * Check if the file can be opened depending on any current file opens and the sharing mode of the
-	 * first file open
-	 *
-	 * @param params FileOpenParams
-	 * @return boolean
-	 */
-	public final boolean allowsOpen( FileOpenParams params) {
+    /**
+     * Check if the file can be opened depending on any current file opens and the sharing mode of the first file open
+     *
+     * @param params
+     *            FileOpenParams
+     * @return boolean
+     */
+    public final boolean allowsOpen(final FileOpenParams params) {
+        // If the file is not currently open then allow the file open
+        if (getOpenCount() == 0) {
+            return true;
+        }
 
-		//	If the file is not currently open then allow the file open
+        // Check the shared access mode
+        if (getSharedAccess() == SharingMode.READWRITE && params.getAccessMode() == SharingMode.READWRITE) {
+            return true;
+        } else if ((getSharedAccess() & SharingMode.READ) != 0 && params.isReadOnlyAccess()) {
+            return true;
+        } else if ((getSharedAccess() & SharingMode.WRITE) != 0 && params.isWriteOnlyAccess()) {
+            return true;
+        }
 
-		if ( getOpenCount() == 0)
-		    return true;
+        // Sharing violation, do not allow the file open
+        return false;
+    }
 
-		//	Check the shared access mode
+    /**
+     * Increment the file open count
+     *
+     * @return int
+     */
+    public synchronized int incrementOpenCount() {
+        return ++m_openCount;
+    }
 
-		if ( getSharedAccess() == SharingMode.READWRITE &&
-		       params.getAccessMode() == SharingMode.READWRITE)
-		    return true;
-		else if (( getSharedAccess() & SharingMode.READ) != 0 &&
-		      params.isReadOnlyAccess())
-		    return true;
-		else if(( getSharedAccess() & SharingMode.WRITE) != 0 &&
-		      params.isWriteOnlyAccess())
-		    return true;
+    /**
+     * Decrement the file open count
+     *
+     * @return int
+     */
+    public synchronized int decrementOpenCount() {
 
-		//	Sharing violation, do not allow the file open
+        if (m_openCount > 0) {
+            m_openCount--;
+        }
 
-		return false;
-	}
+        return m_openCount;
+    }
 
-	/**
-	 * Increment the file open count
-	 *
-	 * @return int
-	 */
-	public synchronized int incrementOpenCount() {
-		return ++m_openCount;
-	}
+    /**
+     * Check if the file state has expired
+     *
+     * @param curTime
+     *            long
+     * @return boolean
+     */
+    public final boolean hasExpired(final long curTime) {
+        if (m_tmo == NoTimeout) {
+            return false;
+        }
+        if (curTime > m_tmo) {
+            return true;
+        }
+        return false;
+    }
 
-	/**
-	 * Decrement the file open count
-	 *
-	 * @return int
-	 */
-	public synchronized int decrementOpenCount() {
+    /**
+     * Return the number of seconds left before the file state expires
+     *
+     * @param curTime
+     *            long
+     * @return long
+     */
+    public final long getSecondsToExpire(final long curTime) {
+        if (m_tmo == NoTimeout) {
+            return -1;
+        }
+        return (m_tmo - curTime) / 1000L;
+    }
 
-		if ( m_openCount > 0)
-			m_openCount--;
+    /**
+     * Return a file status code as a string
+     *
+     * @return String
+     */
+    public final String getStatusAsString() {
+        final int dataSts = getDataStatus();
+        if (dataSts >= 0 && dataSts < _fileStates.length) {
+            return _fileStates[dataSts];
+        }
+        return "Unknown";
+    }
 
-		return m_openCount;
-	}
+    /**
+     * Set the file status
+     *
+     * @param status
+     *            int
+     */
+    public void setFileStatus(final int status) {
+        setFileStatus(status, ReasonNone);
+    }
 
-	/**
-	 * Check if the file state has expired
-	 *
-	 * @param curTime long
-	 * @return boolean
-	 */
-	public final boolean hasExpired(long curTime) {
-	  if ( m_tmo == NoTimeout)
-	  	return false;
-	  if ( curTime > m_tmo)
-	  	return true;
-	  return false;
-	}
+    /**
+     * Set the file status
+     *
+     * @param status
+     *            int
+     * @param reason
+     *            int
+     */
+    public void setFileStatus(final int status, final int reason) {
+        m_fileStatus = status;
+    }
 
-	/**
-	 * Return the number of seconds left before the file state expires
-	 *
-	 * @param curTime long
-	 * @return long
-	 */
-	public final long getSecondsToExpire(long curTime) {
-		if ( m_tmo == NoTimeout)
-			return -1;
-		return ( m_tmo - curTime)/1000L;
-	}
+    /**
+     * Set the file identifier
+     *
+     * @param id
+     *            int
+     */
+    public abstract void setFileId(int id);
 
-	/**
-	 * Return a file status code as a string
-	 *
-	 * @return String
-	 */
-	public final String getStatusAsString() {
-		int dataSts = getDataStatus();
-		if ( dataSts >= 0 && dataSts < _fileStates.length)
-			return _fileStates[dataSts];
-		return "Unknown";
-	}
+    /**
+     * Set the file state expiry time
+     *
+     * @param expire
+     *            long
+     */
+    public void setExpiryTime(final long expire) {
+        m_tmo = expire;
+    }
 
-	/**
-	 * Set the file status
-	 *
-	 * @param status int
-	 */
-	public void setFileStatus(int status) {
-	  setFileStatus(status, ReasonNone);
-	}
+    /**
+     * Set the retention period expiry date/time
+     *
+     * @param expires
+     *            long
+     */
+    public void setRetentionExpiryDateTime(final long expires) {
+        m_retainUntil = expires;
+    }
 
-	/**
-	 * Set the file status
-	 *
-	 * @param status int
-	 * @param reason int
-	 */
-	public void setFileStatus(int status, int reason) {
-	  m_fileStatus = status;
-	}
+    /**
+     * Set the shared access mode, from the first file open
+     *
+     * @param mode
+     *            int
+     */
+    public void setSharedAccess(final int mode) {
+        if (getOpenCount() == 0) {
+            m_sharedAccess = mode;
+        }
+    }
 
-	/**
-	 * Set the file identifier
-	 *
-	 * @param id int
-	 */
-	public abstract void setFileId(int id);
+    /**
+     * Set the file data status
+     *
+     * @param sts
+     *            int
+     */
+    public abstract void setDataStatus(int sts);
 
-	/**
-	 * Set the file state expiry time
-	 *
-	 * @param expire long
-	 */
-	public void setExpiryTime(long expire) {
-		m_tmo = expire;
-	}
+    /**
+     * Add an attribute to the file state
+     *
+     * @param name
+     *            String
+     * @param attr
+     *            Object
+     */
+    public final void addAttribute(final String name, final Object attr) {
+        final HashMap<String, Object> stateAttrs = getAttributeMap(true);
+        if (stateAttrs != null) {
+            stateAttrs.put(name, attr);
+        }
+    }
 
-	/**
-	 * Set the retention period expiry date/time
-	 *
-	 * @param expires long
-	 */
-	public void setRetentionExpiryDateTime(long expires) {
-	  m_retainUntil = expires;
-	}
+    /**
+     * Find an attribute
+     *
+     * @param name
+     *            String
+     * @return Object
+     */
+    public final Object findAttribute(final String name) {
+        final HashMap<String, Object> stateAttrs = getAttributeMap(true);
+        Object attrObj = null;
 
-	/**
-	 * Set the shared access mode, from the first file open
-	 *
-	 * @param mode int
-	 */
-	public void setSharedAccess( int mode) {
-	  if ( getOpenCount() == 0)
-	    m_sharedAccess = mode;
-	}
+        if (stateAttrs != null) {
+            attrObj = stateAttrs.get(name);
+        }
 
-	/**
-	 * Set the file data status
-	 *
-	 * @param sts int
-	 */
-	public abstract void setDataStatus(int sts);
+        return attrObj;
+    }
 
-	/**
-	 * Add an attribute to the file state
-	 *
-	 * @param name String
-	 * @param attr Object
-	 */
-	public final void addAttribute(String name, Object attr) {
-		HashMap<String, Object> stateAttrs = getAttributeMap( true);
-		if ( stateAttrs != null)
-			stateAttrs.put( name, attr);
-	}
+    /**
+     * Return the count of attributes on this file state
+     *
+     * @return int
+     */
+    public final int numberOfAttributes() {
+        final HashMap<String, Object> stateAttrs = getAttributeMap(false);
+        if (stateAttrs != null) {
+            return stateAttrs.size();
+        }
+        return 0;
+    }
 
-	/**
-	 * Find an attribute
-	 *
-	 * @param name String
-	 * @return Object
-	 */
-	public final Object findAttribute(String name) {
-		HashMap<String, Object> stateAttrs = getAttributeMap( true);
-		Object attrObj = null;
+    /**
+     * Remove an attribute from the file state
+     *
+     * @param name
+     *            String
+     * @return Object
+     */
+    public final Object removeAttribute(final String name) {
+        final HashMap<String, Object> stateAttrs = getAttributeMap(true);
+        Object attrObj = null;
 
-		if ( stateAttrs != null)
-			attrObj = stateAttrs.get( name);
+        if (stateAttrs != null) {
+            attrObj = stateAttrs.remove(name);
+        }
 
-		return attrObj;
-	}
+        return attrObj;
+    }
 
-	/**
-	 * Return the count of attributes on this file state
-	 *
-	 * @return int
-	 */
-	public final int numberOfAttributes() {
-		HashMap<String, Object> stateAttrs = getAttributeMap( false);
-		if ( stateAttrs != null)
-			return stateAttrs.size();
-		return 0;
-	}
+    /**
+     * Remove all attributes from the file state
+     */
+    public final void removeAllAttributes() {
+        final HashMap<String, Object> stateAttrs = getAttributeMap(false);
+        if (stateAttrs != null) {
+            stateAttrs.clear();
+        }
+    }
 
-	/**
-	 * Remove an attribute from the file state
-	 *
-	 * @param name String
-	 * @return Object
-	 */
-	public final Object removeAttribute(String name) {
-		HashMap<String, Object> stateAttrs = getAttributeMap( true);
-		Object attrObj = null;
+    /**
+     * Return the map of additional attribute objects attached to this file state, and optionally create the map if it does not exist
+     *
+     * @param createMap
+     *            boolean
+     * @return HashMap
+     */
+    protected abstract HashMap<String, Object> getAttributeMap(boolean createMap);
 
-		if ( stateAttrs != null)
-			attrObj = stateAttrs.remove( name);
+    /**
+     * Set the file path
+     *
+     * @param path
+     *            String
+     * @param caseSensitive
+     *            boolean
+     */
+    public final void setPath(final String path, final boolean caseSensitive) {
+        // Split the path into directories and file name, only uppercase the directories to normalize
+        // the path.
+        m_path = normalizePath(path, caseSensitive);
+    }
 
-		return attrObj;
-	}
-
-	/**
-	 * Remove all attributes from the file state
-	 */
-	public final void removeAllAttributes() {
-		HashMap<String, Object> stateAttrs = getAttributeMap( false);
-		if ( stateAttrs != null)
-			stateAttrs.clear();
-	}
-
-	/**
-	 * Return the map of additional attribute objects attached to this file state, and
-	 * optionally create the map if it does not exist
-	 *
-	 * @param createMap boolean
-	 * @return HashMap
-	 */
-	protected abstract HashMap<String, Object> getAttributeMap( boolean createMap);
-
-	/**
-	 * Set the file path
-	 *
-	 * @param path String
-	 * @param caseSensitive boolean
-	 */
-	public final void setPath(String path, boolean caseSensitive) {
-
-		//	Split the path into directories and file name, only uppercase the directories to normalize
-		//	the path.
-
-		m_path = normalizePath(path, caseSensitive);
-	}
-
-	/**
-	 * Set the file path, using a normalized path, no need to normalize
-	 *
-	 * @param path String
-	 */
-	public final void setPathInternal( String path) {
-		m_path = path;
-	}
+    /**
+     * Set the file path, using a normalized path, no need to normalize
+     *
+     * @param path
+     *            String
+     */
+    public final void setPathInternal(final String path) {
+        m_path = path;
+    }
 
     /**
      * Set the PID of the process opening the file
      *
-     * @param pid int
+     * @param pid
+     *            int
      */
-    public void setProcessId(int pid) {
-    	if ( getOpenCount() == 0)
-    		m_pid = pid;
+    public void setProcessId(final int pid) {
+        if (getOpenCount() == 0) {
+            m_pid = pid;
+        }
     }
 
-	/**
-	 * Return the count of active locks on this file
-	 *
-	 * @return int
-	 */
-	public final int numberOfLocks() {
-		if ( m_lockList != null)
-			return m_lockList.numberOfLocks();
-		return 0;
-	}
+    /**
+     * Return the count of active locks on this file
+     *
+     * @return int
+     */
+    public final int numberOfLocks() {
+        if (m_lockList != null) {
+            return m_lockList.numberOfLocks();
+        }
+        return 0;
+    }
 
-	/**
-	 * Add a lock to this file
-	 *
-	 * @param lock FileLock
-	 * @exception LockConflictException
-	 */
-	public void addLock(FileLock lock)
-		throws LockConflictException {
+    /**
+     * Add a lock to this file
+     *
+     * @param lock
+     *            FileLock
+     * @exception LockConflictException
+     */
+    public void addLock(final FileLock lock) throws LockConflictException {
+        // Check if the lock list has been allocated
+        if (m_lockList == null) {
+            synchronized (this) {
+                // Allocate the lock list, check if the lock list has been allocated elsewhere
+                // as we may have been waiting for the lock
+                if (m_lockList == null) {
+                    m_lockList = new FileLockList();
+                }
+            }
+        }
 
-		//	Check if the lock list has been allocated
+        // Add the lock to the list, check if there are any lock conflicts
+        synchronized (m_lockList) {
+            // Check if the new lock overlaps with any existing locks
+            if (m_lockList.allowsLock(lock)) {
+                // Add the new lock to the list
+                m_lockList.addLock(lock);
+            } else {
+                throw new LockConflictException();
+            }
+        }
+    }
 
-		if ( m_lockList == null) {
+    /**
+     * Remove a lock on this file
+     *
+     * @param lock
+     *            FileLock
+     * @exception NotLockedException
+     */
+    public void removeLock(final FileLock lock) throws NotLockedException {
+        // Check if the lock list has been allocated
+        if (m_lockList == null) {
+            throw new NotLockedException();
+        }
 
-			synchronized (this) {
+        // Remove the lock from the active list
+        synchronized (m_lockList) {
+            // Remove the lock, check if we found the matching lock
+            if (m_lockList.removeLock(lock) == null) {
+                throw new NotLockedException();
+            }
+        }
+    }
 
-				//	Allocate the lock list, check if the lock list has been allocated elsewhere
-				//	as we may have been waiting for the lock
+    /**
+     * Check if the file is readable for the specified section of the file and process id
+     *
+     * @param offset
+     *            long
+     * @param len
+     *            long
+     * @param pid
+     *            int
+     * @return boolean
+     */
+    public boolean canReadFile(final long offset, final long len, final int pid) {
+        // Check if the lock list is valid
+        if (m_lockList == null) {
+            return true;
+        }
 
-				if ( m_lockList == null)
-					m_lockList = new FileLockList();
-			}
-		}
+        // Check if the file section is readable by the specified process
+        boolean readOK = false;
+        synchronized (m_lockList) {
+            // Check if the file section is readable
+            readOK = m_lockList.canReadFile(offset, len, pid);
+        }
 
-		//	Add the lock to the list, check if there are any lock conflicts
+        // Return the read status
+        return readOK;
+    }
 
-		synchronized (m_lockList) {
+    /**
+     * Check if the file is writeable for the specified section of the file and process id
+     *
+     * @param offset
+     *            long
+     * @param len
+     *            long
+     * @param pid
+     *            int
+     * @return boolean
+     */
+    public boolean canWriteFile(final long offset, final long len, final int pid) {
+        // Check if the lock list is valid
+        if (m_lockList == null) {
+            return true;
+        }
 
-			//	Check if the new lock overlaps with any existing locks
+        // Check if the file section is writeable by the specified process
+        boolean writeOK = false;
+        synchronized (m_lockList) {
+            // Check if the file section is writeable
+            writeOK = m_lockList.canWriteFile(offset, len, pid);
+        }
 
-			if ( m_lockList.allowsLock(lock)) {
+        // Return the write status
+        return writeOK;
+    }
 
-				//	Add the new lock to the list
+    /**
+     * Check if the file has an active oplock
+     *
+     * @return boolean
+     */
+    public boolean hasOpLock() {
+        return m_oplock != null ? true : false;
+    }
 
-				m_lockList.addLock(lock);
-			}
-			else
-				throw new LockConflictException();
-		}
-	}
+    /**
+     * Return the oplock details
+     *
+     * @return OpLockDetails
+     */
+    public OpLockDetails getOpLock() {
+        return m_oplock;
+    }
 
-	/**
-	 * Remove a lock on this file
-	 *
-	 * @param lock FileLock
-	 * @exception NotLockedException
-	 */
-	public void removeLock(FileLock lock)
-		throws NotLockedException {
+    /**
+     * Set the oplock for this file
+     *
+     * @param oplock
+     *            OpLockDetails
+     * @exception ExistingOpLockException
+     *                If there is an active oplock on this file
+     */
+    public synchronized void setOpLock(final OpLockDetails oplock) throws ExistingOpLockException {
+        if (m_oplock == null) {
+            m_oplock = oplock;
+        } else {
+            throw new ExistingOpLockException();
+        }
+    }
 
-		//	Check if the lock list has been allocated
-
-		if ( m_lockList == null)
-			throw new NotLockedException();
-
-		//	Remove the lock from the active list
-
-		synchronized ( m_lockList) {
-
-			//	Remove the lock, check if we found the matching lock
-
-			if ( m_lockList.removeLock(lock) == null)
-				throw new NotLockedException();
-		}
-	}
-
-	/**
-	 * Check if the file is readable for the specified section of the file and process id
-	 *
-	 * @param offset long
-	 * @param len long
-	 * @param pid int
-	 * @return boolean
-	 */
-	public boolean canReadFile(long offset, long len, int pid) {
-
-		//	Check if the lock list is valid
-
-		if ( m_lockList == null)
-			return true;
-
-		//	Check if the file section is readable by the specified process
-
-		boolean readOK = false;
-
-		synchronized ( m_lockList) {
-
-			//	Check if the file section is readable
-
-			readOK = m_lockList.canReadFile(offset, len, pid);
-		}
-
-		//	Return the read status
-
-		return readOK;
-	}
-
-	/**
-	 * Check if the file is writeable for the specified section of the file and process id
-	 *
-	 * @param offset long
-	 * @param len long
-	 * @param pid int
-	 * @return boolean
-	 */
-	public boolean canWriteFile(long offset, long len, int pid) {
-
-		//	Check if the lock list is valid
-
-		if ( m_lockList == null)
-			return true;
-
-		//	Check if the file section is writeable by the specified process
-
-		boolean writeOK = false;
-
-		synchronized ( m_lockList) {
-
-			//	Check if the file section is writeable
-
-			writeOK = m_lockList.canWriteFile(offset, len, pid);
-		}
-
-		//	Return the write status
-
-		return writeOK;
-	}
-
-	/**
-	 * Check if the file has an active oplock
-	 *
-	 * @return boolean
-	 */
-	public boolean hasOpLock() {
-		return m_oplock != null ? true : false;
-	}
-
-	/**
-	 * Return the oplock details
-	 *
-	 * @return OpLockDetails
-	 */
-	public OpLockDetails getOpLock() {
-		return m_oplock;
-	}
-
-	/**
-	 * Set the oplock for this file
-	 *
-	 * @param oplock OpLockDetails
-	 * @exception ExistingOpLockException If there is an active oplock on this file
-	 */
-	public synchronized void setOpLock(OpLockDetails oplock)
-		throws ExistingOpLockException {
-
-		if ( m_oplock == null)
-			m_oplock = oplock;
-		else
-			throw new ExistingOpLockException();
-	}
-
-	/**
-	 * Clear the oplock
-	 */
-	public synchronized void clearOpLock() {
-		m_oplock = null;
-	}
+    /**
+     * Clear the oplock
+     */
+    public synchronized void clearOpLock() {
+        m_oplock = null;
+    }
 
     /**
      * Determine if a folder has pseudo files associated with it
@@ -762,9 +755,10 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public boolean hasPseudoFiles() {
-    	PseudoFileList pseudoList = getPseudoFileList( false);
-        if ( pseudoList != null)
+        final PseudoFileList pseudoList = getPseudoFileList(false);
+        if (pseudoList != null) {
             return pseudoList.numberOfFiles() > 0;
+        }
         return false;
     }
 
@@ -774,26 +768,29 @@ public abstract class FileState implements Serializable {
      * @return PseudoFileList
      */
     public PseudoFileList getPseudoFileList() {
-    	return getPseudoFileList( false);
+        return getPseudoFileList(false);
     }
 
     /**
      * Return the pseudo file list, optionally create a new list
      *
-     * @param createList boolean
+     * @param createList
+     *            boolean
      * @return PseudoFileList
      */
-    protected abstract PseudoFileList getPseudoFileList( boolean createList);
+    protected abstract PseudoFileList getPseudoFileList(boolean createList);
 
     /**
      * Add a pseudo file to this folder
      *
-     * @param pfile PseudoFile
+     * @param pfile
+     *            PseudoFile
      */
-    public final void addPseudoFile(PseudoFile pfile) {
-    	PseudoFileList pseudoList = getPseudoFileList( true);
-    	if ( pseudoList != null)
-    		pseudoList.addFile( pfile);
+    public final void addPseudoFile(final PseudoFile pfile) {
+        final PseudoFileList pseudoList = getPseudoFileList(true);
+        if (pseudoList != null) {
+            pseudoList.addFile(pfile);
+        }
     }
 
     /**
@@ -802,7 +799,7 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public final boolean hasAccessDateTime() {
-    	return m_accessDate != 0L ? true : false;
+        return m_accessDate != 0L ? true : false;
     }
 
     /**
@@ -811,14 +808,14 @@ public abstract class FileState implements Serializable {
      * @return long
      */
     public final long getAccessDateTime() {
-    	return m_accessDate;
+        return m_accessDate;
     }
 
     /**
      * Update the access date/time
      */
     public void updateAccessDateTime() {
-    	m_accessDate = System.currentTimeMillis();
+        m_accessDate = System.currentTimeMillis();
     }
 
     /**
@@ -827,7 +824,7 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public final boolean hasChangeDateTime() {
-    	return m_changeDate != 0L ? true : false;
+        return m_changeDate != 0L ? true : false;
     }
 
     /**
@@ -836,23 +833,24 @@ public abstract class FileState implements Serializable {
      * @return long
      */
     public final long getChangeDateTime() {
-    	return m_changeDate;
+        return m_changeDate;
     }
 
     /**
      * Update the change date/time
      */
     public void updateChangeDateTime() {
-    	updateChangeDateTime( System.currentTimeMillis());
+        updateChangeDateTime(System.currentTimeMillis());
     }
 
     /**
      * Update the change date/time
      *
-     * @param changeTime long
+     * @param changeTime
+     *            long
      */
-    public void updateChangeDateTime( long changeTime) {
-    	m_changeDate = changeTime;
+    public void updateChangeDateTime(final long changeTime) {
+        m_changeDate = changeTime;
     }
 
     /**
@@ -861,7 +859,7 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public final boolean hasModifyDateTime() {
-    	return m_modifyDate != 0L ? true : false;
+        return m_modifyDate != 0L ? true : false;
     }
 
     /**
@@ -870,25 +868,26 @@ public abstract class FileState implements Serializable {
      * @return long
      */
     public final long getModifyDateTime() {
-    	return m_modifyDate;
+        return m_modifyDate;
     }
 
     /**
      * Update the modify date/time
      */
     public void updateModifyDateTime() {
-    	long timeNow = System.currentTimeMillis();
-    	updateModifyDateTime( timeNow);
-    	m_accessDate = timeNow;
+        final long timeNow = System.currentTimeMillis();
+        updateModifyDateTime(timeNow);
+        m_accessDate = timeNow;
     }
 
     /**
      * Update the modify date/time
      *
-     * @param modTime long
+     * @param modTime
+     *            long
      */
-    public void updateModifyDateTime( long modTime) {
-    	m_modifyDate = modTime;
+    public void updateModifyDateTime(final long modTime) {
+        m_modifyDate = modTime;
     }
 
     /**
@@ -897,7 +896,7 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public final boolean hasFilesystemObject() {
-    	return getFilesystemObject() != null ? true : false;
+        return getFilesystemObject() != null ? true : false;
     }
 
     /**
@@ -910,9 +909,10 @@ public abstract class FileState implements Serializable {
     /**
      * Set the filesystem object
      *
-     * @param filesysObj Object
+     * @param filesysObj
+     *            Object
      */
-    public abstract void setFilesystemObject( Object filesysObj);
+    public abstract void setFilesystemObject(Object filesysObj);
 
     /**
      * Check if this is a copy file state, or the master file state object
@@ -942,9 +942,10 @@ public abstract class FileState implements Serializable {
     /**
      * Set the file size
      *
-     * @param fileSize long
+     * @param fileSize
+     *            long
      */
-    public void setFileSize(long fileSize) {
+    public void setFileSize(final long fileSize) {
         m_fileSize = fileSize;
     }
 
@@ -969,19 +970,21 @@ public abstract class FileState implements Serializable {
     /**
      * Set the allocation size
      *
-     * @param allocSize long
+     * @param allocSize
+     *            long
      */
-    public void setAllocationSize(long allocSize) {
+    public void setAllocationSize(final long allocSize) {
         m_allocSize = allocSize;
     }
 
     /**
      * Set the file open count
      *
-     * @param count int
+     * @param count
+     *            int
      */
-    public void setOpenCount( int count) {
-    	m_openCount = count;
+    public void setOpenCount(final int count) {
+        m_openCount = count;
     }
 
     /**
@@ -990,199 +993,178 @@ public abstract class FileState implements Serializable {
      * @return boolean
      */
     public boolean hasDataUpdateInProgress() {
-
-    	// No update in progress, not required for the default implementation
-
-    	return false;
+        // No update in progress, not required for the default implementation
+        return false;
     }
 
     /**
      * Normalize the path to uppercase the directory names and keep the case of the file name.
      *
-     * @param path String
+     * @param path
+     *            String
      * @return String
      */
-    public final static String normalizePath(String path) {
-        return normalizePath( path, true);
+    public final static String normalizePath(final String path) {
+        return normalizePath(path, true);
     }
 
-	/**
-	 * Normalize the path to uppercase the directory names and keep the case of the file name.
-	 *
-	 * @param path String
-	 * @param caseSensitive boolean
-	 * @return String
-	 */
-	public final static String normalizePath(String path, boolean caseSensitive) {
-
-	    // Check if the file state names should be case sensitive, if not then just uppercase the whole
-	    // path
-
+    /**
+     * Normalize the path to uppercase the directory names and keep the case of the file name.
+     *
+     * @param path
+     *            String
+     * @param caseSensitive
+     *            boolean
+     * @return String
+     */
+    public final static String normalizePath(final String path, final boolean caseSensitive) {
+        // Check if the file state names should be case sensitive, if not then just uppercase the whole
+        // path
         String normPath = path;
 
-	    if ( caseSensitive == true) {
+        if (caseSensitive == true) {
+            // Split the path into directories and file name, only uppercase the directories to normalize
+            // the path.
+            if (path.length() > 3) {
+                // Split the path to seperate the folders/file name
+                final int pos = path.lastIndexOf(FileName.DOS_SEPERATOR);
+                if (pos != -1) {
+                    // Get the path and file name parts, normalize the path
+                    final String pathPart = upperCaseAToZ(path.substring(0, pos));
+                    final String namePart = path.substring(pos);
 
-    		//	Split the path into directories and file name, only uppercase the directories to normalize
-    		//	the path.
+                    // Rebuild the path string
+                    normPath = pathPart + namePart;
+                }
+            }
+        } else {
+            // Uppercase the whole path
+            normPath = upperCaseAToZ(path);
+        }
 
-    		if ( path.length() > 3) {
+        // Return the normalized path
+        return normPath;
+    }
 
-    			//	Split the path to seperate the folders/file name
+    /**
+     * Uppercase a-z characters only, leave any multi-national characters as is
+     *
+     * @param path
+     *            String
+     * @return String
+     */
+    protected static final String upperCaseAToZ(final String path) {
+        final StringBuilder pathStr = new StringBuilder(path);
+        for (int i = 0; i < pathStr.length(); i++) {
+            final char curChar = pathStr.charAt(i);
+            if (Character.isLowerCase(curChar)) {
+                pathStr.setCharAt(i, Character.toUpperCase(curChar));
+            }
+        }
 
-    			int pos = path.lastIndexOf(FileName.DOS_SEPERATOR);
-    			if ( pos != -1) {
+        return pathStr.toString();
+    }
 
-    				//	Get the path and file name parts, normalize the path
+    /**
+     * Dump the attributes that are attached to the file state
+     */
+    public final void DumpAttributes() {
+        // Check if there are any attributes
+        final HashMap<String, Object> stateAttrs = getAttributeMap(false);
+        if (stateAttrs != null) {
+            // Enumerate the available attribute objects
+            final Iterator<String> names = stateAttrs.keySet().iterator();
+            while (names.hasNext()) {
+                // Get the current attribute name
+                final String name = names.next();
 
-    				String pathPart = upperCaseAToZ( path.substring(0, pos));
-    				String namePart = path.substring(pos);
+                // Get the associated attribute object
+                final Object attrib = stateAttrs.get(name);
 
-    				//	Rebuild the path string
+                // Output the attribute details
+                Debug.println("++    " + name + " : " + attrib);
+            }
+        } else {
+            Debug.println("++    No Attributes");
+        }
+    }
 
-    				normPath = pathPart + namePart;
-    			}
-    		}
-	    }
-	    else {
+    /**
+     * Return file status change reason code as a string
+     *
+     * @param reason
+     *            int
+     * @return String
+     */
+    public static final String getChangeReasonString(final int reason) {
+        String reasonStr = null;
 
-	        // Uppercase the whole path
+        switch (reason) {
+            case ReasonNone:
+                reasonStr = "None";
+                break;
+            case ReasonFileCreated:
+                reasonStr = "FileCreated";
+                break;
+            case ReasonFolderCreated:
+                reasonStr = "FolderCreated";
+                break;
+            case ReasonFileDeleted:
+                reasonStr = "FileDeleted";
+                break;
+            case ReasonFolderDeleted:
+                reasonStr = "FolderDeleted";
+                break;
+            default:
+                reasonStr = "Unknown";
+                break;
+        }
 
-	        normPath = upperCaseAToZ( path);
-	    }
+        return reasonStr;
+    }
 
-		//	Return the normalized path
+    /**
+     * Return the file state as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuffer str = new StringBuffer();
 
-		return normPath;
-	}
+        str.append("[");
+        str.append(getPath());
+        str.append(",");
+        str.append(FileStatus.asString(getFileStatus()));
+        str.append(":Opn=");
+        str.append(getOpenCount());
 
-	/**
-	 * Uppercase a-z characters only, leave any multi-national characters as is
-	 *
-	 * @param path String
-	 * @return String
-	 */
-	protected static final String upperCaseAToZ( String path) {
-		StringBuilder pathStr = new StringBuilder( path);
+        if (getOpenCount() > 0) {
+            str.append("(shr=0x");
+            str.append(Integer.toHexString(getSharedAccess()));
+            str.append(",pid=");
+            str.append(getProcessId());
+            str.append(")");
+        }
+        str.append(",Fid=");
+        str.append(getFileId());
 
-		for ( int i = 0; i < pathStr.length(); i++) {
-			char curChar = pathStr.charAt( i);
+        str.append(",Expire=");
+        str.append(getSecondsToExpire(System.currentTimeMillis()));
 
-			if ( Character.isLowerCase( curChar))
-				pathStr.setCharAt( i, Character.toUpperCase( curChar));
-		}
+        str.append(",Sts=");
+        str.append(_fileStates[getDataStatus()]);
 
-		return pathStr.toString();
-	}
+        str.append(",Locks=");
+        str.append(numberOfLocks());
 
-	/**
-	 * Dump the attributes that are attached to the file state
-	 */
-	public final void DumpAttributes() {
+        if (hasOpLock()) {
+            str.append(",OpLock=");
+            str.append(getOpLock());
+        }
 
-	  //	Check if there are any attributes
+        str.append("]");
 
-	  HashMap<String, Object> stateAttrs = getAttributeMap( false);
-
-	  if ( stateAttrs != null) {
-
-	    //	Enumerate the available attribute objects
-
-	    Iterator<String> names = stateAttrs.keySet().iterator();
-
-	    while ( names.hasNext()) {
-
-	      //	Get the current attribute name
-
-	      String name = names.next();
-
-	      //	Get the associated attribute object
-
-	      Object attrib = stateAttrs.get(name);
-
-	      //	Output the attribute details
-
-	      Debug.println("++    " + name + " : " + attrib);
-	    }
-	  }
-	  else
-	    Debug.println("++    No Attributes");
-	}
-
-	/**
-	 * Return file status change reason code as a string
-	 *
-	 * @param reason int
-	 * @return String
-	 */
-	public static final String getChangeReasonString( int reason) {
-		String reasonStr = null;
-
-		switch( reason) {
-			case ReasonNone:
-				reasonStr = "None";
-				break;
-			case ReasonFileCreated:
-				reasonStr = "FileCreated";
-				break;
-			case ReasonFolderCreated:
-				reasonStr = "FolderCreated";
-				break;
-			case ReasonFileDeleted:
-				reasonStr = "FileDeleted";
-				break;
-			case ReasonFolderDeleted:
-				reasonStr = "FolderDeleted";
-				break;
-			default:
-				reasonStr = "Unknown";
-				break;
-		}
-
-		return reasonStr;
-	}
-
-	/**
-	 * Return the file state as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-	  StringBuffer str = new StringBuffer();
-
-	  str.append("[");
-	  str.append(getPath());
-	  str.append(",");
-	  str.append(FileStatus.asString(getFileStatus()));
-	  str.append(":Opn=");
-	  str.append(getOpenCount());
-
-	  if ( getOpenCount() > 0) {
-		  str.append( "(shr=0x");
-		  str.append( Integer.toHexString( getSharedAccess()));
-		  str.append( ",pid=");
-		  str.append( getProcessId());
-		  str.append( ")");
-	  }
-	  str.append(",Fid=");
-	  str.append(getFileId());
-
-	  str.append(",Expire=");
-	  str.append(getSecondsToExpire(System.currentTimeMillis()));
-
-	  str.append(",Sts=");
-	  str.append(_fileStates[getDataStatus()]);
-
-	  str.append(",Locks=");
-	  str.append(numberOfLocks());
-
-	  if ( hasOpLock()) {
-		  str.append(",OpLock=");
-		  str.append(getOpLock());
-	  }
-
-	  str.append("]");
-
-	  return str.toString();
-	}
+        return str.toString();
+    }
 }
-

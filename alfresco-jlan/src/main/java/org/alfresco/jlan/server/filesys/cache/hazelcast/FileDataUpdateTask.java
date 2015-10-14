@@ -19,134 +19,116 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
 /**
  * File Data Update Remote Task Class
  *
- * <p>Used to synchronize setting/clearing the file data update in progress details on a file state by executing
- *  on the remote node that owns the file state/key.
+ * <p>
+ * Used to synchronize setting/clearing the file data update in progress details on a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class FileDataUpdateTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileDataUpdateTask.class);
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;
 
-	private static final long serialVersionUID = 1L;
+    // Node that has the updated data
+    private String m_updateNode;
 
-	// Node that has the updated data
+    // Start of update or completed update
+    private boolean m_startUpdate;
 
-	private String m_updateNode;
+    /**
+     * Default constructor
+     */
+    public FileDataUpdateTask() {
+    }
 
-	// Start of update or completed update
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param node
+     *            ClusterNode
+     * @param startUpdate
+     *            boolean
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public FileDataUpdateTask(final String mapName, final String key, final ClusterNode node, final boolean startUpdate, final boolean debug,
+            final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-	private boolean m_startUpdate;
+        m_updateNode = node.getName();
+        m_startUpdate = startUpdate;
+    }
 
-	/**
-	 * Default constructor
-	 */
-	public FileDataUpdateTask() {
-	}
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Boolean
+     * @exception Exception
+     */
+    @Override
+    protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
+        if (hasDebug()) {
+            LOGGER.debug("FileDataUpdateTask: Update on node {} {} on {}", m_updateNode, m_startUpdate ? "started" : "completed", fState);
+        }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param node ClusterNode
-	 * @param startUpdate boolean
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public FileDataUpdateTask( String mapName, String key, ClusterNode node, boolean startUpdate, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+        // Check if this is the start of the data update
+        boolean updSts = false;
+        if (m_startUpdate == true) {
+            // Check if there is an existing data update on this file
+            if (fState.hasDataUpdateInProgress()) {
+                if (hasDebug()) {
+                    LOGGER.debug("Existing data update on state={}", fState);
+                }
+            } else {
+                // Set the node that has the updated file data
+                fState.setDataUpdateNode(m_updateNode);
+                updSts = true;
+                if (hasDebug()) {
+                    LOGGER.debug("File data update start on node={}, state={}", m_updateNode, fState);
+                }
+            }
+        } else {
+            // Check if the node matches the existing update node
+            if (fState.hasDataUpdateInProgress()) {
+                // Check the node
+                if (fState.getDataUpdateNode().equals(m_updateNode) == false) {
+                    if (hasDebug()) {
+                        LOGGER.debug("Update is not the requesting node, node={}, update={}", m_updateNode, fState.getDataUpdateNode());
+                    }
+                } else {
+                    // Clear the file data update, completed
+                    fState.setDataUpdateNode(null);
+                    updSts = true;
+                    if (hasDebug()) {
+                        LOGGER.debug("File data update complete on node=" + m_updateNode + ", state=" + fState);
+                    }
 
-		m_updateNode = node.getName();
-		m_startUpdate = startUpdate;
-	}
+                }
+            }
+        }
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Boolean
-	 * @exception Exception
-	 */
-	protected Boolean runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
-
-		// DEBUG
-
-		if ( hasDebug())
-			Debug.println( "FileDataUpdateTask: Update on node " + m_updateNode + " " + (m_startUpdate ? "started" : "completed") + " on " + fState);
-
-		// Check if this is the start of the data update
-
-		boolean updSts = false;
-
-		if ( m_startUpdate == true) {
-
-			// Check if there is an existing data update on this file
-
-			if ( fState.hasDataUpdateInProgress()) {
-
-				// DEBUG
-
-				if ( hasDebug())
-					Debug.println("Existing data update on state=" + fState);
-			}
-			else {
-
-				// Set the node that has the updated file data
-
-				fState.setDataUpdateNode( m_updateNode);
-				updSts = true;
-
-				// DEBUG
-
-				if ( hasDebug())
-					Debug.println("File data update start on node=" + m_updateNode + ", state=" + fState);
-			}
-		}
-		else {
-
-			// Check if the node matches the existing update node
-
-			if ( fState.hasDataUpdateInProgress()) {
-
-				// Check the node
-
-				if ( fState.getDataUpdateNode().equals( m_updateNode) == false) {
-
-					// DEBUG
-
-					if ( hasDebug())
-						Debug.println("Update is not the requesting node, node=" + m_updateNode + ", update=" + fState.getDataUpdateNode());
-				}
-				else {
-
-					// Clear the file data update, completed
-
-					fState.setDataUpdateNode( null);
-					updSts = true;
-
-					// DEBUG
-
-					if ( hasDebug())
-						Debug.println("File data update complete on node=" + m_updateNode + ", state=" + fState);
-
-				}
-			}
-		}
-
-		// Return the updated file state
-
-		return Boolean.valueOf(updSts);
-	}
+        // Return the updated file state
+        return Boolean.valueOf(updSts);
+    }
 }

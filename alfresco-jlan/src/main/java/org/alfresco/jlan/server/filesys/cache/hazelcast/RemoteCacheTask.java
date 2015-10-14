@@ -32,201 +32,218 @@ import com.hazelcast.core.IMap;
 /**
  * Remote Cache Task Class
  *
- * <p>Base class for remote cache tasks.
+ * <p>
+ * Base class for remote cache tasks.
  *
  * @author gkspencer
  */
 public abstract class RemoteCacheTask<T> implements Callable<T>, HazelcastInstanceAware, Serializable {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Task option flags
+    // Task option flags
 
-	public static final int TaskDebug		= 0x0001;
-	public static final int TaskTiming		= 0x0002;
+    public static final int TaskDebug = 0x0001;
+    public static final int TaskTiming = 0x0002;
 
-	// Clustered map name
+    // Clustered map name
 
-	private String m_mapName;
-	private String m_keyName;
+    private String m_mapName;
+    private String m_keyName;
 
-	// Hazelcast instance
+    // Hazelcast instance
 
-	private transient HazelcastInstance m_hcInstance;
+    private transient HazelcastInstance m_hcInstance;
 
-	// Task options
+    // Task options
 
-	private short m_taskOptions;
+    private short m_taskOptions;
 
-	// Task name
+    // Task name
 
-	private transient String m_taskName;
+    private transient String m_taskName;
 
-	/**
-	 * Default constructor
-	 */
-	public RemoteCacheTask() {
-	}
+    /**
+     * Default constructor
+     */
+    public RemoteCacheTask() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param options int
-	 */
-	public RemoteCacheTask( String mapName, String key, int options) {
-		m_mapName = mapName;
-		m_keyName = key;
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param options
+     *            int
+     */
+    public RemoteCacheTask(final String mapName, final String key, final int options) {
+        m_mapName = mapName;
+        m_keyName = key;
 
-		m_taskOptions = ( short) options;
-	}
+        m_taskOptions = (short) options;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public RemoteCacheTask( String mapName, String key, boolean debug, boolean timingDebug) {
-		m_mapName = mapName;
-		m_keyName = key;
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public RemoteCacheTask(final String mapName, final String key, final boolean debug, final boolean timingDebug) {
+        m_mapName = mapName;
+        m_keyName = key;
 
-		if ( debug)
-			m_taskOptions += TaskDebug;
+        if (debug) {
+            m_taskOptions += TaskDebug;
+        }
 
-		if ( timingDebug)
-			m_taskOptions += TaskTiming;
-	}
+        if (timingDebug) {
+            m_taskOptions += TaskTiming;
+        }
+    }
 
-	/**
-	 * Get the Hazelcast instance
-	 *
-	 * @return HazelcastInstance
-	 */
-	public HazelcastInstance getHazelcastInstance() {
-		return m_hcInstance;
-	}
+    /**
+     * Get the Hazelcast instance
+     *
+     * @return HazelcastInstance
+     */
+    public HazelcastInstance getHazelcastInstance() {
+        return m_hcInstance;
+    }
 
-	/**
-	 * Set the Hazelcast instance
-	 *
-	 * @param hcInstance HazelcastInstance
-	 */
-	public void setHazelcastInstance(HazelcastInstance hcInstance) {
-		m_hcInstance = hcInstance;
-	}
+    /**
+     * Set the Hazelcast instance
+     *
+     * @param hcInstance
+     *            HazelcastInstance
+     */
+    @Override
+    public void setHazelcastInstance(final HazelcastInstance hcInstance) {
+        m_hcInstance = hcInstance;
+    }
 
-	/**
-	 * Return the clustered map name
-	 *
-	 * @return String
-	 */
-	public final String getMapName() {
-		return m_mapName;
-	}
+    /**
+     * Return the clustered map name
+     *
+     * @return String
+     */
+    public final String getMapName() {
+        return m_mapName;
+    }
 
-	/**
-	 * Return the file state key
-	 *
-	 * @return String
-	 */
-	public final String getKey() {
-		return m_keyName;
-	}
+    /**
+     * Return the file state key
+     *
+     * @return String
+     */
+    public final String getKey() {
+        return m_keyName;
+    }
 
-	/**
-	 * Check if the specifed task option is enabled
-	 *
-	 * @param option int
-	 * @return boolean
-	 */
-	public final boolean hasOption( int option) {
-		return ( m_taskOptions & option) != 0 ? true : false;
-	}
+    /**
+     * Check if the specifed task option is enabled
+     *
+     * @param option
+     *            int
+     * @return boolean
+     */
+    public final boolean hasOption(final int option) {
+        return (m_taskOptions & option) != 0 ? true : false;
+    }
 
-	/**
-	 * Check if debug output is enabled for this remote task
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasDebug() {
-		return hasOption( TaskDebug);
-	}
+    /**
+     * Check if debug output is enabled for this remote task
+     *
+     * @return boolean
+     */
+    public final boolean hasDebug() {
+        return hasOption(TaskDebug);
+    }
 
-	/**
-	 * Check if the timing debug output is enabled for this remote task
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasTimingDebug() {
-		return hasOption( TaskTiming);
-	}
+    /**
+     * Check if the timing debug output is enabled for this remote task
+     *
+     * @return boolean
+     */
+    public final boolean hasTimingDebug() {
+        return hasOption(TaskTiming);
+    }
 
-	/**
-	 * Get the task name
-	 *
-	 * @return String
-	 */
-	public final String getTaskName() {
-		if ( m_taskName == null)
-			m_taskName = this.getClass().getSimpleName();
-		return m_taskName;
-	}
+    /**
+     * Get the task name
+     *
+     * @return String
+     */
+    public final String getTaskName() {
+        if (m_taskName == null) {
+            m_taskName = this.getClass().getSimpleName();
+        }
+        return m_taskName;
+    }
 
-	/**
-	 * Run the remote task
-	 */
-	public T call()
-		throws Exception {
+    /**
+     * Run the remote task
+     */
+    @Override
+    public T call() throws Exception {
 
-		// DEBUG
+        // DEBUG
 
-		long startTime = 0L;
-		if ( hasTimingDebug())
-			startTime = System.currentTimeMillis();
+        long startTime = 0L;
+        if (hasTimingDebug()) {
+            startTime = System.currentTimeMillis();
+        }
 
-		// Get the clustered cache
+        // Get the clustered cache
 
-		IMap<String, ClusterFileState> cache = getHazelcastInstance().getMap( getMapName());
-		if ( cache == null)
-			throw new Exception( "Failed to find clustered map " + getMapName());
+        final IMap<String, ClusterFileState> cache = getHazelcastInstance().getMap(getMapName());
+        if (cache == null) {
+            throw new Exception("Failed to find clustered map " + getMapName());
+        }
 
-		// Run the task
+        // Run the task
 
-		T retVal = null;
+        T retVal = null;
 
-		try {
+        try {
 
-			// Run the remote task
+            // Run the remote task
 
-			retVal = runRemoteTask( cache, getKey());
-		}
-		finally {
+            retVal = runRemoteTask(cache, getKey());
+        } finally {
 
-			// DEBUG
+            // DEBUG
 
-			if ( hasTimingDebug())
-				Debug.println("Remote task executed in " + ( System.currentTimeMillis() - startTime) + "ms");
-		}
+            if (hasTimingDebug()) {
+                Debug.println("Remote task executed in " + (System.currentTimeMillis() - startTime) + "ms");
+            }
+        }
 
-		// Return the task result
+        // Return the task result
 
-		return retVal;
-	}
+        return retVal;
+    }
 
-	/**
-	 * Run a remote task
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param key String
-	 * @return T
-	 * @exception Exception
-	 */
-	protected abstract T runRemoteTask( IMap<String, ClusterFileState> stateCache, String key)
-		throws Exception;
+    /**
+     * Run a remote task
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param key
+     *            String
+     * @return T
+     * @exception Exception
+     */
+    protected abstract T runRemoteTask(IMap<String, ClusterFileState> stateCache, String key) throws Exception;
 }

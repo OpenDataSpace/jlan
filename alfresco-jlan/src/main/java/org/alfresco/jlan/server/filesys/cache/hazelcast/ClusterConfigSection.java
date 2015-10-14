@@ -36,113 +36,117 @@ import com.hazelcast.core.HazelcastInstance;
  */
 public class ClusterConfigSection extends ConfigSection {
 
-	  // Global configuration section name
+    // Global configuration section name
 
-	  public static final String SectionName = "HazelcastCluster";
+    public static final String SectionName = "HazelcastCluster";
 
-	  //  Hazelcast cluster configuration file
+    // Hazelcast cluster configuration file
 
-	  private String m_configFile;
+    private String m_configFile;
 
-	  // Hazelcast instance shared by various components/filesystems
+    // Hazelcast instance shared by various components/filesystems
 
-	  private HazelcastInstance m_hazelcastInstance;
+    private HazelcastInstance m_hazelcastInstance;
 
-	  // Flag to indicate if the Hazelcast instance is from an external source
+    // Flag to indicate if the Hazelcast instance is from an external source
 
-	  private boolean m_externalHazelcast;
+    private boolean m_externalHazelcast;
 
-	  /**
-	   * Class constructor
-	   *
-	   * @param config ServerConfiguration
-	   */
-	  public ClusterConfigSection(ServerConfiguration config) {
-	    super( SectionName, config);
-	  }
+    /**
+     * Class constructor
+     *
+     * @param config
+     *            ServerConfiguration
+     */
+    public ClusterConfigSection(final ServerConfiguration config) {
+        super(SectionName, config);
+    }
 
-	  /**
-	   * Return the Hazelcast config file path
-	   *
-	   * @return String
-	   */
-	  public String getConfigFile() {
-		  return m_configFile;
-	  }
+    /**
+     * Return the Hazelcast config file path
+     *
+     * @return String
+     */
+    public String getConfigFile() {
+        return m_configFile;
+    }
 
-	  /**
-	   * Set the Hazelcast configuration file path
-	   *
-	   * @param path String
-	   */
-	  public void setConfigFile( String path) {
-		  m_configFile = path;
-	  }
+    /**
+     * Set the Hazelcast configuration file path
+     *
+     * @param path
+     *            String
+     */
+    public void setConfigFile(final String path) {
+        m_configFile = path;
+    }
 
-	  /**
-	   * Return the Hazelcast instance, or create it
-	   *
-	   * @return HazelcastInstance
-	   * @exception FileNotFoundException
-	   */
-	  public synchronized HazelcastInstance getHazelcastInstance()
-	  	throws FileNotFoundException {
+    /**
+     * Return the Hazelcast instance, or create it
+     *
+     * @return HazelcastInstance
+     * @exception FileNotFoundException
+     */
+    public synchronized HazelcastInstance getHazelcastInstance() throws FileNotFoundException {
 
-		  // Check if the Hazelcast instance has been initialized
+        // Check if the Hazelcast instance has been initialized
 
-		  if ( m_hazelcastInstance == null) {
+        if (m_hazelcastInstance == null) {
 
-			  // Create the Hazelcast instance
+            // Create the Hazelcast instance
 
-			Config hcConfig = new FileSystemXmlConfig( getConfigFile());
-			m_hazelcastInstance = Hazelcast.newHazelcastInstance( hcConfig);
+            final Config hcConfig = new FileSystemXmlConfig(getConfigFile());
+            m_hazelcastInstance = Hazelcast.newHazelcastInstance(hcConfig);
 
-			// Indicate we own the Hazelcast instance
+            // Indicate we own the Hazelcast instance
 
-			m_externalHazelcast = false;
-		  }
+            m_externalHazelcast = false;
+        }
 
-		  // Return the Hazelcast instance
+        // Return the Hazelcast instance
 
-		  return m_hazelcastInstance;
-	  }
+        return m_hazelcastInstance;
+    }
 
-	  /**
-	   * Check if the Hazelcast instance being used is from an external source
-	   *
-	   * @return boolean
-	   */
-	  public final boolean isExternalHazlecast() {
-		  return m_externalHazelcast;
-	  }
+    /**
+     * Check if the Hazelcast instance being used is from an external source
+     *
+     * @return boolean
+     */
+    public final boolean isExternalHazlecast() {
+        return m_externalHazelcast;
+    }
 
-	  /**
-	   * Set an external Hazelcast instance to be used
-	   *
-	   * @param hazelcast HazelcastInstance
-	   */
-	  public final void setHazelcastInstance( HazelcastInstance hazelcast) {
+    /**
+     * Set an external Hazelcast instance to be used
+     *
+     * @param hazelcast
+     *            HazelcastInstance
+     */
+    public final void setHazelcastInstance(final HazelcastInstance hazelcast) {
 
-		  // Use an external Hazelcast instance rather than creating our own
+        // Use an external Hazelcast instance rather than creating our own
 
-		  m_externalHazelcast = true;
-		  m_hazelcastInstance = hazelcast;
-	  }
+        m_externalHazelcast = true;
+        m_hazelcastInstance = hazelcast;
+    }
 
-	  /**
-	   * Close the configuration section, perform any cleanup
-	   */
-	  public void closeConfig() {
+    /**
+     * Close the configuration section, perform any cleanup
+     */
+    @Override
+    public void closeConfig() {
 
-		  // Close the Hazelcast instance
+        // Close the Hazelcast instance
 
-		  if ( m_hazelcastInstance != null) {
+        if (m_hazelcastInstance != null) {
 
-			  // Clear the Hazelcast instance, shut it down if we created it
+            // Clear the Hazelcast instance, shut it down if we created it
 
-			  m_hazelcastInstance = null;
-			  if ( isExternalHazlecast() == false)
-				  Hazelcast.shutdownAll();
-		  }
-	  }
+            m_hazelcastInstance = null;
+            if (isExternalHazlecast() == false) {
+                Hazelcast.shutdownAll();
+            }
+        }
+    }
 }

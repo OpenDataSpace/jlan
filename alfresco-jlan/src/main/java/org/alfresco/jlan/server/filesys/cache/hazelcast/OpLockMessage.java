@@ -22,61 +22,66 @@ package org.alfresco.jlan.server.filesys.cache.hazelcast;
 /**
  * OpLock Message Class
  *
- * <p>Contains the details of an oplock break request or notification of an oplock break completing.
+ * <p>
+ * Contains the details of an oplock break request or notification of an oplock break completing.
  *
  * @author gkspencer
  */
 public class OpLockMessage extends ClusterMessage {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Oplock path
+    // Oplock path
 
-	private String m_path;
+    private String m_path;
 
-	/**
-	 * Default constructor
-	 */
-	public OpLockMessage() {
-	}
+    /**
+     * Default constructor
+     */
+    public OpLockMessage() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param msgType int
-	 * @param path String
-	 */
-	public OpLockMessage( String targetNode, int msgType, String path) {
-		super ( targetNode, msgType);
-		m_path = path;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param msgType
+     *            int
+     * @param path
+     *            String
+     */
+    public OpLockMessage(final String targetNode, final int msgType, final String path) {
+        super(targetNode, msgType);
+        m_path = path;
+    }
 
-	/**
-	 * Return the normalized path of the oplocked file/folder
-	 *
-	 * @return String
-	 */
-	public final String getPath() {
-		return m_path;
-	}
+    /**
+     * Return the normalized path of the oplocked file/folder
+     *
+     * @return String
+     */
+    public final String getPath() {
+        return m_path;
+    }
 
-	/**
-	 * Return the oplock message as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the oplock message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append( "[");
-		str.append( super.toString());
-		str.append( ",path=");
-		str.append( getPath());
-		str.append( "]");
+        str.append("[");
+        str.append(super.toString());
+        str.append(",path=");
+        str.append(getPath());
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

@@ -31,69 +31,78 @@ import com.hazelcast.core.Member;
  */
 public class HazelCastClusterNode extends ClusterNode {
 
-	/**
-	 * Class constructor
-	 *
-	 * @param name String
-	 * @param priority int
-	 * @param cluster ClusterInterface
-	 * @param addr Member
-	 */
-	public HazelCastClusterNode(String name, int priority, ClusterInterface cluster, Member addr) {
-		super( name, priority, cluster, addr);
+    /**
+     * Class constructor
+     *
+     * @param name
+     *            String
+     * @param priority
+     *            int
+     * @param cluster
+     *            ClusterInterface
+     * @param addr
+     *            Member
+     */
+    public HazelCastClusterNode(final String name, final int priority, final ClusterInterface cluster, final Member addr) {
+        super(name, priority, cluster, addr);
 
-		// Check for the local node
+        // Check for the local node
 
-		if ( addr.localMember())
-			setLocalNode( true);
-	}
+        if (addr.localMember()) {
+            setLocalNode(true);
+        }
+    }
 
-	/**
-	 * Return the cluster node state as a string
-	 *
-	 * @return String
-	 */
-	public String getStateAsString() {
-		return "Running";
-	}
+    /**
+     * Return the cluster node state as a string
+     *
+     * @return String
+     */
+    @Override
+    public String getStateAsString() {
+        return "Running";
+    }
 
-	/**
-	 * Return the HazelCast node details
-	 *
-	 * @return Member
-	 */
-	public final Member getHazelCastAddress() {
-		return (Member) getAddress();
-	}
+    /**
+     * Return the HazelCast node details
+     *
+     * @return Member
+     */
+    public final Member getHazelCastAddress() {
+        return (Member) getAddress();
+    }
 
-	/**
-	 * Check if this cluster node matches the specified name.
-	 *
-	 * Need to provide additional checking as names may be in the format 'name/ip-addr:port' or
-	 * '/ip-addr:port'
-	 *
-	 * @param name String
-	 */
-	public boolean nameMatches( String name) {
+    /**
+     * Check if this cluster node matches the specified name.
+     *
+     * Need to provide additional checking as names may be in the format 'name/ip-addr:port' or '/ip-addr:port'
+     *
+     * @param name
+     *            String
+     */
+    @Override
+    public boolean nameMatches(final String name) {
 
-		// Get the '/ip-addr:port' part from this nodes name
+        // Get the '/ip-addr:port' part from this nodes name
 
-		String thisName = getName();
-		int idx = thisName.indexOf( '/');
+        String thisName = getName();
+        int idx = thisName.indexOf('/');
 
-		if ( idx > 0)
-			thisName = thisName.substring( idx);
+        if (idx > 0) {
+            thisName = thisName.substring(idx);
+        }
 
-		// Make sure the name to check is also in the '/ip-addr:port' format
+        // Make sure the name to check is also in the '/ip-addr:port' format
 
-		String chkName = name;
-		idx = chkName.indexOf( '/');
+        String chkName = name;
+        idx = chkName.indexOf('/');
 
-		if ( idx > 0)
-			chkName = chkName.substring( idx);
+        if (idx > 0) {
+            chkName = chkName.substring(idx);
+        }
 
-		// Check if the addresses match
+        // Check if the addresses match
 
-		return thisName.equalsIgnoreCase( chkName);
-	}
+        return thisName.equalsIgnoreCase(chkName);
+    }
 }

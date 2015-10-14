@@ -30,78 +30,85 @@ import com.hazelcast.core.IMap;
 /**
  * Remove File Byte Range Lock Remote Task Class
  *
- * <p>Used to synchronize removing a byte range lock on a file state by executing on the remote node
- * that owns the file state/key.
+ * <p>
+ * Used to synchronize removing a byte range lock on a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class RemoveFileByteLockTask extends RemoteStateTask<ClusterFileState> {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Byte range lock details
+    // Byte range lock details
 
-	private ClusterFileLock m_lock;
+    private ClusterFileLock m_lock;
 
-	/**
-	 * Default constructor
-	 */
-	public RemoveFileByteLockTask() {
-	}
+    /**
+     * Default constructor
+     */
+    public RemoveFileByteLockTask() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param lock ClusterFileLock
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public RemoveFileByteLockTask( String mapName, String key, ClusterFileLock lock, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param lock
+     *            ClusterFileLock
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public RemoveFileByteLockTask(final String mapName, final String key, final ClusterFileLock lock, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-		m_lock = lock;
-	}
+        m_lock = lock;
+    }
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return ClusterFileState
-	 * @exception Exception
-	 */
-	protected ClusterFileState runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return ClusterFileState
+     * @exception Exception
+     */
+    @Override
+    protected ClusterFileState runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
 
-		// DEBUG
+        // DEBUG
 
-		if ( hasDebug())
-			Debug.println( "RemoveFileByteLockTask: Remove lock=" + m_lock + " from " + fState);
+        if (hasDebug()) {
+            Debug.println("RemoveFileByteLockTask: Remove lock=" + m_lock + " from " + fState);
+        }
 
-		// Find the matching lock, make sure the owner node matches
+        // Find the matching lock, make sure the owner node matches
 
-		FileLockList lockList = fState.getLockList();
-		ClusterFileLock clLock = (ClusterFileLock) lockList.findLock( m_lock);
+        final FileLockList lockList = fState.getLockList();
+        final ClusterFileLock clLock = (ClusterFileLock) lockList.findLock(m_lock);
 
-		if ( clLock != null && clLock.getOwnerNode().equalsIgnoreCase( m_lock.getOwnerNode()) == true) {
+        if (clLock != null && clLock.getOwnerNode().equalsIgnoreCase(m_lock.getOwnerNode()) == true) {
 
-			// Remove the lock
+            // Remove the lock
 
-			lockList.removeLock( clLock);
-		}
-		else {
+            lockList.removeLock(clLock);
+        } else {
 
-			// Return a not locked exception, node does not own the matching lock
+            // Return a not locked exception, node does not own the matching lock
 
-			throw new NotLockedException();
-		}
+            throw new NotLockedException();
+        }
 
-		// Return the updated file state
+        // Return the updated file state
 
-		return fState;
-	}
+        return fState;
+    }
 }

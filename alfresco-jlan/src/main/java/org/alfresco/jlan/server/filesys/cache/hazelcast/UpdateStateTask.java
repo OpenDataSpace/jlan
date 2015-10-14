@@ -29,89 +29,99 @@ import com.hazelcast.core.IMap;
 /**
  * Update File State Task Class
  *
- * <p>Update a file state using a synchronous update.
+ * <p>
+ * Update a file state using a synchronous update.
  *
  * @author gkspencer
  */
 public class UpdateStateTask extends RemoteStateTask<Boolean> {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// File status
+    // File status
 
-	private int m_fileStatus;
+    private int m_fileStatus;
 
-	/**
-	 * Default constructor
-	 */
-	public UpdateStateTask() {
-	}
+    /**
+     * Default constructor
+     */
+    public UpdateStateTask() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param fileSts int
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public UpdateStateTask( String mapName, String key, int fileSts, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param fileSts
+     *            int
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public UpdateStateTask(final String mapName, final String key, final int fileSts, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-		m_fileStatus = fileSts;
-	}
+        m_fileStatus = fileSts;
+    }
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Boolean
-	 * @exception Exception
-	 */
-	protected Boolean runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Boolean
+     * @exception Exception
+     */
+    @Override
+    protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
 
-		// DEBUG
+        // DEBUG
 
-		if ( hasDebug())
-			Debug.println( "UpdateStateTask: Update file status=" + FileStatus.asString( m_fileStatus) + ", state=" + fState);
+        if (hasDebug()) {
+            Debug.println("UpdateStateTask: Update file status=" + FileStatus.asString(m_fileStatus) + ", state=" + fState);
+        }
 
-		// Check if the file status has changed
+        // Check if the file status has changed
 
-		boolean changedSts = false;
+        boolean changedSts = false;
 
-		if ( fState.getFileStatus() != m_fileStatus) {
+        if (fState.getFileStatus() != m_fileStatus) {
 
-			// Update the file status
+            // Update the file status
 
-			fState.setFileStatusInternal( m_fileStatus, FileState.ReasonNone);
-			changedSts = true;
+            fState.setFileStatusInternal(m_fileStatus, FileState.ReasonNone);
+            changedSts = true;
 
-			// If the status indicates the file/folder no longer exists then clear the file id, state attributes
+            // If the status indicates the file/folder no longer exists then clear the file id, state attributes
 
-			if ( fState.getFileStatus() == FileStatus.NotExist) {
+            if (fState.getFileStatus() == FileStatus.NotExist) {
 
-				// Reset the file id
+                // Reset the file id
 
-				fState.setFileId( FileState.UnknownFileId);
+                fState.setFileId(FileState.UnknownFileId);
 
-				// Clear out any state attributes
+                // Clear out any state attributes
 
-				fState.removeAllAttributes();
-			}
+                fState.removeAllAttributes();
+            }
 
-			// DEBUG
+            // DEBUG
 
-			if ( hasDebug())
-				Debug.println( "UpdateStateTask: Status updated, state=" + fState);
-		}
+            if (hasDebug()) {
+                Debug.println("UpdateStateTask: Status updated, state=" + fState);
+            }
+        }
 
-		// Return a status
+        // Return a status
 
-		return Boolean.valueOf(changedSts);
-	}
+        return Boolean.valueOf(changedSts);
+    }
 }

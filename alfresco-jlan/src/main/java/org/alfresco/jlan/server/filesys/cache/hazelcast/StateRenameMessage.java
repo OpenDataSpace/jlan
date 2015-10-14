@@ -24,97 +24,104 @@ import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
 /**
  * File State Rename Message Class
  *
- * <p>Used to informa cluster members of a state rename. If a folder has been renamed any cached states
- * on the local node that are below the changed path will need to be updated, or deleted.
+ * <p>
+ * Used to informa cluster members of a state rename. If a folder has been renamed any cached states on the local node that are below the changed path will need
+ * to be updated, or deleted.
  *
  * @author gkspencer
  */
 public class StateRenameMessage extends ClusterMessage {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Original and new path
+    // Original and new path
 
-	private String m_oldPath;
-	private String m_newPath;
+    private String m_oldPath;
+    private String m_newPath;
 
-	// Indicate is path is to a folder
+    // Indicate is path is to a folder
 
-	private boolean m_isFolder;
+    private boolean m_isFolder;
 
-	/**
-	 * Default constructor
-	 */
-	public StateRenameMessage() {
-	}
+    /**
+     * Default constructor
+     */
+    public StateRenameMessage() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param fromNode ClusterNode
-	 * @param oldPath String
-	 * @param newPath String
-	 * @param isFolder boolean
-	 */
-	public StateRenameMessage( String targetNode, ClusterNode fromNode, String oldPath, String newPath, boolean isFolder) {
-		super ( targetNode, fromNode, ClusterMessageType.RenameState);
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param fromNode
+     *            ClusterNode
+     * @param oldPath
+     *            String
+     * @param newPath
+     *            String
+     * @param isFolder
+     *            boolean
+     */
+    public StateRenameMessage(final String targetNode, final ClusterNode fromNode, final String oldPath, final String newPath, final boolean isFolder) {
+        super(targetNode, fromNode, ClusterMessageType.RenameState);
 
-		// save the rename details
+        // save the rename details
 
-		m_oldPath = oldPath;
-		m_newPath = newPath;
+        m_oldPath = oldPath;
+        m_newPath = newPath;
 
-		m_isFolder = isFolder;
-	}
+        m_isFolder = isFolder;
+    }
 
-	/**
-	 * Return the old state path
-	 *
-	 * @return String
-	 */
-	public final String getOldPath() {
-		return m_oldPath;
-	}
+    /**
+     * Return the old state path
+     *
+     * @return String
+     */
+    public final String getOldPath() {
+        return m_oldPath;
+    }
 
-	/**
-	 * Return the new state path
-	 *
-	 * @return String
-	 */
-	public final String getNewPath() {
-		return m_newPath;
-	}
+    /**
+     * Return the new state path
+     *
+     * @return String
+     */
+    public final String getNewPath() {
+        return m_newPath;
+    }
 
-	/**
-	 * Check if the path is to a folder state
-	 *
-	 * @return boolean
-	 */
-	public final boolean isFolderPath() {
-		return m_isFolder;
-	}
+    /**
+     * Check if the path is to a folder state
+     *
+     * @return boolean
+     */
+    public final boolean isFolderPath() {
+        return m_isFolder;
+    }
 
-	/**
-	 * Return the rename state message as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the rename state message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append( "[");
-		str.append( super.toString());
-		str.append("fromPath=");
-		str.append( getOldPath());
-		str.append( ",toPath=");
-		str.append( getNewPath());
-		str.append(",folder=");
-		str.append( isFolderPath());
-		str.append( "]");
+        str.append("[");
+        str.append(super.toString());
+        str.append("fromPath=");
+        str.append(getOldPath());
+        str.append(",toPath=");
+        str.append(getNewPath());
+        str.append(",folder=");
+        str.append(isFolderPath());
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

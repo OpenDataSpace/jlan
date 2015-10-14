@@ -26,154 +26,168 @@ import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
 /**
  * Cluster Message Class
  *
- * <p>Base object for messages passed between cluster nodes using the message topic.
+ * <p>
+ * Base object for messages passed between cluster nodes using the message topic.
  *
  * @author gkspencer
  */
 public class ClusterMessage implements Serializable {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// Target to indicate message is for all nodes
+    // Target to indicate message is for all nodes
 
-	public static final String AllNodes = "*";
+    public static final String AllNodes = "*";
 
-	// Target node name, or '*' for all nodes
+    // Target node name, or '*' for all nodes
 
-	private String m_targetNode;
+    private String m_targetNode;
 
-	// Node the message was sent from
+    // Node the message was sent from
 
-	private String m_fromNode;
+    private String m_fromNode;
 
-	// Message type
+    // Message type
 
-	private int m_msgType;
+    private int m_msgType;
 
-	/**
-	 * Default constructor
-	 */
-	ClusterMessage() {
-	}
+    /**
+     * Default constructor
+     */
+    ClusterMessage() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param msgType int
-	 */
-	public ClusterMessage( String targetNode, int msgType) {
-		m_targetNode = targetNode;
-		m_msgType = msgType;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param msgType
+     *            int
+     */
+    public ClusterMessage(final String targetNode, final int msgType) {
+        m_targetNode = targetNode;
+        m_msgType = msgType;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param fromNode String
-	 * @param msgType int
-	 */
-	public ClusterMessage( String targetNode, String fromNode, int msgType) {
-		m_targetNode = targetNode;
-		m_fromNode   = fromNode;
-		m_msgType = msgType;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param fromNode
+     *            String
+     * @param msgType
+     *            int
+     */
+    public ClusterMessage(final String targetNode, final String fromNode, final int msgType) {
+        m_targetNode = targetNode;
+        m_fromNode = fromNode;
+        m_msgType = msgType;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param targetNode String
-	 * @param fromNode ClusterNode
-	 * @param msgType int
-	 */
-	public ClusterMessage( String targetNode, ClusterNode fromNode, int msgType) {
-		m_targetNode = targetNode;
-		if ( fromNode != null)
-			m_fromNode = fromNode.getName();
-		m_msgType = msgType;
-	}
+    /**
+     * Class constructor
+     *
+     * @param targetNode
+     *            String
+     * @param fromNode
+     *            ClusterNode
+     * @param msgType
+     *            int
+     */
+    public ClusterMessage(final String targetNode, final ClusterNode fromNode, final int msgType) {
+        m_targetNode = targetNode;
+        if (fromNode != null) {
+            m_fromNode = fromNode.getName();
+        }
+        m_msgType = msgType;
+    }
 
-	/**
-	 * Return the target node name
-	 *
-	 * @return String
-	 */
-	public final String getTargetNode() {
-		return m_targetNode;
-	}
+    /**
+     * Return the target node name
+     *
+     * @return String
+     */
+    public final String getTargetNode() {
+        return m_targetNode;
+    }
 
-	/**
-	 * Check if the target is all nodes
-	 *
-	 * @return boolean
-	 */
-	public final boolean isAllNodes() {
-		return m_targetNode.equals( AllNodes) ? true : false;
-	}
+    /**
+     * Check if the target is all nodes
+     *
+     * @return boolean
+     */
+    public final boolean isAllNodes() {
+        return m_targetNode.equals(AllNodes) ? true : false;
+    }
 
-	/**
-	 * Return the message type
-	 *
-	 * @return int
-	 */
-	public final int isType() {
-		return m_msgType;
-	}
+    /**
+     * Return the message type
+     *
+     * @return int
+     */
+    public final int isType() {
+        return m_msgType;
+    }
 
-	/**
-	 * Check if the from node is valid
-	 *
-	 * @return boolean
-	 */
-	public final boolean hasFromNode() {
-		return ( m_fromNode != null && m_fromNode.length() > 0) ? true : false;
-	}
+    /**
+     * Check if the from node is valid
+     *
+     * @return boolean
+     */
+    public final boolean hasFromNode() {
+        return (m_fromNode != null && m_fromNode.length() > 0) ? true : false;
+    }
 
-	/**
-	 * Return the from node
-	 *
-	 * @return String
-	 */
-	public final String getFromNode() {
-		return m_fromNode;
-	}
+    /**
+     * Return the from node
+     *
+     * @return String
+     */
+    public final String getFromNode() {
+        return m_fromNode;
+    }
 
-	/**
-	 * Check if the message was sent by the local node
-	 *
-	 * @param localNode ClusterNode
-	 * @return boolean
-	 */
-	public final boolean isFromLocalNode( ClusterNode localNode) {
-		if ( m_fromNode != null && m_fromNode.equals( localNode.getName()))
-			return true;
-		return false;
-	}
+    /**
+     * Check if the message was sent by the local node
+     *
+     * @param localNode
+     *            ClusterNode
+     * @return boolean
+     */
+    public final boolean isFromLocalNode(final ClusterNode localNode) {
+        if (m_fromNode != null && m_fromNode.equals(localNode.getName())) {
+            return true;
+        }
+        return false;
+    }
 
-	/**
-	 * Return the cluster message as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+    /**
+     * Return the cluster message as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-		str.append( "[Target=");
-		if ( isAllNodes())
-			str.append( "All");
-		else
-			str.append( getTargetNode());
-		if ( hasFromNode()) {
-			str.append( ",from=");
-			str.append( getFromNode());
-		}
-		str.append( ",type=");
-		str.append( ClusterMessageType.getTypeAsString( isType()));
-		str.append( "]");
+        str.append("[Target=");
+        if (isAllNodes()) {
+            str.append("All");
+        } else {
+            str.append(getTargetNode());
+        }
+        if (hasFromNode()) {
+            str.append(",from=");
+            str.append(getFromNode());
+        }
+        str.append(",type=");
+        str.append(ClusterMessageType.getTypeAsString(isType()));
+        str.append("]");
 
-		return str.toString();
-	}
+        return str.toString();
+    }
 }

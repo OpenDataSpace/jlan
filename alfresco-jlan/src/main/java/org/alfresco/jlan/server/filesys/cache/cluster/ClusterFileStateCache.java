@@ -19,12 +19,13 @@
 
 package org.alfresco.jlan.server.filesys.cache.cluster;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.DiskSharedDevice;
 import org.alfresco.jlan.server.filesys.cache.FileStateCache;
 import org.alfresco.jlan.server.filesys.cache.StateCacheException;
 import org.alfresco.jlan.server.locking.OpLockManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Cluster File State Cache Class
@@ -32,196 +33,201 @@ import org.alfresco.jlan.server.locking.OpLockManager;
  * @author gkspencer
  */
 public abstract class ClusterFileStateCache extends FileStateCache {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClusterFileStateCache.class);
 
-	// Cluster interface
+    // Cluster interface
+    private ClusterInterface m_cluster;
 
-	private ClusterInterface m_cluster;
+    // List of nodes to be purged from the state cache on the next expiry pass
+    private final ClusterNodeList m_purgeList;
 
-	// List of nodes to be purged from the state cache on the next expiry pass
+    /**
+     * Class constructor
+     */
+    public ClusterFileStateCache() {
+        // Create the purge list
+        m_purgeList = new ClusterNodeList();
+    }
 
-	private ClusterNodeList m_purgeList;
+    /**
+     * Determine if the cache is a clustered cache
+     *
+     * @return boolean
+     */
+    @Override
+    public boolean isClusteredCache() {
+        return true;
+    }
 
-	/**
-	 * Class constructor
-	 */
-	public ClusterFileStateCache() {
+    /**
+     * Return the per node state for a file state, and optionally create a new per node state
+     *
+     * @param fState
+     *            ClusterFileState
+     * @param createState
+     *            boolean
+     * @return PerNodeState
+     */
+    public abstract PerNodeState getPerNodeState(ClusterFileState fState, boolean createState);
 
-		// Create the purge list
+    /**
+     * Return the per node state for a file state, and optionally create a new per node state
+     *
+     * @param path
+     *            String
+     * @param createState
+     *            boolean
+     * @return PerNodeState
+     */
+    public abstract PerNodeState getPerNodeState(String path, boolean createState);
 
-		m_purgeList = new ClusterNodeList();
-	}
+    /**
+     * Check if the file is readable for the specified section of the file and process id
+     *
+     * @param clState
+     *            ClusterFileState
+     * @param offset
+     *            long
+     * @param len
+     *            long
+     * @param pid
+     *            int
+     * @return boolean
+     */
+    public abstract boolean canReadFile(ClusterFileState clState, long offset, long len, int pid);
 
-	/**
-	 * Determine if the cache is a clustered cache
-	 *
-	 * @return boolean
-	 */
-	public boolean isClusteredCache() {
-		return true;
-	}
+    /**
+     * Check if the file is writeable for the specified section of the file and process id
+     *
+     * @param clState
+     *            ClusterFileState
+     * @param offset
+     *            long
+     * @param len
+     *            long
+     * @param pid
+     *            int
+     * @return boolean
+     */
+    public abstract boolean canWriteFile(ClusterFileState clState, long offset, long len, int pid);
 
-	/**
-	 * Return the per node state for a file state, and optionally create a new per node state
-	 *
-	 * @param fState ClusterFileState
-	 * @param createState boolean
-	 * @return PerNodeState
-	 */
-	public abstract PerNodeState getPerNodeState( ClusterFileState fState, boolean createState);
+    /**
+     * Update a file state, notify the cluster of the updates
+     *
+     * @param clState
+     *            ClusterFileState
+     * @param updateMask
+     *            int
+     */
+    public abstract void updateFileState(ClusterFileState clState, int updateMask);
 
-	/**
-	 * Return the per node state for a file state, and optionally create a new per node state
-	 *
-	 * @param path String
-	 * @param createState boolean
-	 * @return PerNodeState
-	 */
-	public abstract PerNodeState getPerNodeState( String path, boolean createState);
+    /**
+     * Set the filesystem driver and driver context details, if required by the cache
+     *
+     * @param diskDev
+     *            DiskSharedDevice
+     */
+    @Override
+    public void setDriverDetails(final DiskSharedDevice diskDev) {
+        // We need the oplock manager details from the driver/context
+        if (diskDev.getContext() != null && diskDev.getContext() instanceof DiskDeviceContext) {
+            // Get the oplock manager implementation
+            final DiskDeviceContext diskCtx = (DiskDeviceContext) diskDev.getContext();
+            final OpLockManager oplockMgr = diskCtx.getOpLockManager();
 
-	/**
-	 * Check if the file is readable for the specified section of the file and process id
-	 *
-	 * @param clState ClusterFileState
-	 * @param offset long
-	 * @param len long
-	 * @param pid int
-	 * @return boolean
-	 */
-	public abstract boolean canReadFile(ClusterFileState clState, long offset, long len, int pid);
+            // Cluster view needs access to the oplock manager
+            m_cluster.setOpLockManager(oplockMgr);
 
-	/**
-	 * Check if the file is writeable for the specified section of the file and process id
-	 *
-	 * @param clState ClusterFileState
-	 * @param offset long
-	 * @param len long
-	 * @param pid int
-	 * @return boolean
-	 */
-	public abstract boolean canWriteFile(ClusterFileState clState, long offset, long len, int pid);
+            // Cluster view can send out change notifications
+            m_cluster.setNotifyChangeHandler(diskCtx.getChangeHandler());
+        }
+    }
 
-	/**
-	 * Update a file state, notify the cluster of the updates
-	 *
-	 * @param clState ClusterFileState
-	 * @param updateMask int
-	 */
-	public abstract void updateFileState( ClusterFileState clState, int updateMask);
+    /**
+     * Return the associated cluster view
+     *
+     * @return ClusterInterface
+     */
+    public final ClusterInterface getCluster() {
+        return m_cluster;
+    }
 
-	/**
-	 * Set the filesystem driver and driver context details, if required by the cache
-	 *
-	 * @param diskDev DiskSharedDevice
-	 */
-	public void setDriverDetails( DiskSharedDevice diskDev) {
+    /**
+     * Set the associated cluster
+     *
+     * @param cluster
+     *            ClusterInterface
+     */
+    protected final void setCluster(final ClusterInterface cluster) {
+        m_cluster = cluster;
+    }
 
-		// We need the oplock manager details from the driver/context
+    /**
+     * Cache started
+     */
+    @Override
+    public void stateCacheStarted() {
+        // Inform cache listener
+        if (hasStateCacheListener()) {
+            getStateCacheListener().stateCacheInitializing();
+        }
 
-		if ( diskDev.getContext() != null && diskDev.getContext() instanceof DiskDeviceContext) {
-
-			// Get the oplock manager implementation
-
-			DiskDeviceContext diskCtx = (DiskDeviceContext) diskDev.getContext();
-			OpLockManager oplockMgr = diskCtx.getOpLockManager();
-
-			// Cluster view needs access to the oplock manager
-
-			m_cluster.setOpLockManager( oplockMgr);
-
-			// Cluster view can send out change notifications
-
-			m_cluster.setNotifyChangeHandler( diskCtx.getChangeHandler());
-		}
-	}
-
-	/**
-	 * Return the associated cluster view
-	 *
-	 * @return ClusterInterface
-	 */
-	public final ClusterInterface getCluster() {
-		return m_cluster;
-	}
-
-	/**
-	 * Set the associated cluster
-	 *
-	 * @param cluster ClusterInterface
-	 */
-	protected final void setCluster( ClusterInterface cluster) {
-		m_cluster = cluster;
-	}
-
-	/**
-	 * Cache started
-	 */
-	public void stateCacheStarted() {
-
-		// Inform cache listener
-
-		if ( hasStateCacheListener())
-			getStateCacheListener().stateCacheInitializing();
-
-		// Start the cluster
-
-		if ( m_cluster != null) {
-			try {
-				m_cluster.startCluster();
-			}
-			catch ( Exception ex) {
+        // Start the cluster
+        if (m_cluster != null) {
+            try {
+                m_cluster.startCluster();
+            } catch (final Exception ex) {
                 throw new StateCacheException("Failed to start cluster", ex);
-			}
-		}
-	}
+            }
+        }
+    }
 
-	/**
-	 * Cache shutting down
-	 */
-	public void stateCacheShuttingDown() {
+    /**
+     * Cache shutting down
+     */
+    @Override
+    public void stateCacheShuttingDown() {
+        // Inform cache listener
+        if (hasStateCacheListener()) {
+            getStateCacheListener().stateCacheShuttingDown();
+        }
 
-		// Inform cache listener
+        // Check if the state cache entries should be dumped out during shutdown
+        if (hasDumpOnShutdown()) {
+            dumpCache(false);
+        }
 
-		if ( hasStateCacheListener())
-			getStateCacheListener().stateCacheShuttingDown();
+        // Shutdown the cluster
+        if (m_cluster != null) {
+            try {
+                m_cluster.shutdownCluster();
+            } catch (final Exception ex) {
+                if (hasDebug()) {
+                    LOGGER.debug(ex.getMessage(), ex);
+                }
+            }
+        }
+    }
 
-		 // Check if the state cache entries should be dumped out during shutdown
+    /**
+     * Add a node to the state cache purge list, as it has left the cluster
+     *
+     * @param clNode
+     *            ClusterNode
+     */
+    protected final void addNodeToPurgeList(final ClusterNode clNode) {
+        m_purgeList.addNode(clNode);
+    }
 
-		if ( hasDumpOnShutdown())
-			dumpCache( false);
+    /**
+     * Cluster connection is running
+     */
+    public final void clusterRunning() {
 
-		// Shutdown the cluster
+        // Inform cache listener
 
-		if ( m_cluster != null) {
-			try {
-				m_cluster.shutdownCluster();
-			}
-			catch (Exception ex) {
-
-				// DEBUG
-
-				if ( Debug.EnableDbg && hasDebug())
-					Debug.println(ex);
-			}
-		}
-	}
-
-	/**
-	 * Add a node to the state cache purge list, as it has left the cluster
-	 *
-	 * @param clNode ClusterNode
-	 */
-	protected final void addNodeToPurgeList( ClusterNode clNode) {
-		m_purgeList.addNode( clNode);
-	}
-
-	/**
-	 * Cluster connection is running
-	 */
-	public final void clusterRunning() {
-
-		// Inform cache listener
-
-		if ( hasStateCacheListener())
-			getStateCacheListener().stateCacheRunning();
-	}
+        if (hasStateCacheListener()) {
+            getStateCacheListener().stateCacheRunning();
+        }
+    }
 }

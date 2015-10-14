@@ -27,75 +27,82 @@ import org.alfresco.jlan.server.filesys.cache.cluster.FileStatePostProcessor;
 /**
  * File State Update Post Processor Class
  *
- * <p>Low priority file state updates are sent out at the end of request processing.
+ * <p>
+ * Low priority file state updates are sent out at the end of request processing.
  *
  * @author gkspencer
  */
 public class StateUpdatePostProcessor extends FileStatePostProcessor {
 
-	// Update mask
+    // Update mask
 
-	private int m_updateMask;
+    private int m_updateMask;
 
-	/**
-	 * Class constructor
-	 *
-	 * @param stateCache HazelCastClusterFileStateCache
-	 * @param state HazelCastClusterFileState
-	 * @param updateMask int
-	 */
-	public StateUpdatePostProcessor( ClusterFileStateCache stateCache, HazelCastClusterFileState state, int updateMask) {
-		super ( stateCache, state);
+    /**
+     * Class constructor
+     *
+     * @param stateCache
+     *            HazelCastClusterFileStateCache
+     * @param state
+     *            HazelCastClusterFileState
+     * @param updateMask
+     *            int
+     */
+    public StateUpdatePostProcessor(final ClusterFileStateCache stateCache, final HazelCastClusterFileState state, final int updateMask) {
+        super(stateCache, state);
 
-		m_updateMask = updateMask;
-	}
+        m_updateMask = updateMask;
+    }
 
-	/**
-	 * Return the update mask
-	 *
-	 * @return int
-	 */
-	public final int getUpdateMask() {
-		return m_updateMask;
-	}
+    /**
+     * Return the update mask
+     *
+     * @return int
+     */
+    public final int getUpdateMask() {
+        return m_updateMask;
+    }
 
-	/**
-	 * Add another state update to the existing update mask
-	 *
-	 * @param updateMask int
-	 */
-	public final void addToUpdateMask( int updateMask) {
-		m_updateMask |= updateMask;
-	}
+    /**
+     * Add another state update to the existing update mask
+     *
+     * @param updateMask
+     *            int
+     */
+    public final void addToUpdateMask(final int updateMask) {
+        m_updateMask |= updateMask;
+    }
 
-	/**
-	 * Remove updates from the mask
-	 *
-	 * @param updateMask int
-	 */
-	public final void removeFromUpdateMask( int updateMask) {
-		m_updateMask &= ~updateMask;
-	}
+    /**
+     * Remove updates from the mask
+     *
+     * @param updateMask
+     *            int
+     */
+    public final void removeFromUpdateMask(final int updateMask) {
+        m_updateMask &= ~updateMask;
+    }
 
-	/**
-	 * Run the post processor
-	 */
-	public void runProcessor() {
+    /**
+     * Run the post processor
+     */
+    @Override
+    public void runProcessor() {
 
-		try {
+        try {
 
-			// Send the state updated message to the cluster
+            // Send the state updated message to the cluster
 
-			getStateCache().updateFileState( getState(), m_updateMask);
-		}
-		catch ( Exception ex) {
+            getStateCache().updateFileState(getState(), m_updateMask);
+        } catch (final Exception ex) {
 
-			// DEBUG
+            // DEBUG
 
-			if ( hasDebug()) {
-				Debug.println( "State update post processor failed to update state=" + getState() + ", updates=" + ClusterFileState.getUpdateMaskAsString( m_updateMask));
-				Debug.println( ex);
-			}
-		}
-	}
+            if (hasDebug()) {
+                Debug.println("State update post processor failed to update state=" + getState() + ", updates="
+                        + ClusterFileState.getUpdateMaskAsString(m_updateMask));
+                Debug.println(ex);
+            }
+        }
+    }
 }

@@ -19,89 +19,89 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.server.locking.OpLockDetails;
 import org.alfresco.jlan.smb.OpLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
 /**
  * Change OpLock Type Remote Task Class
  *
- * <p>Used to synchronize changing an oplock type on a file state by executing on the remote
- * node that owns the file state/key.
+ * <p>
+ * Used to synchronize changing an oplock type on a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class ChangeOpLockTypeTask extends RemoteStateTask<Integer> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChangeOpLockTypeTask.class);
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;
 
-	private static final long serialVersionUID = 1L;
+    // New oplock type
+    private int m_oplockType;
 
-	// New oplock type
+    /**
+     * Default constructor
+     */
+    public ChangeOpLockTypeTask() {
+    }
 
-	private int m_oplockType;
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param newLockType
+     *            int
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public ChangeOpLockTypeTask(final String mapName, final String key, final int newLockType, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-	/**
-	 * Default constructor
-	 */
-	public ChangeOpLockTypeTask() {
-	}
+        m_oplockType = newLockType;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param newLockType int
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public ChangeOpLockTypeTask( String mapName, String key, int newLockType, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Integer
+     * @exception Exception
+     */
+    @Override
+    protected Integer runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
+        if (hasDebug()) {
+            LOGGER.debug("ChangeOpLockTypeTask: New type={} for state {}", OpLock.getTypeAsString(m_oplockType), fState);
+        }
 
-		m_oplockType = newLockType;
-	}
+        // Get the oplock
+        final OpLockDetails oplock = fState.getOpLock();
+        int newType = -1;
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Integer
-	 * @exception Exception
-	 */
-	protected Integer runRemoteTaskAgainstState(IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+        if (oplock != null) {
+            // Update the oplock type
+            final int oldOpLockType = oplock.getLockType();
+            oplock.setLockType(m_oplockType);
+            newType = m_oplockType;
+            if (hasDebug()) {
+                LOGGER.debug(
+                        "ChangeOpLockTypeTask: Changed type from=" + OpLock.getTypeAsString(oldOpLockType) + " to=" + OpLock.getTypeAsString(m_oplockType));
+            }
+        }
 
-		// DEBUG
-
-		if ( hasDebug())
-			Debug.println( "ChangeOpLockTypeTask: New type=" + OpLock.getTypeAsString( m_oplockType) + " for state " + fState);
-
-		// Get the oplock
-
-		OpLockDetails oplock = fState.getOpLock();
-		int newType = -1;
-
-		if ( oplock != null) {
-
-			// Update the oplock type
-
-			int oldOpLockType = oplock.getLockType();
-			oplock.setLockType( m_oplockType);
-			newType = m_oplockType;
-
-			// DEBUG
-
-			if ( hasDebug())
-				Debug.println("ChangeOpLockTypeTask: Changed type from=" + OpLock.getTypeAsString( oldOpLockType) + " to=" + OpLock.getTypeAsString( m_oplockType));
-		}
-
-		// Return the new oplock type, or -1 if no oplock to update
-
-		return new Integer( newType);
-	}
+        // Return the new oplock type, or -1 if no oplock to update
+        return new Integer(newType);
+    }
 }

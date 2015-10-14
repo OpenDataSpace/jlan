@@ -19,72 +19,75 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
 /**
  * Add OpLock Remote Task Class
  *
- * <p>Used to synchronize adding an oplock to a file state by executing on the remote node
- * that owns the file state/key.
+ * <p>
+ * Used to synchronize adding an oplock to a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class AddOpLockTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AddOpLockTask.class);
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;
 
-	private static final long serialVersionUID = 1L;
+    // Remote oplock details
+    private RemoteOpLockDetails m_oplock;
 
-	// Remote oplock details
+    /**
+     * Default constructor
+     */
+    public AddOpLockTask() {
+    }
 
-	private RemoteOpLockDetails m_oplock;
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param oplock
+     *            RemoteOpLockDetails
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public AddOpLockTask(final String mapName, final String key, final RemoteOpLockDetails oplock, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-	/**
-	 * Default constructor
-	 */
-	public AddOpLockTask() {
-	}
+        m_oplock = oplock;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param oplock RemoteOpLockDetails
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public AddOpLockTask( String mapName, String key, RemoteOpLockDetails oplock, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Boolean
+     * @exception Exception
+     */
+    @Override
+    protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
+        if (hasDebug()) {
+            LOGGER.debug("AddOpLockTask: Add oplock={} to {}", m_oplock, fState);
+        }
 
-		m_oplock = oplock;
-	}
+        // May throw an exception if there is an existing oplock on the file
+        fState.setOpLock(m_oplock);
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Boolean
-	 * @exception Exception
-	 */
-	protected Boolean runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
-
-		// DEBUG
-
-		if ( hasDebug())
-			Debug.println( "AddOpLockTask: Add oplock=" + m_oplock + " to " + fState);
-
-		// May throw an exception if there is an existing oplock on the file
-
-		fState.setOpLock( m_oplock);
-
-		// Return a success status
-
-		return Boolean.TRUE;
-	}
+        // Return a success status
+        return Boolean.TRUE;
+    }
 }

@@ -27,56 +27,64 @@ import com.hazelcast.core.IMap;
 /**
  * Rename File State Task Class
  *
- * <p>Used to synchronize renaing a file state by executing on the remote node that owns the file state/key.
+ * <p>
+ * Used to synchronize renaing a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class RemoveOpLockTask extends RemoteStateTask<Boolean> {
 
-	// Serialization id
+    // Serialization id
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * Default constructor
-	 */
-	public RemoveOpLockTask() {
-	}
+    /**
+     * Default constructor
+     */
+    public RemoveOpLockTask() {
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public RemoveOpLockTask( String mapName, String key, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
-	}
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public RemoveOpLockTask(final String mapName, final String key, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
+    }
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return Boolean
-	 * @exception Exception
-	 */
-	protected Boolean runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return Boolean
+     * @exception Exception
+     */
+    @Override
+    protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
 
-		// DEBUG
+        // DEBUG
 
-		if ( hasDebug())
-			Debug.println( "RemoveOpLockTask: Remove oplock from " + fState);
+        if (hasDebug()) {
+            Debug.println("RemoveOpLockTask: Remove oplock from " + fState);
+        }
 
-		// Remove the oplock
+        // Remove the oplock
 
-		fState.clearOpLock();
+        fState.clearOpLock();
 
-		// Return a success status
+        // Return a success status
 
-		return Boolean.TRUE;
-	}
+        return Boolean.TRUE;
+    }
 }

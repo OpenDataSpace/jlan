@@ -25,41 +25,45 @@ import org.alfresco.jlan.server.filesys.cache.FileStateProxy;
 /**
  * HazelCast File State Proxy Class
  *
- * <p>Store the key path and state cache details so the file state can be retrieved on demand, to avoid
- * saving a reference to a copy of the file state that will not be updated.
+ * <p>
+ * Store the key path and state cache details so the file state can be retrieved on demand, to avoid saving a reference to a copy of the file state that will
+ * not be updated.
  *
  * @author gkspencer
  */
 public class HazelCastFileStateProxy implements FileStateProxy {
 
-	// Key path
+    // Key path
 
-	private String m_keyPath;
+    private final String m_keyPath;
 
-	// State cache
+    // State cache
 
-	private HazelCastClusterFileStateCache m_stateCache;
+    private final HazelCastClusterFileStateCache m_stateCache;
 
-	/**
-	 * Class constructor
-	 *
-	 * @param keyPath String
-	 * @param stateCache HazelCastClusterFileStateCache
-	 */
-	public HazelCastFileStateProxy( String keyPath, HazelCastClusterFileStateCache stateCache) {
-		m_keyPath = keyPath;
-		m_stateCache = stateCache;
-	}
+    /**
+     * Class constructor
+     *
+     * @param keyPath
+     *            String
+     * @param stateCache
+     *            HazelCastClusterFileStateCache
+     */
+    public HazelCastFileStateProxy(final String keyPath, final HazelCastClusterFileStateCache stateCache) {
+        m_keyPath = keyPath;
+        m_stateCache = stateCache;
+    }
 
-	/**
-	 * Return the file state
-	 *
-	 * @return FileState
-	 */
-	public FileState getFileState() {
+    /**
+     * Return the file state
+     *
+     * @return FileState
+     */
+    @Override
+    public FileState getFileState() {
 
-		// Retrieve the current file state from the cache
+        // Retrieve the current file state from the cache
 
-		return m_stateCache.findFileState( m_keyPath);
-	}
+        return m_stateCache.findFileState(m_keyPath);
+    }
 }

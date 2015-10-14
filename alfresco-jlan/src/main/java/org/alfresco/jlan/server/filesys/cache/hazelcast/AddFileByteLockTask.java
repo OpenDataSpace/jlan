@@ -19,119 +19,106 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.locking.FileLockList;
 import org.alfresco.jlan.locking.LockConflictException;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileLock;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
 /**
  * Add File Byte Range Lock Remote Task Class
  *
- * <p>Used to synchronize adding a byte range lock to a file state by executing on the remote node
- * that owns the file state/key.
+ * <p>
+ * Used to synchronize adding a byte range lock to a file state by executing on the remote node that owns the file state/key.
  *
  * @author gkspencer
  */
 public class AddFileByteLockTask extends RemoteStateTask<ClusterFileState> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AddFileByteLockTask.class);
 
-	// Serialization id
+    // Serialization id
+    private static final long serialVersionUID = 1L;
 
-	private static final long serialVersionUID = 1L;
+    // Byte range lock details
+    private ClusterFileLock m_lock;
 
-	// Byte range lock details
+    /**
+     * Default constructor
+     */
+    public AddFileByteLockTask() {
+    }
 
-	private ClusterFileLock m_lock;
+    /**
+     * Class constructor
+     *
+     * @param mapName
+     *            String
+     * @param key
+     *            String
+     * @param lock
+     *            ClusterFileLock
+     * @param debug
+     *            boolean
+     * @param timingDebug
+     *            boolean
+     */
+    public AddFileByteLockTask(final String mapName, final String key, final ClusterFileLock lock, final boolean debug, final boolean timingDebug) {
+        super(mapName, key, true, false, debug, timingDebug);
 
-	/**
-	 * Default constructor
-	 */
-	public AddFileByteLockTask() {
-	}
+        m_lock = lock;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param mapName String
-	 * @param key String
-	 * @param lock ClusterFileLock
-	 * @param debug boolean
-	 * @param timingDebug boolean
-	 */
-	public AddFileByteLockTask( String mapName, String key, ClusterFileLock lock, boolean debug, boolean timingDebug) {
-		super( mapName, key, true, false, debug, timingDebug);
+    /**
+     * Run a remote task against a file state
+     *
+     * @param stateCache
+     *            IMap<String, ClusterFileState>
+     * @param fState
+     *            ClusterFileState
+     * @return ClusterFileState
+     * @exception Exception
+     */
+    @Override
+    protected ClusterFileState runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
+        if (hasDebug()) {
+            LOGGER.debug("AddFileByteLockTask: Add lock={} to {}", m_lock, fState);
+        }
 
-		m_lock = lock;
-	}
+        // Check if there are any locks on the file
+        if (fState.hasActiveLocks() == false) {
+            // Add the lock
+            fState.addLock(m_lock);
+        } else {
+            // Check for lock conflicts
+            final FileLockList lockList = fState.getLockList();
+            int idx = 0;
 
-	/**
-	 * Run a remote task against a file state
-	 *
-	 * @param stateCache IMap<String, ClusterFileState>
-	 * @param fState ClusterFileState
-	 * @return ClusterFileState
-	 * @exception Exception
-	 */
-	protected ClusterFileState runRemoteTaskAgainstState( IMap<String, ClusterFileState> stateCache, ClusterFileState fState)
-		throws Exception {
+            while (idx < lockList.numberOfLocks()) {
+                // Get the current file lock
+                final ClusterFileLock curLock = (ClusterFileLock) lockList.getLockAt(idx++);
 
-		// DEBUG
+                // Check if the lock overlaps with the new lock
+                if (curLock.hasOverlap(m_lock)) {
+                    // Check the if the lock owner is the same
+                    if (curLock.getProcessId() != m_lock.getProcessId() || curLock.getOwnerNode().equalsIgnoreCase(m_lock.getOwnerNode()) == false) {
+                        if (hasDebug()) {
+                            LOGGER.debug("AddLock Lock conflict with lock={}", curLock);
+                        }
 
-		if ( hasDebug())
-			Debug.println( "AddFileByteLockTask: Add lock=" + m_lock + " to " + fState);
+                        // Lock conflict
+                        throw new LockConflictException();
+                    }
+                }
+            }
 
-		// Check if there are any locks on the file
+            // Add the lock
+            fState.addLock(m_lock);
+        }
 
-		if ( fState.hasActiveLocks() == false) {
-
-			// Add the lock
-
-			fState.addLock( m_lock);
-		}
-		else {
-
-			// Check for lock conflicts
-
-			FileLockList lockList = fState.getLockList();
-			int idx = 0;
-			boolean lockConflict = false;
-
-			while ( idx < lockList.numberOfLocks() && lockConflict == false) {
-
-				// Get the current file lock
-
-				ClusterFileLock curLock = (ClusterFileLock) lockList.getLockAt( idx++);
-
-				// Check if the lock overlaps with the new lock
-
-				if ( curLock.hasOverlap( m_lock)) {
-
-					// Check the if the lock owner is the same
-
-					if ( curLock.getProcessId() != m_lock.getProcessId() ||
-						 curLock.getOwnerNode().equalsIgnoreCase( m_lock.getOwnerNode()) == false) {
-
-						// DEBUG
-
-						if ( hasDebug())
-							Debug.println("AddLock Lock conflict with lock=" + curLock);
-
-						// Lock conflict
-
-						throw new LockConflictException();
-					}
-				}
-			}
-
-			// Add the lock
-
-			fState.addLock( m_lock);
-		}
-
-		// Return the updated file state
-
-		return fState;
-	}
+        // Return the updated file state
+        return fState;
+    }
 }

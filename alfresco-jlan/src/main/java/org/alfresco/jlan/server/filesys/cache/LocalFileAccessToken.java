@@ -19,8 +19,9 @@
 
 package org.alfresco.jlan.server.filesys.cache;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileAccessToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Local File Access Token Class
@@ -28,102 +29,106 @@ import org.alfresco.jlan.server.filesys.FileAccessToken;
  * @author gkspencer
  */
 public class LocalFileAccessToken implements FileAccessToken {
+    private static final Logger LOGGER = LoggerFactory.getLogger(LocalFileAccessToken.class);
 
-	// Use the request process id
+    // Use the request process id
+    private final int m_pid;
 
-	private int m_pid;
+    // Attributes only file access
+    private boolean m_attribOnly;
 
-	// Attributes only file access
+    // Access token has been released
+    private transient boolean m_released = false;
 
-	private boolean m_attribOnly;
+    /**
+     * Class constructor
+     *
+     * @param pid
+     *            int
+     */
+    public LocalFileAccessToken(final int pid) {
+        m_pid = pid;
+    }
 
-	// Access token has been released
+    /**
+     * Return the process id
+     *
+     * @return int
+     */
+    public final int getProcessId() {
+        return m_pid;
+    }
 
-	private transient boolean m_released = false;
+    /**
+     * Check if the access token has been released
+     *
+     * @return boolean
+     */
+    public final boolean isReleased() {
+        return m_released;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param pid int
-	 */
-	public LocalFileAccessToken( int pid) {
-		m_pid = pid;
-	}
+    /**
+     * Set the released state of the access token
+     *
+     * @param released
+     *            boolean
+     */
+    public final void setReleased(final boolean released) {
+        m_released = released;
+    }
 
-	/**
-	 * Return the process id
-	 *
-	 * @return int
-	 */
-	public final int getProcessId() {
-		return m_pid;
-	}
+    /**
+     * Check if the access token is on attributes only file open
+     *
+     * @return boolean
+     */
+    public final boolean isAttributesOnly() {
+        return m_attribOnly;
+    }
 
-	/**
-	 * Check if the access token has been released
-	 *
-	 * @return boolean
-	 */
-	public final boolean isReleased() {
-		return m_released;
-	}
+    /**
+     * Set/clear the attributes only flag
+     *
+     * @param attrOnly
+     *            boolean
+     */
+    public final void setAttributesOnly(final boolean attrOnly) {
+        m_attribOnly = attrOnly;
+    }
 
-	/**
-	 * Set the released state of the access token
-	 *
-	 * @param released boolean
-	 */
-	public final void setReleased( boolean released) {
-		m_released = released;
-	}
+    /**
+     * Return the access token as a string
+     *
+     * @return String
+     */
+    @Override
+    public String toString() {
+        final StringBuilder str = new StringBuilder();
 
-	/**
-	 * Check if the access token is on attributes only file open
-	 *
-	 * @return boolean
-	 */
-	public final boolean isAttributesOnly() {
-		return m_attribOnly;
-	}
+        str.append("[Token pid=");
+        str.append(getProcessId());
 
-	/**
-	 * Set/clear the attributes only flag
-	 *
-	 * @param attrOnly boolean
-	 */
-	public final void setAttributesOnly( boolean attrOnly) {
-		m_attribOnly = attrOnly;
-	}
+        if (isAttributesOnly()) {
+            str.append(",AttribOnly");
+        }
 
-	/**
-	 * Return the access token as a string
-	 *
-	 * @return String
-	 */
-	public String toString() {
-		StringBuilder str = new StringBuilder();
+        if (isReleased()) {
+            str.append(",Released");
+        }
+        str.append("]");
 
-		str.append( "[Token pid=");
-		str.append( getProcessId());
+        return str.toString();
+    }
 
-		if ( isAttributesOnly())
-			str.append( ",AttribOnly");
-
-		if ( isReleased())
-			str.append( ",Released");
-		str.append( "]");
-
-		return str.toString();
-	}
-
-	/**
-	 * Finalize
-	 */
-	public void finalize() {
-
-		// Check if hte access token was released
-
-		if ( isReleased() == false)
-			Debug.println( "** Access token finalized, not released, " + toString() + " **");
-	}
+    /**
+     * Finalize
+     */
+    @Override
+    public void finalize() {
+        // Check if hte access token was released
+        if (isReleased() == false) {
+            LOGGER.warn("** Access token finalized, not released, {} **", this);
+        }
+    }
 }
