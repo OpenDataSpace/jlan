@@ -24,52 +24,50 @@ import java.io.IOException;
 /**
  * Console IO Class
  *
- * <p>Provides a wrapper class for conole I/O functions to allow Java and J#/.NET versions.
+ * <p>
+ * Provides a wrapper class for conole I/O functions to allow Java and J#/.NET versions.
  *
  * @author gkspencer
  */
 public class ConsoleIO {
 
-  /**
-   * Check if the console input is connected to a valid stream
-   *
-   * @return boolean
-   */
-  public final static boolean isValid() {
-    try {
-      System.in.available();
-      return true;
+    /**
+     * Check if the console input is connected to a valid stream
+     *
+     * @return boolean
+     */
+    public final static boolean isValid() {
+        try {
+            System.in.available();
+            return true;
+        } catch (final IOException ex) {
+        }
+        return false;
     }
-    catch (IOException ex) {
-    }
-    return false;
-  }
 
-  /**
-   * Check if there is input available
-   *
-   * @return int
-   */
-  public final static int available() {
-    try {
-      return System.in.available();
+    /**
+     * Check if there is input available
+     *
+     * @return int
+     */
+    public final static int available() {
+        try {
+            return System.in.available();
+        } catch (final Exception ex) {
+        }
+        return -1;
     }
-    catch (Exception ex) {
-    }
-    return -1;
-  }
 
-  /**
-   * Read a character from the console
-   *
-   * @return int
-   */
-  public final static int readCharacter() {
-    try {
-      return System.in.read();
+    /**
+     * Read a character from the console
+     *
+     * @return int
+     */
+    public final static int readCharacter() {
+        try {
+            return System.in.read();
+        } catch (final Exception ex) {
+        }
+        return -1;
     }
-    catch (Exception ex) {
-    }
-    return -1;
-  }
 }

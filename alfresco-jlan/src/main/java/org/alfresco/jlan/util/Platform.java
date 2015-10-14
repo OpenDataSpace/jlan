@@ -22,51 +22,53 @@ package org.alfresco.jlan.util;
 /**
  * Platform Class
  *
- * <p>Determine the platform type that we are runnng on.
+ * <p>
+ * Determine the platform type that we are runnng on.
  *
  * @author gkspencer
  */
 public class Platform {
 
-  // Platform types
+    // Platform types
 
-  public enum Type {
-    Unchecked, Unknown, WINDOWS, LINUX, SOLARIS, MACOSX, AIX
-  };
+    public enum Type {
+        Unchecked, Unknown, WINDOWS, LINUX, SOLARIS, MACOSX, AIX
+    };
 
-  // Platform type we are running on
+    // Platform type we are running on
 
-  private static Type _platformType = Type.Unchecked;
+    private static Type _platformType = Type.Unchecked;
 
-  /**
-   * Determine the platform type
-   *
-   * @return Type
-   */
-  public static final Type isPlatformType() {
+    /**
+     * Determine the platform type
+     *
+     * @return Type
+     */
+    public static final Type isPlatformType() {
 
-    // Check if the type has been set
+        // Check if the type has been set
 
-    if (_platformType == Type.Unchecked) {
+        if (_platformType == Type.Unchecked) {
 
-      // Get the operating system type
+            // Get the operating system type
 
-      String osName = System.getProperty("os.name");
+            final String osName = System.getProperty("os.name");
 
-      if (osName.startsWith("Windows"))
-        _platformType = Type.WINDOWS;
-      else if (osName.equalsIgnoreCase("Linux"))
-        _platformType = Type.LINUX;
-      else if (osName.startsWith("Mac OS X") || osName.equals( "Darwin"))
-        _platformType = Type.MACOSX;
-      else if (osName.startsWith("Solaris") || osName.startsWith("SunOS"))
-        _platformType = Type.SOLARIS;
-      else if (osName.startsWith("AIX"))
-      	_platformType = Type.AIX;
+            if (osName.startsWith("Windows")) {
+                _platformType = Type.WINDOWS;
+            } else if (osName.equalsIgnoreCase("Linux")) {
+                _platformType = Type.LINUX;
+            } else if (osName.startsWith("Mac OS X") || osName.equals("Darwin")) {
+                _platformType = Type.MACOSX;
+            } else if (osName.startsWith("Solaris") || osName.startsWith("SunOS")) {
+                _platformType = Type.SOLARIS;
+            } else if (osName.startsWith("AIX")) {
+                _platformType = Type.AIX;
+            }
+        }
+
+        // Return the current platform type
+
+        return _platformType;
     }
-
-    // Return the current platform type
-
-    return _platformType;
-  }
 }

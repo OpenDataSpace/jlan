@@ -30,202 +30,196 @@ import java.lang.reflect.Method;
  */
 public class UTF8Normalizer {
 
-  // Normalizer method type
+    // Normalizer method type
 
-  public enum NormalizerType { Unknown, Java5, Java6or7, IBMICU };
+    public enum NormalizerType {
+        Unknown, Java5, Java6or7, IBMICU
+    };
 
-  // Type of normalizer method
+    // Type of normalizer method
 
-  private NormalizerType m_type = NormalizerType.Unknown;
+    private NormalizerType m_type = NormalizerType.Unknown;
 
-  // Normalizer method
+    // Normalizer method
 
-  private Method m_method;
+    private Method m_method;
 
-  // Normalizer form parameter field for Java 6 call
+    // Normalizer form parameter field for Java 6 call
 
-  private Field m_field;
+    private Field m_field;
 
-  /**
-   * Default constructor
-   */
-  public UTF8Normalizer() {
-    initNormalizer();
+    /**
+     * Default constructor
+     */
+    public UTF8Normalizer() {
+        initNormalizer();
 
-    if ( isType() == NormalizerType.Unknown)
-      throw new RuntimeException("UTf8Normalizer failed to initialize");
-  }
-
-  /**
-   * Normalize a UTF-8 string
-   *
-   * @param utf8str String
-   * @return String
-   */
-  public final String normalize( String utf8str) {
-
-    // Determine the method to be called
-
-    String normStr = null;
-
-    try {
-      switch ( isType()) {
-
-        // IBM ICU library
-
-        case IBMICU:
-
-          // Call the compose(String, boolean) method
-
-          normStr = (String) m_method.invoke( null, utf8str, false);
-          break;
-
-        // Java5
-
-        case Java5:
-
-          // Call the compose(String, boolean, int) method
-
-          normStr = (String) m_method.invoke( null, utf8str, false, 0);
-          break;
-
-        // Java6 or 7
-
-        case Java6or7:
-
-          // Call the normalize(CharSequence, Normalizer.Form) method
-
-          normStr = (String) m_method.invoke( null, utf8str, m_field.get( null));
-          break;
-
-        // Not initialized
-
-        case Unknown:
-          throw new RuntimeException("Normalizer is not initialized");
-      }
-    }
-    catch ( InvocationTargetException ex) {
-    }
-    catch ( IllegalAccessException ex) {
-    }
-
-    // Return the normalized string
-
-    return normStr;
-  }
-
-  /**
-   * Return the normalizer type
-   *
-   * @return Normalizer.Type
-   */
-  public final NormalizerType isType() {
-    return m_type;
-  }
-
-  /**
-   * Initialize the normalizer
-   */
-  private final void initNormalizer() {
-
-    // Check if the IBM ICU library is available
-
-    try {
-
-      // Load the IBM ICU class
-
-      Class<?> icuClass = Class.forName( "com.ibm.icu.text.Normalizer");
-
-      // Find the compose method
-
-      Class<?>[] paramTypes = new Class<?>[2];
-      paramTypes[0] = String.class;
-      paramTypes[1] = boolean.class;
-
-      m_method = icuClass.getMethod( "compose", paramTypes);
-
-      // Check if the method is valid
-
-      if ( m_method != null) {
-        m_type = NormalizerType.IBMICU;
-        return;
-      }
-    }
-    catch ( ClassNotFoundException ex) {
-    }
-    catch (NoSuchMethodException ex) {
-    }
-
-    // Check the Java version and use the appropriate method
-
-    String javaVer = System.getProperty("java.specification.version");
-
-    if ( javaVer.equals("1.5")) {
-
-      try {
-
-        // Load the sun.text.Normalizer class
-
-        Class<?> sunClass = Class.forName("sun.text.Normalizer");
-
-        // Find the compose method
-
-        Class<?>[] paramTypes = new Class<?>[3];
-        paramTypes[0] = String.class;
-        paramTypes[1] = boolean.class;
-        paramTypes[2] = int.class;
-
-        m_method = sunClass.getMethod("compose", paramTypes);
-
-        // Check if the method is valid
-
-        if ( m_method != null) {
-          m_type = NormalizerType.Java5;
-          return;
+        if (isType() == NormalizerType.Unknown) {
+            throw new RuntimeException("UTf8Normalizer failed to initialize");
         }
-      }
-      catch ( ClassNotFoundException ex) {
-      }
-      catch (NoSuchMethodException ex) {
-      }
     }
-    else if ( javaVer.equals("1.6") || javaVer.equals( "1.7")) {
 
-      try {
+    /**
+     * Normalize a UTF-8 string
+     *
+     * @param utf8str
+     *            String
+     * @return String
+     */
+    public final String normalize(final String utf8str) {
 
-        // Load the java.text.Normalizer class
+        // Determine the method to be called
 
-        Class<?> java6Class = Class.forName("java.text.Normalizer");
+        String normStr = null;
 
-        // Load the Normalizer.Form class, used as a parameter
+        try {
+            switch (isType()) {
 
-        Class<?> normFormClass = Class.forName("java.text.Normalizer$Form");
+                // IBM ICU library
 
-        // Get the required Normalizer.Form value
+                case IBMICU:
 
-        m_field = normFormClass.getField("NFC");
+                    // Call the compose(String, boolean) method
 
-        // Find the compose method
+                    normStr = (String) m_method.invoke(null, utf8str, false);
+                    break;
 
-        Class<?>[] paramTypes = new Class<?>[2];
-        paramTypes[0] = CharSequence.class;
-        paramTypes[1] = normFormClass;
+                // Java5
 
-        m_method = java6Class.getMethod("normalize", paramTypes);
+                case Java5:
 
-        // Check if the method is valid
+                    // Call the compose(String, boolean, int) method
 
-        if ( m_method != null) {
-          m_type = NormalizerType.Java6or7;
-          return;
+                    normStr = (String) m_method.invoke(null, utf8str, false, 0);
+                    break;
+
+                // Java6 or 7
+
+                case Java6or7:
+
+                    // Call the normalize(CharSequence, Normalizer.Form) method
+
+                    normStr = (String) m_method.invoke(null, utf8str, m_field.get(null));
+                    break;
+
+                // Not initialized
+
+                case Unknown:
+                    throw new RuntimeException("Normalizer is not initialized");
+            }
+        } catch (final InvocationTargetException ex) {
+        } catch (final IllegalAccessException ex) {
         }
-      }
-      catch ( ClassNotFoundException ex) {
-      }
-      catch (NoSuchMethodException ex) {
-      }
-      catch (NoSuchFieldException ex) {
-      }
+
+        // Return the normalized string
+
+        return normStr;
     }
-  }
+
+    /**
+     * Return the normalizer type
+     *
+     * @return Normalizer.Type
+     */
+    public final NormalizerType isType() {
+        return m_type;
+    }
+
+    /**
+     * Initialize the normalizer
+     */
+    private final void initNormalizer() {
+
+        // Check if the IBM ICU library is available
+
+        try {
+
+            // Load the IBM ICU class
+
+            final Class<?> icuClass = Class.forName("com.ibm.icu.text.Normalizer");
+
+            // Find the compose method
+
+            final Class<?>[] paramTypes = new Class<?>[2];
+            paramTypes[0] = String.class;
+            paramTypes[1] = boolean.class;
+
+            m_method = icuClass.getMethod("compose", paramTypes);
+
+            // Check if the method is valid
+
+            if (m_method != null) {
+                m_type = NormalizerType.IBMICU;
+                return;
+            }
+        } catch (final ClassNotFoundException ex) {
+        } catch (final NoSuchMethodException ex) {
+        }
+
+        // Check the Java version and use the appropriate method
+
+        final String javaVer = System.getProperty("java.specification.version");
+
+        if (javaVer.equals("1.5")) {
+
+            try {
+
+                // Load the sun.text.Normalizer class
+
+                final Class<?> sunClass = Class.forName("sun.text.Normalizer");
+
+                // Find the compose method
+
+                final Class<?>[] paramTypes = new Class<?>[3];
+                paramTypes[0] = String.class;
+                paramTypes[1] = boolean.class;
+                paramTypes[2] = int.class;
+
+                m_method = sunClass.getMethod("compose", paramTypes);
+
+                // Check if the method is valid
+
+                if (m_method != null) {
+                    m_type = NormalizerType.Java5;
+                    return;
+                }
+            } catch (final ClassNotFoundException ex) {
+            } catch (final NoSuchMethodException ex) {
+            }
+        } else if (javaVer.equals("1.6") || javaVer.equals("1.7")) {
+
+            try {
+
+                // Load the java.text.Normalizer class
+
+                final Class<?> java6Class = Class.forName("java.text.Normalizer");
+
+                // Load the Normalizer.Form class, used as a parameter
+
+                final Class<?> normFormClass = Class.forName("java.text.Normalizer$Form");
+
+                // Get the required Normalizer.Form value
+
+                m_field = normFormClass.getField("NFC");
+
+                // Find the compose method
+
+                final Class<?>[] paramTypes = new Class<?>[2];
+                paramTypes[0] = CharSequence.class;
+                paramTypes[1] = normFormClass;
+
+                m_method = java6Class.getMethod("normalize", paramTypes);
+
+                // Check if the method is valid
+
+                if (m_method != null) {
+                    m_type = NormalizerType.Java6or7;
+                    return;
+                }
+            } catch (final ClassNotFoundException ex) {
+            } catch (final NoSuchMethodException ex) {
+            } catch (final NoSuchFieldException ex) {
+            }
+        }
+    }
 }
