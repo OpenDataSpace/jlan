@@ -66,3906 +66,3977 @@ import org.alfresco.jlan.smb.server.ntfs.StreamInfoList;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.WildCard;
 import org.alfresco.jlan.util.db.DBConnectionPool;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 
 /**
  * Derby Base Database Interface Class
  *
  * <p>
- * Derby (formerly Cloudscape) specific implementation of the database interface used by the
- * database filesystem driver (DBDiskDriver).
+ * Derby (formerly Cloudscape) specific implementation of the database interface used by the database filesystem driver (DBDiskDriver).
  *
  * @author gkspencer
  */
 public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterface, DBDataInterface, DBObjectIdInterface {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DerbyDBInterface.class);
+
+    // Memory buffer maximum size
+    public final static long MaxMemoryBuffer = MemorySize.MEGABYTE / 2; // 512Kb
+
+    // Blob reading buffer size
+    public static final int BlobReadBuffer = 32768;
+
+    // Lock file name, used to check if server shutdown was clean or not
+    public final static String LockFileName = "DerbyLoader.lock";
+
+    // Database connection and prepared statement used to write file requests to the queue tables
+    private Connection m_dbConn;
+    private PreparedStatement m_reqStmt;
+    private PreparedStatement m_tranStmt;
+
+    /**
+     * Default constructor
+     */
+    public DerbyDBInterface() {
+        super();
+    }
+
+    /**
+     * Return the database interface name
+     *
+     * @return String
+     */
+    @Override
+    public String getDBInterfaceName() {
+        return "Derby";
+    }
+
+    /**
+     * Get the supported database features mask
+     *
+     * @return int
+     */
+    @Override
+    protected int getSupportedFeatures() {
+        // Determine the available database interface features
+        return FeatureNTFS + FeatureRetention + FeatureSymLinks + FeatureQueue + FeatureData + FeatureJarData + FeatureObjectId;
+    }
+
+    /**
+     * Initialize the database interface
+     *
+     * @param dbCtx
+     *            DBDeviceContext
+     * @param params
+     *            ConfigElement
+     * @exception InvalidConfigurationException
+     */
+    @Override
+    public void initializeDatabase(final DBDeviceContext dbCtx, final ConfigElement params) throws InvalidConfigurationException {
+        // Set the JDBC driver class, must be set before the connection pool is created
+        setDriverName("org.apache.derby.jdbc.EmbeddedDriver");
+
+        // Call the base class to do the main initialization
+        super.initializeDatabase(dbCtx, params);
+
+        // Create the database connection pool
+        try {
+            createConnectionPool();
+        } catch (final Exception ex) {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Error creating connection pool, " + ex.toString());
+            }
+            // Rethrow the exception
+            throw new InvalidConfigurationException("Failed to create connection pool, " + ex.getMessage());
+        }
+        // Check if the file system table exists
+        Connection conn = null;
+
+        try {
+
+            // Open a connection to the database
+
+            conn = getConnection();
+
+            final DatabaseMetaData dbMeta = conn.getMetaData();
+            final ResultSet rs = dbMeta.getTables(null, null, null, null);
+
+            boolean foundStruct = false;
+            boolean foundStream = false;
+            boolean foundRetain = false;
+            boolean foundQueue = false;
+            boolean foundTrans = false;
+            boolean foundData = false;
+            boolean foundJarData = false;
+            boolean foundObjId = false;
+
+            while (rs.next()) {
+
+                // Get the table name
 
-	// Memory buffer maximum size
+                final String tblName = rs.getString("TABLE_NAME");
 
-	public final static long MaxMemoryBuffer = MemorySize.MEGABYTE / 2; // 512Kb
+                // Check if we found the filesystem structure or streams table
 
-	// Blob reading buffer size
+                if (tblName.equalsIgnoreCase(getFileSysTableName())) {
+                    foundStruct = true;
+                } else if (hasStreamsTableName() && tblName.equalsIgnoreCase(getStreamsTableName())) {
+                    foundStream = true;
+                } else if (hasRetentionTableName() && tblName.equalsIgnoreCase(getRetentionTableName())) {
+                    foundRetain = true;
+                } else if (hasDataTableName() && tblName.equalsIgnoreCase(getDataTableName())) {
+                    foundData = true;
+                } else if (hasJarDataTableName() && tblName.equalsIgnoreCase(getJarDataTableName())) {
+                    foundJarData = true;
+                } else if (hasQueueTableName() && tblName.equalsIgnoreCase(getQueueTableName())) {
+                    foundQueue = true;
+                } else if (hasTransactionTableName() && tblName.equalsIgnoreCase(getTransactionTableName())) {
+                    foundTrans = true;
+                } else if (hasObjectIdTableName() && tblName.equalsIgnoreCase(getObjectIdTableName())) {
+                    foundObjId = true;
+                }
+            }
 
-	public static final int BlobReadBuffer = 32768;
+            // Check if the file system structure table should be created
 
-	// Lock file name, used to check if server shutdown was clean or not
+            if (foundStruct == false) {
 
-	public final static String LockFileName = "DerbyLoader.lock";
+                // Create the file system structure table
 
-	// Database connection and prepared statement used to write file requests to the queue tables
+                final Statement stmt = conn.createStatement();
 
-	private Connection m_dbConn;
-	private PreparedStatement m_reqStmt;
-	private PreparedStatement m_tranStmt;
+                stmt.execute("CREATE TABLE " + getFileSysTableName()
+                        + "(FileId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, DirId INTEGER, FileName VARCHAR(255),"
+                        + "FileSize INTEGER, CreateDate TIMESTAMP, ModifyDate TIMESTAMP, AccessDate TIMESTAMP, ChangeDate TIMESTAMP, ReadOnlyFile CHAR,"
+                        + "ArchivedFile CHAR, DirectoryFile CHAR, SystemFile CHAR, HiddenFile CHAR, OwnerUid INTEGER, OwnerGid INTEGER,"
+                        + "FileMode INTEGER, IsDeleted CHAR DEFAULT 'N')");
 
-	/**
-	 * Default constructor
-	 */
-	public DerbyDBInterface() {
-		super();
-	}
+                // Create various indexes
 
-	/**
-	 * Return the database interface name
-	 *
-	 * @return String
-	 */
-	public String getDBInterfaceName() {
-		return "Derby";
-	}
+                stmt.execute("CREATE INDEX IFileDirId ON " + getFileSysTableName() + "(FileName,DirId)");
+                stmt.execute("CREATE INDEX IDirId ON " + getFileSysTableName() + "(DirId)");
+                stmt.execute("CREATE INDEX IDir ON " + getFileSysTableName() + "(DirId,DirectoryFile)");
+                stmt.execute("CREATE INDEX IFileDirIdDir ON " + getFileSysTableName() + "(FileName,DirId,DirectoryFile)");
 
-	/**
-	 * Get the supported database features mask
-	 *
-	 * @return int
-	 */
-	protected int getSupportedFeatures() {
+                stmt.close();
 
-		// Determine the available database interface features
+                // DEBUG
 
-		return FeatureNTFS + FeatureRetention + FeatureSymLinks + FeatureQueue + FeatureData + FeatureJarData + FeatureObjectId;
-	}
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getFileSysTableName());
+                }
+            }
 
-	/**
-	 * Initialize the database interface
-	 *
-	 * @param dbCtx DBDeviceContext
-	 * @param params ConfigElement
-	 * @exception InvalidConfigurationException
-	 */
-	public void initializeDatabase(DBDeviceContext dbCtx, ConfigElement params)
-		throws InvalidConfigurationException {
+            // Check if the file streams table should be created
 
-		// Set the JDBC driver class, must be set before the connection pool is created
+            if (isNTFSEnabled() && foundStream == false && getStreamsTableName() != null) {
 
-		setDriverName("org.apache.derby.jdbc.EmbeddedDriver");
+                // Create the file streams table
 
-		// Call the base class to do the main initialization
+                final Statement stmt = conn.createStatement();
 
-		super.initializeDatabase(dbCtx, params);
+                stmt.execute("CREATE TABLE " + getStreamsTableName()
+                        + " (StreamId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, FileId INTEGER NOT NULL, StreamName VARCHAR(255) NOT NULL, StreamSize INTEGER,"
+                        + "CreateDate TIMESTAMP, ModifyDate TIMESTAMP, AccessDate TIMESTAMP)");
 
-		// Create the database connection pool
+                // Create various indexes
 
-		try {
-			createConnectionPool();
-		}
-		catch (Exception ex) {
+                stmt.execute("CREATE INDEX IFileId ON " + getStreamsTableName() + "(FileId)");
 
-			// DEBUG
+                stmt.close();
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Error creating connection pool, " + ex.toString());
+                // DEBUG
 
-			// Rethrow the exception
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getStreamsTableName());
+                }
+            }
 
-			throw new InvalidConfigurationException("Failed to create connection pool, " + ex.getMessage());
-		}
-		// Check if the file system table exists
+            // Check if the retention table should be created
 
-		Connection conn = null;
+            if (isRetentionEnabled() && foundRetain == false && getRetentionTableName() != null) {
 
-		try {
+                // Create the retention period data table
 
-			// Open a connection to the database
+                final Statement stmt = conn.createStatement();
 
-			conn = getConnection();
+                stmt.execute("CREATE TABLE " + getRetentionTableName() + " (FileId INTEGER NOT NULL PRIMARY KEY,"
+                        + "StartDate TIMESTAMP, EndDate TIMESTAMP, PurgeFlag CHAR DEFAULT '0')");
+                stmt.close();
 
-			DatabaseMetaData dbMeta = conn.getMetaData();
-			ResultSet rs = dbMeta.getTables(null, null, null, null);
+                // DEBUG
 
-			boolean foundStruct = false;
-			boolean foundStream = false;
-			boolean foundRetain = false;
-			boolean foundQueue = false;
-			boolean foundTrans = false;
-			boolean foundData = false;
-			boolean foundJarData = false;
-			boolean foundObjId = false;
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getRetentionTableName());
+                }
+            }
 
-			while (rs.next()) {
+            // Check if the file loader queue table should be created
 
-				// Get the table name
+            if (isQueueEnabled() && foundQueue == false && getQueueTableName() != null) {
 
-				String tblName = rs.getString("TABLE_NAME");
+                // Create the request queue data table
 
-				// Check if we found the filesystem structure or streams table
+                final Statement stmt = conn.createStatement();
 
-				if ( tblName.equalsIgnoreCase(getFileSysTableName()))
-					foundStruct = true;
-				else if ( hasStreamsTableName() && tblName.equalsIgnoreCase(getStreamsTableName()))
-					foundStream = true;
-				else if ( hasRetentionTableName() && tblName.equalsIgnoreCase(getRetentionTableName()))
-					foundRetain = true;
-				else if ( hasDataTableName() && tblName.equalsIgnoreCase(getDataTableName()))
-					foundData = true;
-				else if ( hasJarDataTableName() && tblName.equalsIgnoreCase(getJarDataTableName()))
-					foundJarData = true;
-				else if ( hasQueueTableName() && tblName.equalsIgnoreCase(getQueueTableName()))
-					foundQueue = true;
-				else if ( hasTransactionTableName() && tblName.equalsIgnoreCase(getTransactionTableName()))
-					foundTrans = true;
-				else if ( hasObjectIdTableName() && tblName.equalsIgnoreCase(getObjectIdTableName()))
-					foundObjId = true;
-			}
+                stmt.execute("CREATE TABLE " + getQueueTableName() + " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, ReqType SMALLINT,"
+                        + "SeqNo INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, TempFile VARCHAR(512), VirtualPath VARCHAR(512), QueuedAt TIMESTAMP)");
 
-			// Check if the file system structure table should be created
+                stmt.execute("CREATE INDEX IQFileId ON " + getQueueTableName() + "(FileId)");
+                stmt.execute("CREATE INDEX IQFileIdType ON " + getQueueTableName() + "(FileId, ReqType)");
 
-			if ( foundStruct == false) {
+                stmt.close();
 
-				// Create the file system structure table
+                // DEBUG
 
-				Statement stmt = conn.createStatement();
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getQueueTableName());
+                }
+            }
 
-				stmt.execute("CREATE TABLE "
-								+ getFileSysTableName()
-								+ "(FileId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, DirId INTEGER, FileName VARCHAR(255),"
-								+ "FileSize INTEGER, CreateDate TIMESTAMP, ModifyDate TIMESTAMP, AccessDate TIMESTAMP, ChangeDate TIMESTAMP, ReadOnlyFile CHAR,"
-								+ "ArchivedFile CHAR, DirectoryFile CHAR, SystemFile CHAR, HiddenFile CHAR, OwnerUid INTEGER, OwnerGid INTEGER,"
-								+ "FileMode INTEGER, IsDeleted CHAR DEFAULT 'N')");
+            // Check if the file loader transaction queue table should be created
 
-				// Create various indexes
+            if (isQueueEnabled() && foundTrans == false && getTransactionTableName() != null) {
 
-				stmt.execute("CREATE INDEX IFileDirId ON " + getFileSysTableName() + "(FileName,DirId)");
-				stmt.execute("CREATE INDEX IDirId ON " + getFileSysTableName() + "(DirId)");
-				stmt.execute("CREATE INDEX IDir ON " + getFileSysTableName() + "(DirId,DirectoryFile)");
-				stmt.execute("CREATE INDEX IFileDirIdDir ON " + getFileSysTableName() + "(FileName,DirId,DirectoryFile)");
+                // Create the transaction request queue data table
 
-				stmt.close();
+                final Statement stmt = conn.createStatement();
 
-				// DEBUG
+                stmt.execute("CREATE TABLE " + getTransactionTableName() + " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL,"
+                        + "TranId INTEGER NOT NULL, ReqType SMALLINT, TempFile VARCHAR(512), VirtualPath VARCHAR(512), QueuedAt TIMESTAMP,"
+                        + "PRIMARY KEY (FileId,StreamId,TranId))");
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getFileSysTableName());
-			}
+                stmt.close();
 
-			// Check if the file streams table should be created
+                // DEBUG
 
-			if ( isNTFSEnabled() && foundStream == false && getStreamsTableName() != null) {
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getTransactionTableName());
+                }
+            }
 
-				// Create the file streams table
+            // Check if the file data table should be created
 
-				Statement stmt = conn.createStatement();
+            if (isDataEnabled() && foundData == false && hasDataTableName()) {
 
-				stmt.execute("CREATE TABLE "
-								+ getStreamsTableName()
-								+ " (StreamId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, FileId INTEGER NOT NULL, StreamName VARCHAR(255) NOT NULL, StreamSize INTEGER,"
-								+ "CreateDate TIMESTAMP, ModifyDate TIMESTAMP, AccessDate TIMESTAMP)");
+                // Create the file data table
 
-				// Create various indexes
+                final Statement stmt = conn.createStatement();
 
-				stmt.execute("CREATE INDEX IFileId ON " + getStreamsTableName() + "(FileId)");
+                stmt.execute("CREATE TABLE " + getDataTableName()
+                        + " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, FragNo INTEGER, FragLen INTEGER, Data BLOB (512K), JarFile CHAR DEFAULT '0', JarId INTEGER)");
 
-				stmt.close();
+                stmt.execute("CREATE INDEX IDataFileStreamId ON " + getDataTableName() + "(FileId,StreamId)");
+                stmt.execute("CREATE INDEX IDataFileId ON " + getDataTableName() + "(FileId)");
+                stmt.execute("CREATE INDEX IDataFileIdFrag ON " + getDataTableName() + "(FileId,FragNo)");
 
-				// DEBUG
+                stmt.close();
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getStreamsTableName());
-			}
+                // DEBUG
 
-			// Check if the retention table should be created
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getDataTableName());
+                }
+            }
 
-			if ( isRetentionEnabled() && foundRetain == false && getRetentionTableName() != null) {
+            // Check if the Jar file data table should be created
 
-				// Create the retention period data table
+            if (isJarDataEnabled() && foundJarData == false && hasJarDataTableName()) {
 
-				Statement stmt = conn.createStatement();
+                // Create the Jar file data table
 
-				stmt.execute("CREATE TABLE " + getRetentionTableName() + " (FileId INTEGER NOT NULL PRIMARY KEY,"
-						+ "StartDate TIMESTAMP, EndDate TIMESTAMP, PurgeFlag CHAR DEFAULT '0')");
-				stmt.close();
+                final Statement stmt = conn.createStatement();
 
-				// DEBUG
+                stmt.execute("CREATE TABLE " + getJarDataTableName() + " (JarId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, Data BLOB (512K))");
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getRetentionTableName());
-			}
+                stmt.close();
 
-			// Check if the file loader queue table should be created
+                // DEBUG
 
-			if ( isQueueEnabled() && foundQueue == false && getQueueTableName() != null) {
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getJarDataTableName());
+                }
+            }
 
-				// Create the request queue data table
+            // Check if the file id/object id mapping table should be created
 
-				Statement stmt = conn.createStatement();
+            if (isObjectIdEnabled() && foundObjId == false && hasObjectIdTableName()) {
 
-				stmt.execute("CREATE TABLE "
-								+ getQueueTableName()
-								+ " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, ReqType SMALLINT,"
-								+ "SeqNo INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, TempFile VARCHAR(512), VirtualPath VARCHAR(512), QueuedAt TIMESTAMP)");
+                // Create the file id/object id mapping table
 
-				stmt.execute("CREATE INDEX IQFileId ON " + getQueueTableName() + "(FileId)");
-				stmt.execute("CREATE INDEX IQFileIdType ON " + getQueueTableName() + "(FileId, ReqType)");
+                final Statement stmt = conn.createStatement();
 
-				stmt.close();
+                stmt.execute("CREATE TABLE " + getObjectIdTableName()
+                        + " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, ObjectId VARCHAR(128), PRIMARY KEY (FileId,StreamId))");
 
-				// DEBUG
+                stmt.close();
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getQueueTableName());
-			}
+                // DEBUG
 
-			// Check if the file loader transaction queue table should be created
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created table " + getObjectIdTableName());
+                }
+            }
+        } catch (final Exception ex) {
+            Debug.println("[Derby] Error: " + ex.toString());
+        } finally {
 
-			if ( isQueueEnabled() && foundTrans == false && getTransactionTableName() != null) {
+            // Release the database connection
 
-				// Create the transaction request queue data table
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-				Statement stmt = conn.createStatement();
+    /**
+     * Check if a file/folder exists
+     *
+     * @param dirId
+     *            int
+     * @param fname
+     *            String
+     * @return FileStatus.NotExist, FileStatus.FileExists or FileStatus.DirectoryExists
+     * @throws DBException
+     */
+    @Override
+    public int fileExists(final int dirId, final String fname) throws DBException {
 
-				stmt.execute("CREATE TABLE "
-								+ getTransactionTableName()
-								+ " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL,"
-								+ "TranId INTEGER NOT NULL, ReqType SMALLINT, TempFile VARCHAR(512), VirtualPath VARCHAR(512), QueuedAt TIMESTAMP,"
-								+ "PRIMARY KEY (FileId,StreamId,TranId))");
+        // Check if the file exists, and whether it is a file or folder
 
-				stmt.close();
+        int sts = FileStatus.NotExist;
 
-				// DEBUG
+        Connection conn = null;
+        Statement stmt = null;
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getTransactionTableName());
-			}
+        try {
 
-			// Check if the file data table should be created
+            // Get a connection to the database, create a statement for the database lookup
 
-			if ( isDataEnabled() && foundData == false && hasDataTableName()) {
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-				// Create the file data table
+            final String sql = "SELECT FileName,DirectoryFile FROM " + getFileSysTableName() + " WHERE DirId = " + dirId + " AND FileName = '"
+                    + checkNameForSpecialChars(fname) + "'";
 
-				Statement stmt = conn.createStatement();
+            // DEBUG
 
-				stmt.execute("CREATE TABLE "
-								+ getDataTableName()
-								+ " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, FragNo INTEGER, FragLen INTEGER, Data BLOB (512K), JarFile CHAR DEFAULT '0', JarId INTEGER)");
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] File exists SQL: " + sql);
+            }
 
-				stmt.execute("CREATE INDEX IDataFileStreamId ON " + getDataTableName() + "(FileId,StreamId)");
-				stmt.execute("CREATE INDEX IDataFileId ON " + getDataTableName() + "(FileId)");
-				stmt.execute("CREATE INDEX IDataFileIdFrag ON " + getDataTableName() + "(FileId,FragNo)");
+            // Search for the file/folder
 
-				stmt.close();
+            final ResultSet rs = stmt.executeQuery(sql);
 
-				// DEBUG
+            // Check if a file record exists
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getDataTableName());
-			}
+            if (rs.next()) {
 
-			// Check if the Jar file data table should be created
+                // Check if the record is for a file or folder
 
-			if ( isJarDataEnabled() && foundJarData == false && hasJarDataTableName()) {
+                if (rs.getBoolean("DirectoryFile") == true) {
+                    sts = FileStatus.DirectoryExists;
+                } else {
+                    sts = FileStatus.FileExists;
+                }
+            }
 
-				// Create the Jar file data table
+            // Close the result set
 
-				Statement stmt = conn.createStatement();
+            rs.close();
+        } catch (final Exception ex) {
 
-				stmt.execute("CREATE TABLE " + getJarDataTableName()
-						+ " (JarId INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY, Data BLOB (512K))");
+            // DEBUG
 
-				stmt.close();
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] File exists error " + ex.getMessage());
+            }
 
-				// DEBUG
+            // Rethrow the exception
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getJarDataTableName());
-			}
+            throw new DBException(ex.toString());
+        } finally {
 
-			// Check if the file id/object id mapping table should be created
+            // Close the statement
 
-			if ( isObjectIdEnabled() && foundObjId == false && hasObjectIdTableName()) {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-				// Create the file id/object id mapping table
+            // Release the database connection
 
-				Statement stmt = conn.createStatement();
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-				stmt.execute("CREATE TABLE " + getObjectIdTableName()
-						+ " (FileId INTEGER NOT NULL, StreamId INTEGER NOT NULL, ObjectId VARCHAR(128), PRIMARY KEY (FileId,StreamId))");
+        // Return the status
 
-				stmt.close();
+        return sts;
+    }
 
-				// DEBUG
+    /**
+     * Create a file record for a new file or folder
+     *
+     * @param fname
+     *            String
+     * @param dirId
+     *            int
+     * @param params
+     *            FileOpenParams
+     * @param retain
+     *            boolean
+     * @return int
+     * @exception DBException
+     * @exception FileExistsException
+     */
+    @Override
+    public int createFileRecord(final String fname, final int dirId, final FileOpenParams params, final boolean retain)
+            throws DBException, FileExistsException {
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created table " + getObjectIdTableName());
-			}
-		}
-		catch (Exception ex) {
-			Debug.println("[Derby] Error: " + ex.toString());
-		}
-		finally {
+        // Create a new file record for a file/folder and return a unique file id
 
-			// Release the database connection
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        PreparedStatement stmt = null;
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+        int fileId = -1;
 
-	/**
-	 * Check if a file/folder exists
-	 *
-	 * @param dirId int
-	 * @param fname String
-	 * @return FileStatus.NotExist, FileStatus.FileExists or FileStatus.DirectoryExists
-	 * @throws DBException
-	 */
-	public int fileExists(int dirId, String fname)
-		throws DBException {
+        try {
 
-		// Check if the file exists, and whether it is a file or folder
+            // Get a database connection
 
-		int sts = FileStatus.NotExist;
+            conn = getConnection();
 
-		Connection conn = null;
-		Statement stmt = null;
+            // Check if the file already exists in the database
 
-		try {
+            final String qsql = "SELECT FileName FROM " + getFileSysTableName() + " WHERE FileName = ? AND DirId = ?";
 
-			// Get a connection to the database, create a statement for the database lookup
+            stmt = conn.prepareStatement(qsql);
+            stmt.setString(1, fname);
+            stmt.setInt(2, dirId);
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // DEBUG
 
-			String sql = "SELECT FileName,DirectoryFile FROM " + getFileSysTableName() + " WHERE DirId = " + dirId
-					+ " AND FileName = '" + checkNameForSpecialChars(fname) + "'";
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Create file SQL: " + qsql);
+            }
 
-			// DEBUG
+            // Check if the file/folder already exists
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] File exists SQL: " + sql);
+            final ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                throw new FileExistsException();
+            }
+            stmt.close();
 
-			// Search for the file/folder
+            // Check if a file or folder record should be created
 
-			ResultSet rs = stmt.executeQuery(sql);
+            final boolean dirRec = params.isDirectory();
 
-			// Check if a file record exists
+            // Get a statement
 
-			if ( rs.next()) {
+            final Timestamp timeNow = new Timestamp(System.currentTimeMillis());
 
-				// Check if the record is for a file or folder
+            pstmt = conn
+                    .prepareStatement("INSERT INTO " + getFileSysTableName() + "(FileName,CreateDate,ModifyDate,AccessDate,DirId,DirectoryFile,ReadOnlyFile,"
+                            + "ArchivedFile,SystemFile,HiddenFile,FileSize,OwnerGid,OwnerUid,FileMode)" + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+            pstmt.setString(1, fname);
+            pstmt.setTimestamp(2, timeNow);
+            pstmt.setTimestamp(3, timeNow);
+            pstmt.setTimestamp(4, timeNow);
+            pstmt.setInt(5, dirId);
+            pstmt.setBoolean(6, dirRec);
+            pstmt.setBoolean(7, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.ReadOnly));
+            pstmt.setBoolean(8, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Archive));
+            pstmt.setBoolean(9, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.System));
+            pstmt.setBoolean(10, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Hidden));
+            pstmt.setInt(11, 0);
 
-				if ( rs.getBoolean("DirectoryFile") == true)
-					sts = FileStatus.DirectoryExists;
-				else
-					sts = FileStatus.FileExists;
-			}
+            pstmt.setInt(12, params.hasGid() ? params.getGid() : 0);
+            pstmt.setInt(13, params.hasUid() ? params.getUid() : 0);
+            pstmt.setInt(14, params.hasMode() ? params.getMode() : 0);
 
-			// Close the result set
+            // DEBUG
 
-			rs.close();
-		}
-		catch (Exception ex) {
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Create file SQL: " + pstmt.toString());
+            }
 
-			// DEBUG
+            // Create an entry for the new file
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] File exists error " + ex.getMessage());
+            if (pstmt.executeUpdate() > 0) {
 
-			// Rethrow the exception
+                // Get the last insert id
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+                stmt = conn.prepareStatement("SELECT FileId FROM " + getFileSysTableName() + " WHERE FileName = ? AND DirId = ?");
+                stmt.setString(1, fname);
+                stmt.setInt(2, dirId);
 
-			// Close the statement
+                final ResultSet rs2 = stmt.executeQuery();
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                if (rs2.next()) {
+                    fileId = rs2.getInt(1);
+                }
 
-			// Release the database connection
+                // Check if the returned file id is valid
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                if (fileId == -1) {
+                    throw new DBException("Failed to get file id for " + fname);
+                }
 
-		// Return the status
+                // If retention is enabled then create a retention record for the new file/folder
 
-		return sts;
-	}
+                if (retain == true && isRetentionEnabled()) {
 
-	/**
-	 * Create a file record for a new file or folder
-	 *
-	 * @param fname String
-	 * @param dirId int
-	 * @param params FileOpenParams
-	 * @param retain boolean
-	 * @return int
-	 * @exception DBException
-	 * @exception FileExistsException
-	 */
-	public int createFileRecord(String fname, int dirId, FileOpenParams params, boolean retain)
-		throws DBException, FileExistsException {
+                    // Create a retention record for the new file/directory
 
-		// Create a new file record for a file/folder and return a unique file id
+                    final Timestamp startDate = new Timestamp(System.currentTimeMillis());
+                    final Timestamp endDate = new Timestamp(startDate.getTime() + getRetentionPeriod());
 
-		Connection conn = null;
-		PreparedStatement pstmt = null;
-		PreparedStatement stmt = null;
+                    final String rSql = "INSERT INTO " + getRetentionTableName() + " (FileId,StartDate,EndDate) VALUES (" + fileId + ",'" + startDate.toString()
+                            + "','" + endDate.toString() + "')";
 
-		int fileId = -1;
+                    // DEBUG
 
-		try {
+                    if (Debug.EnableInfo && hasSQLDebug()) {
+                        Debug.println("[Derby] Add retention record SQL: " + rSql);
+                    }
 
-			// Get a database connection
+                    // Add the retention record for the file/folder
 
-			conn = getConnection();
+                    stmt.executeUpdate(rSql);
+                }
 
-			// Check if the file already exists in the database
+                // DEBUG
 
-			String qsql = "SELECT FileName FROM " + getFileSysTableName() + " WHERE FileName = ? AND DirId = ?";
+                if (Debug.EnableInfo && hasDebug()) {
+                    Debug.println("[Derby] Created file name=" + fname + ", dirId=" + dirId + ", fileId=" + fileId);
+                }
+            }
+        } catch (final Exception ex) {
 
-			stmt = conn.prepareStatement( qsql);
-			stmt.setString( 1, fname);
-			stmt.setInt( 2, dirId);
+            // DEBUG
 
-			// DEBUG
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Create file record error " + ex.getMessage());
+            }
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Create file SQL: " + qsql);
+            // Rethrow the exception
 
-			// Check if the file/folder already exists
+            throw new DBException(ex.toString());
+        } finally {
 
-			ResultSet rs = stmt.executeQuery();
-			if ( rs.next())
-				throw new FileExistsException();
-			stmt.close();
+            // Close the prepared statement
 
-			// Check if a file or folder record should be created
+            if (pstmt != null) {
+                try {
+                    pstmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			boolean dirRec = params.isDirectory();
+            // Close the query statement
 
-			// Get a statement
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			Timestamp timeNow = new Timestamp(System.currentTimeMillis());
+            // Release the database connection
 
-			pstmt = conn.prepareStatement("INSERT INTO " + getFileSysTableName()
-					+ "(FileName,CreateDate,ModifyDate,AccessDate,DirId,DirectoryFile,ReadOnlyFile,"
-					+ "ArchivedFile,SystemFile,HiddenFile,FileSize,OwnerGid,OwnerUid,FileMode)"
-					+ " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-			pstmt.setString(1, fname);
-			pstmt.setTimestamp(2, timeNow);
-			pstmt.setTimestamp(3, timeNow);
-			pstmt.setTimestamp(4, timeNow);
-			pstmt.setInt(5, dirId);
-			pstmt.setBoolean(6, dirRec);
-			pstmt.setBoolean(7, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.ReadOnly));
-			pstmt.setBoolean(8, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Archive));
-			pstmt.setBoolean(9, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.System));
-			pstmt.setBoolean(10, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Hidden));
-			pstmt.setInt(11, 0);
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			pstmt.setInt(12, params.hasGid() ? params.getGid() : 0);
-			pstmt.setInt(13, params.hasUid() ? params.getUid() : 0);
-			pstmt.setInt(14, params.hasMode() ? params.getMode() : 0);
+        // Return the allocated file id
 
-			// DEBUG
+        return fileId;
+    }
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Create file SQL: " + pstmt.toString());
+    /**
+     * Create a stream record for a new file stream
+     *
+     * @param sname
+     *            String
+     * @param fid
+     *            int
+     * @return int
+     * @exception DBException
+     */
+    @Override
+    public int createStreamRecord(final String sname, final int fid) throws DBException {
 
-			// Create an entry for the new file
+        // Create a new file stream attached to the specified file
 
-			if ( pstmt.executeUpdate() > 0) {
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        PreparedStatement stmt2 = null;
 
-				// Get the last insert id
+        int streamId = -1;
 
-				stmt = conn.prepareStatement( "SELECT FileId FROM " + getFileSysTableName() + " WHERE FileName = ? AND DirId = ?");
-				stmt.setString( 1, fname);
-				stmt.setInt( 2, dirId);
+        try {
 
-				ResultSet rs2 = stmt.executeQuery();
+            // Get a database connection
 
-				if ( rs2.next())
-					fileId = rs2.getInt(1);
+            conn = getConnection();
 
-				// Check if the returned file id is valid
+            // Get a statement
 
-				if ( fileId == -1)
-					throw new DBException("Failed to get file id for " + fname);
+            final Timestamp timeNow = new Timestamp(System.currentTimeMillis());
 
-				// If retention is enabled then create a retention record for the new file/folder
+            stmt = conn.prepareStatement(
+                    "INSERT INTO " + getStreamsTableName() + "(FileId,StreamName,CreateDate,ModifyDate,AccessDate,StreamSize) VALUES (?,?,?,?,?,?)");
+            stmt.setInt(1, fid);
+            stmt.setString(2, sname);
+            stmt.setTimestamp(3, timeNow);
+            stmt.setTimestamp(4, timeNow);
+            stmt.setTimestamp(5, timeNow);
+            stmt.setInt(6, 0);
 
-				if ( retain == true && isRetentionEnabled()) {
+            // DEBUG
 
-					// Create a retention record for the new file/directory
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Create stream SQL: " + stmt.toString());
+            }
 
-					Timestamp startDate = new Timestamp(System.currentTimeMillis());
-					Timestamp endDate = new Timestamp(startDate.getTime() + getRetentionPeriod());
+            // Create an entry for the new stream
 
-					String rSql = "INSERT INTO " + getRetentionTableName() + " (FileId,StartDate,EndDate) VALUES (" + fileId
-							+ ",'" + startDate.toString() + "','" + endDate.toString() + "')";
+            if (stmt.executeUpdate() > 0) {
 
-					// DEBUG
+                // Get the stream id for the newly created stream
 
-					if ( Debug.EnableInfo && hasSQLDebug())
-						Debug.println("[Derby] Add retention record SQL: " + rSql);
+                stmt2 = conn.prepareStatement("SELECT StreamId FROM " + getStreamsTableName() + " WHERE FileId = ? AND StreamName = ?");
+                stmt2.setInt(1, fid);
+                stmt2.setString(2, sname);
 
-					// Add the retention record for the file/folder
+                final ResultSet rs2 = stmt2.executeQuery();
 
-					stmt.executeUpdate(rSql);
-				}
+                if (rs2.next()) {
+                    streamId = rs2.getInt(1);
+                }
+                rs2.close();
+            }
+        } catch (final Exception ex) {
 
-				// DEBUG
+            // DEBUG
 
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[Derby] Created file name=" + fname + ", dirId=" + dirId + ", fileId=" + fileId);
-			}
-		}
-		catch (Exception ex) {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Create file stream error " + ex.getMessage());
+            }
 
-			// DEBUG
+            // Rethrow the exception
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Create file record error " + ex.getMessage());
+            throw new DBException(ex.toString());
+        } finally {
 
-			// Rethrow the exception
+            // Close the statements
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Close the prepared statement
+            if (stmt2 != null) {
+                try {
+                    stmt2.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			if ( pstmt != null) {
-				try {
-					pstmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Release the database connection
 
-			// Close the query statement
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+        // Return the allocated stream id
 
-			// Release the database connection
+        return streamId;
+    }
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+    /**
+     * Delete a file or folder record
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param markOnly
+     *            boolean
+     * @exception DBException
+     */
+    @Override
+    public void deleteFileRecord(final int dirId, final int fid, final boolean markOnly) throws DBException {
 
-		// Return the allocated file id
+        // Delete a file record from the database, or mark the file record as deleted
 
-		return fileId;
-	}
+        Connection conn = null;
+        Statement stmt = null;
 
-	/**
-	 * Create a stream record for a new file stream
-	 *
-	 * @param sname String
-	 * @param fid int
-	 * @return int
-	 * @exception DBException
-	 */
-	public int createStreamRecord(String sname, int fid)
-		throws DBException {
+        try {
 
-		// Create a new file stream attached to the specified file
+            // Get a connection to the database
 
-		Connection conn = null;
-		PreparedStatement stmt = null;
-		PreparedStatement stmt2 = null;
+            conn = getConnection();
 
-		int streamId = -1;
+            // Delete the file entry from the database
 
-		try {
+            stmt = conn.createStatement();
+            String sql = null;
 
-			// Get a database connection
+            if (markOnly == true) {
+                sql = "UPDATE " + getFileSysTableName() + " SET IsDeleted = 'Y' WHERE FileId = " + fid;
+            } else {
+                sql = "DELETE FROM " + getFileSysTableName() + " WHERE FileId = " + fid;
+            }
 
-			conn = getConnection();
+            // DEBUG
 
-			// Get a statement
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Delete file SQL: " + sql);
+            }
 
-			Timestamp timeNow = new Timestamp(System.currentTimeMillis());
+            // Delete the file/folder, or mark as deleted
 
-			stmt = conn.prepareStatement("INSERT INTO " + getStreamsTableName()
-					+ "(FileId,StreamName,CreateDate,ModifyDate,AccessDate,StreamSize) VALUES (?,?,?,?,?,?)");
-			stmt.setInt(1, fid);
-			stmt.setString(2, sname);
-			stmt.setTimestamp(3, timeNow);
-			stmt.setTimestamp(4, timeNow);
-			stmt.setTimestamp(5, timeNow);
-			stmt.setInt(6, 0);
+            stmt.executeUpdate(sql);
+        } catch (final SQLException ex) {
 
-			// DEBUG
+            // DEBUG
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Create stream SQL: " + stmt.toString());
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Delete file error " + ex.getMessage());
+            }
 
-			// Create an entry for the new stream
+            // Rethrow the exception
 
-			if ( stmt.executeUpdate() > 0) {
+            throw new DBException(ex.toString());
+        } finally {
 
-				// Get the stream id for the newly created stream
+            // Close the statement
 
-				stmt2 = conn.prepareStatement( "SELECT StreamId FROM " + getStreamsTableName() + " WHERE FileId = ? AND StreamName = ?");
-				stmt2.setInt( 1, fid);
-				stmt2.setString( 2, sname);
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-				ResultSet rs2 = stmt2.executeQuery();
+            // Release the database connection
 
-				if ( rs2.next())
-					streamId = rs2.getInt(1);
-				rs2.close();
-			}
-		}
-		catch (Exception ex) {
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			// DEBUG
+    /**
+     * Delete a file stream record
+     *
+     * @param fid
+     *            int
+     * @param stid
+     *            int
+     * @param markOnly
+     *            boolean
+     * @exception DBException
+     */
+    @Override
+    public void deleteStreamRecord(final int fid, final int stid, final boolean markOnly) throws DBException {
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Create file stream error " + ex.getMessage());
+        // Delete a file stream from the database, or mark the stream as deleted
 
-			// Rethrow the exception
+        Connection conn = null;
+        Statement stmt = null;
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+        try {
 
-			// Close the statements
+            // Get a database connection
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            conn = getConnection();
 
-			if ( stmt2 != null) {
-				try {
-					stmt2.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Get a statement
 
-			// Release the database connection
+            stmt = conn.createStatement();
+            final String sql = "DELETE FROM " + getStreamsTableName() + " WHERE FileId = " + fid + " AND StreamId = " + stid;
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+            // DEBUG
 
-		// Return the allocated stream id
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Delete stream SQL: " + sql);
+            }
 
-		return streamId;
-	}
+            // Delete the stream record
 
-	/**
-	 * Delete a file or folder record
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param markOnly boolean
-	 * @exception DBException
-	 */
-	public void deleteFileRecord(int dirId, int fid, boolean markOnly)
-		throws DBException {
+            stmt.executeUpdate(sql);
+        } catch (final Exception ex) {
 
-		// Delete a file record from the database, or mark the file record as deleted
+            // DEBUG
 
-		Connection conn = null;
-		Statement stmt = null;
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Delete stream error: " + ex.getMessage());
+            }
 
-		try {
+            // Rethrow the exception
 
-			// Get a connection to the database
+            throw new DBException(ex.toString());
+        } finally {
 
-			conn = getConnection();
+            // Close the statement
 
-			// Delete the file entry from the database
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			stmt = conn.createStatement();
-			String sql = null;
+            // Release the database connection
 
-			if ( markOnly == true)
-				sql = "UPDATE " + getFileSysTableName() + " SET IsDeleted = 'Y' WHERE FileId = " + fid;
-			else
-				sql = "DELETE FROM " + getFileSysTableName() + " WHERE FileId = " + fid;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			// DEBUG
+    /**
+     * Set file information for a file or folder
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param finfo
+     *            FileInfo
+     * @exception DBException
+     */
+    @Override
+    public void setFileInformation(final int dirId, final int fid, final FileInfo finfo) throws DBException {
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Delete file SQL: " + sql);
+        // Set file information fields
 
-			// Delete the file/folder, or mark as deleted
+        Connection conn = null;
+        Statement stmt = null;
 
-			stmt.executeUpdate(sql);
-		}
-		catch (SQLException ex) {
+        try {
 
-			// DEBUG
+            // Get a connection to the database
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Delete file error " + ex.getMessage());
+            conn = getConnection();
 
-			// Rethrow the exception
+            // Build the SQL statement to update the file information settings
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            final StringBuffer sql = new StringBuffer(256);
+            sql.append("UPDATE ");
+            sql.append(getFileSysTableName());
+            sql.append(" SET ");
 
-			// Close the statement
+            // Check if the file attributes have been updated
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            if (finfo.hasSetFlag(FileInfo.SetAttributes)) {
 
-			// Release the database connection
+                // Update the basic file attributes
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+                sql.append("ReadOnlyFile = ");
+                sql.append(finfo.isReadOnly() ? "'1'" : "'0'");
 
-	/**
-	 * Delete a file stream record
-	 *
-	 * @param fid int
-	 * @param stid int
-	 * @param markOnly boolean
-	 * @exception DBException
-	 */
-	public void deleteStreamRecord(int fid, int stid, boolean markOnly)
-		throws DBException {
+                sql.append(", ArchivedFile =");
+                sql.append(finfo.isArchived() ? "'1'" : "'0'");
 
-		// Delete a file stream from the database, or mark the stream as deleted
+                sql.append(", SystemFile = ");
+                sql.append(finfo.isSystem() ? "'1'" : "'0'");
 
-		Connection conn = null;
-		Statement stmt = null;
+                sql.append(", HiddenFile = ");
+                sql.append(finfo.isHidden() ? "'1'" : "'0'");
+                sql.append(",");
+            }
 
-		try {
+            // Check if the file size should be set
 
-			// Get a database connection
+            if (finfo.hasSetFlag(FileInfo.SetFileSize)) {
 
-			conn = getConnection();
+                // Update the file size
 
-			// Get a statement
+                sql.append("FileSize = ");
+                sql.append(finfo.getSize());
+                sql.append(",");
+            }
 
-			stmt = conn.createStatement();
-			String sql = "DELETE FROM " + getStreamsTableName() + " WHERE FileId = " + fid + " AND StreamId = " + stid;
+            // Merge the group id, user id and mode into the in-memory file information
 
-			// DEBUG
+            if (finfo.hasSetFlag(FileInfo.SetGid)) {
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Delete stream SQL: " + sql);
+                // Update the group id
 
-			// Delete the stream record
+                sql.append("OwnerGid = ");
+                sql.append(finfo.getGid());
+                sql.append(",");
+            }
 
-			stmt.executeUpdate(sql);
-		}
-		catch (Exception ex) {
+            if (finfo.hasSetFlag(FileInfo.SetUid)) {
 
-			// DEBUG
+                // Update the user id
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Delete stream error: " + ex.getMessage());
+                sql.append("OwnerUid = ");
+                sql.append(finfo.getUid());
+                sql.append(",");
+            }
 
-			// Rethrow the exception
+            if (finfo.hasSetFlag(FileInfo.SetMode)) {
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+                // Update the mode
 
-			// Close the statement
+                sql.append("FileMode = ");
+                sql.append(finfo.getMode());
+                sql.append(",");
+            }
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Check if the access date/time has been set
 
-			// Release the database connection
+            if (finfo.hasSetFlag(FileInfo.SetAccessDate)) {
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+                // Add the SQL to update the access date/time
 
-	/**
-	 * Set file information for a file or folder
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param finfo FileInfo
-	 * @exception DBException
-	 */
-	public void setFileInformation(int dirId, int fid, FileInfo finfo)
-		throws DBException {
+                sql.append(" AccessDate = TIMESTAMP('");
+                sql.append(new Timestamp(finfo.getAccessDateTime()));
+                sql.append("'),");
+            }
 
-		// Set file information fields
+            // Check if the modify date/time has been set
 
-		Connection conn = null;
-		Statement stmt = null;
+            if (finfo.hasSetFlag(FileInfo.SetModifyDate)) {
 
-		try {
+                // Add the SQL to update the modify date/time
 
-			// Get a connection to the database
+                sql.append(" ModifyDate = TIMESTAMP('");
+                sql.append(new Timestamp(finfo.getModifyDateTime()));
+                sql.append("'),");
+            }
 
-			conn = getConnection();
+            // Check if the inode change date/time has been set
 
-			// Build the SQL statement to update the file information settings
+            if (finfo.hasSetFlag(FileInfo.SetChangeDate)) {
 
-			StringBuffer sql = new StringBuffer(256);
-			sql.append("UPDATE ");
-			sql.append(getFileSysTableName());
-			sql.append(" SET ");
+                // Add the SQL to update the change date/time
 
-			// Check if the file attributes have been updated
+                sql.append(" ChangeDate = TIMESTAMP('");
+                sql.append(new Timestamp(finfo.getChangeDateTime()));
+                sql.append("')");
+            }
 
-			if ( finfo.hasSetFlag(FileInfo.SetAttributes)) {
+            // Trim any trailing comma
 
-				// Update the basic file attributes
+            if (sql.charAt(sql.length() - 1) == ',') {
+                sql.setLength(sql.length() - 1);
+            }
 
-				sql.append("ReadOnlyFile = ");
-				sql.append(finfo.isReadOnly() ? "'1'" : "'0'");
+            // Complete the SQL request string
 
-				sql.append(", ArchivedFile =");
-				sql.append(finfo.isArchived() ? "'1'" : "'0'");
+            sql.append(" WHERE FileId = ");
+            sql.append(fid);
+            sql.append("");
 
-				sql.append(", SystemFile = ");
-				sql.append(finfo.isSystem() ? "'1'" : "'0'");
+            // DEBUG
 
-				sql.append(", HiddenFile = ");
-				sql.append(finfo.isHidden() ? "'1'" : "'0'");
-				sql.append(",");
-			}
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Set file info SQL: " + sql.toString());
+            }
 
-			// Check if the file size should be set
+            // Create the SQL statement
 
-			if ( finfo.hasSetFlag(FileInfo.SetFileSize)) {
+            stmt = conn.createStatement();
+            stmt.executeUpdate(sql.toString());
+        } catch (final SQLException ex) {
 
-				// Update the file size
+            // DEBUG
 
-				sql.append("FileSize = ");
-				sql.append(finfo.getSize());
-				sql.append(",");
-			}
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Set file information error " + ex.getMessage());
+            }
 
-			// Merge the group id, user id and mode into the in-memory file information
+            // Rethrow the exception
 
-			if ( finfo.hasSetFlag(FileInfo.SetGid)) {
+            throw new DBException(ex.toString());
+        } finally {
 
-				// Update the group id
+            // Close the statement
 
-				sql.append("OwnerGid = ");
-				sql.append(finfo.getGid());
-				sql.append(",");
-			}
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			if ( finfo.hasSetFlag(FileInfo.SetUid)) {
+            // Release the database connection
 
-				// Update the user id
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-				sql.append("OwnerUid = ");
-				sql.append(finfo.getUid());
-				sql.append(",");
-			}
+    /**
+     * Set information for a file stream
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param stid
+     *            int
+     * @param sinfo
+     *            StreamInfo
+     * @exception DBException
+     */
+    @Override
+    public void setStreamInformation(final int dirId, final int fid, final int stid, final StreamInfo sinfo) throws DBException {
 
-			if ( finfo.hasSetFlag(FileInfo.SetMode)) {
+        // Set file stream information fields
 
-				// Update the mode
+        Connection conn = null;
+        Statement stmt = null;
 
-				sql.append("FileMode = ");
-				sql.append(finfo.getMode());
-				sql.append(",");
-			}
+        try {
 
-			// Check if the access date/time has been set
+            // Get a connection to the database
 
-			if ( finfo.hasSetFlag(FileInfo.SetAccessDate)) {
+            conn = getConnection();
 
-				// Add the SQL to update the access date/time
+            // Build the SQL statement to update the file information settings
 
-				sql.append(" AccessDate = TIMESTAMP('");
-				sql.append(new Timestamp(finfo.getAccessDateTime()));
-				sql.append("'),");
-			}
+            final StringBuffer sql = new StringBuffer(256);
+            sql.append("UPDATE ");
+            sql.append(getStreamsTableName());
+            sql.append(" SET ");
 
-			// Check if the modify date/time has been set
+            // Check if the access date/time has been set
 
-			if ( finfo.hasSetFlag(FileInfo.SetModifyDate)) {
+            if (sinfo.hasSetFlag(StreamInfo.SetAccessDate)) {
 
-				// Add the SQL to update the modify date/time
+                // Add the SQL to update the access date/time
 
-				sql.append(" ModifyDate = TIMESTAMP('");
-				sql.append(new Timestamp(finfo.getModifyDateTime()));
-				sql.append("'),");
-			}
+                sql.append(" AccessDate = TIMESTAMP('");
+                sql.append(new Timestamp(sinfo.getAccessDateTime()));
+                sql.append("'),");
+            }
 
-			// Check if the inode change date/time has been set
+            // Check if the modify date/time has been set
 
-			if ( finfo.hasSetFlag(FileInfo.SetChangeDate)) {
+            if (sinfo.hasSetFlag(StreamInfo.SetModifyDate)) {
 
-				// Add the SQL to update the change date/time
+                // Add the SQL to update the modify date/time
 
-				sql.append(" ChangeDate = TIMESTAMP('");
-				sql.append(new Timestamp(finfo.getChangeDateTime()));
-				sql.append("')");
-			}
+                sql.append(" ModifyDate = TIMESTAMP('");
+                sql.append(new Timestamp(sinfo.getModifyDateTime()));
+                sql.append("'),");
+            }
 
-			// Trim any trailing comma
+            // Check if the stream size should be updated
 
-			if ( sql.charAt(sql.length() - 1) == ',')
-				sql.setLength(sql.length() - 1);
+            if (sinfo.hasSetFlag(StreamInfo.SetStreamSize)) {
 
-			// Complete the SQL request string
+                // Update the stream size
 
-			sql.append(" WHERE FileId = ");
-			sql.append(fid);
-			sql.append("");
+                sql.append(" StreamSize = ");
+                sql.append(sinfo.getSize());
+            }
 
-			// DEBUG
+            // Trim any trailing comma
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Set file info SQL: " + sql.toString());
+            if (sql.charAt(sql.length() - 1) == ',') {
+                sql.setLength(sql.length() - 1);
+            }
 
-			// Create the SQL statement
+            // Complete the SQL request string
 
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql.toString());
-		}
-		catch (SQLException ex) {
+            sql.append(" WHERE FileId = ");
+            sql.append(fid);
+            sql.append(" AND StreamId = ");
+            sql.append(stid);
+            sql.append("");
 
-			// DEBUG
+            // DEBUG
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Set file information error " + ex.getMessage());
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Set stream info SQL: " + sql.toString());
+            }
 
-			// Rethrow the exception
+            // Create the SQL statement
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            stmt = conn.createStatement();
+            stmt.executeUpdate(sql.toString());
+        } catch (final SQLException ex) {
 
-			// Close the statement
+            // DEBUG
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Set stream information error " + ex.getMessage());
+            }
 
-			// Release the database connection
+            // Rethrow the exception
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            throw new DBException(ex.toString());
+        } finally {
 
-	/**
-	 * Set information for a file stream
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param stid int
-	 * @param sinfo StreamInfo
-	 * @exception DBException
-	 */
-	public void setStreamInformation(int dirId, int fid, int stid, StreamInfo sinfo)
-		throws DBException {
+            // Close the statement
 
-		// Set file stream information fields
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-		Connection conn = null;
-		Statement stmt = null;
+            // Release the database connection
 
-		try {
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			// Get a connection to the database
+    /**
+     * Get the id for a file/folder, or -1 if the file/folder does not exist.
+     *
+     * @param dirId
+     *            int
+     * @param fname
+     *            String
+     * @param dirOnly
+     *            boolean
+     * @param caseLess
+     *            boolean
+     * @return int
+     * @throws DBException
+     */
+    @Override
+    public int getFileId(final int dirId, String fname, final boolean dirOnly, final boolean caseLess) throws DBException {
 
-			conn = getConnection();
+        // Get the file id for a file/folder
 
-			// Build the SQL statement to update the file information settings
+        int fileId = -1;
 
-			StringBuffer sql = new StringBuffer(256);
-			sql.append("UPDATE ");
-			sql.append(getStreamsTableName());
-			sql.append(" SET ");
+        Connection conn = null;
+        PreparedStatement stmt = null;
 
-			// Check if the access date/time has been set
+        try {
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetAccessDate)) {
+            // Get a connection to the database, create a statement for the database lookup
 
-				// Add the SQL to update the access date/time
+            conn = getConnection();
 
-				sql.append(" AccessDate = TIMESTAMP('");
-				sql.append(new Timestamp(sinfo.getAccessDateTime()));
-				sql.append("'),");
-			}
+            // Build the SQL for the file lookup
 
-			// Check if the modify date/time has been set
+            final StringBuffer sql = new StringBuffer(128);
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetModifyDate)) {
+            sql.append("SELECT FileId FROM ");
+            sql.append(getFileSysTableName());
+            sql.append(" WHERE DirId = ? AND ");
 
-				// Add the SQL to update the modify date/time
+            // Check if the search is for a directory only
 
-				sql.append(" ModifyDate = TIMESTAMP('");
-				sql.append(new Timestamp(sinfo.getModifyDateTime()));
-				sql.append("'),");
-			}
+            if (dirOnly == true) {
 
-			// Check if the stream size should be updated
+                // Search for a directory record
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetStreamSize)) {
+                sql.append(" DirectoryFile = '1' AND ");
+            }
 
-				// Update the stream size
+            // Check if the file name search should be caseless
 
-				sql.append(" StreamSize = ");
-				sql.append(sinfo.getSize());
-			}
+            if (caseLess == true) {
 
-			// Trim any trailing comma
+                // Perform a caseless search
 
-			if ( sql.charAt(sql.length() - 1) == ',')
-				sql.setLength(sql.length() - 1);
+                sql.append(" UPPER(FileName) = ?");
+                fname = fname.toUpperCase();
+            } else {
 
-			// Complete the SQL request string
+                // Perform a case sensitive search
 
-			sql.append(" WHERE FileId = ");
-			sql.append(fid);
-			sql.append(" AND StreamId = ");
-			sql.append(stid);
-			sql.append("");
+                sql.append(" FileName = ?");
+            }
 
-			// DEBUG
+            // DEBUG
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Set stream info SQL: " + sql.toString());
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Get file id SQL: " + sql.toString());
+            }
 
-			// Create the SQL statement
+            // Use a prepared statement
 
-			stmt = conn.createStatement();
-			stmt.executeUpdate(sql.toString());
-		}
-		catch (SQLException ex) {
+            stmt = conn.prepareStatement(sql.toString());
+            stmt.setInt(1, dirId);
+            stmt.setString(2, fname);
 
-			// DEBUG
+            // Run the database search
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Set stream information error " + ex.getMessage());
+            final ResultSet rs = stmt.executeQuery();
 
-			// Rethrow the exception
+            // Check if a file record exists
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            if (rs.next()) {
 
-			// Close the statement
+                // Get the unique file id for the file or folder
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                fileId = rs.getInt("FileId");
+            }
 
-			// Release the database connection
+            // Close the result set
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            rs.close();
+        } catch (final Exception ex) {
 
-	/**
-	 * Get the id for a file/folder, or -1 if the file/folder does not exist.
-	 *
-	 * @param dirId int
-	 * @param fname String
-	 * @param dirOnly boolean
-	 * @param caseLess boolean
-	 * @return int
-	 * @throws DBException
-	 */
-	public int getFileId(int dirId, String fname, boolean dirOnly, boolean caseLess)
-		throws DBException {
+            // DEBUG
 
-		// Get the file id for a file/folder
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get file id error " + ex.getMessage());
+            }
 
-		int fileId = -1;
+            // Rethrow the exception
 
-		Connection conn = null;
-		PreparedStatement stmt = null;
+            throw new DBException(ex.toString());
+        } finally {
 
-		try {
+            // Close the statement
 
-			// Get a connection to the database, create a statement for the database lookup
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			conn = getConnection();
+            // Release the database connection
 
-			// Build the SQL for the file lookup
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			StringBuffer sql = new StringBuffer(128);
+        // Return the file id, or -1 if not found
 
-			sql.append("SELECT FileId FROM ");
-			sql.append(getFileSysTableName());
-			sql.append(" WHERE DirId = ? AND ");
+        return fileId;
+    }
 
-			// Check if the search is for a directory only
+    /**
+     * Get information for a file or folder
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param infoLevel
+     *            int
+     * @return FileInfo
+     * @exception DBException
+     */
+    @Override
+    public DBFileInfo getFileInformation(final int dirId, final int fid, final int infoLevel) throws DBException {
 
-			if ( dirOnly == true) {
+        // Create a SQL select for the required file information
 
-				// Search for a directory record
+        final StringBuffer sql = new StringBuffer(128);
 
-				sql.append(" DirectoryFile = '1' AND ");
-			}
+        sql.append("SELECT ");
 
-			// Check if the file name search should be caseless
+        // Select fields according to the required information level
 
-			if ( caseLess == true) {
+        switch (infoLevel) {
 
-				// Perform a caseless search
+            // File name only
 
-				sql.append(" UPPER(FileName) = ?");
-				fname = fname.toUpperCase();
-			}
-			else {
+            case DBInterface.FileNameOnly:
+                sql.append("FileName");
+                break;
 
-				// Perform a case sensitive search
+            // File ids and name
 
-				sql.append(" FileName = ?");
-			}
+            case DBInterface.FileIds:
+                sql.append("FileName,FileId,DirId");
+                break;
 
-			// DEBUG
+            // All file information
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Get file id SQL: " + sql.toString());
+            case DBInterface.FileAll:
+                sql.append("*");
+                break;
 
-			// Use a prepared statement
+            // Unknown information level
 
-			stmt = conn.prepareStatement( sql.toString());
-			stmt.setInt(1, dirId);
-			stmt.setString(2, fname);
+            default:
+                throw new DBException("Invalid information level, " + infoLevel);
+        }
 
-			// Run the database search
+        sql.append(" FROM ");
+        sql.append(getFileSysTableName());
+        sql.append(" WHERE FileId = ");
+        sql.append(fid);
 
-			ResultSet rs = stmt.executeQuery();
+        // DEBUG
 
-			// Check if a file record exists
+        if (Debug.EnableInfo && hasSQLDebug()) {
+            Debug.println("[Derby] Get file info SQL: " + sql.toString());
+        }
 
-			if ( rs.next()) {
+        // Load the file record
 
-				// Get the unique file id for the file or folder
+        Connection conn = null;
+        Statement stmt = null;
 
-				fileId = rs.getInt("FileId");
-			}
+        DBFileInfo finfo = null;
 
-			// Close the result set
+        try {
 
-			rs.close();
-		}
-		catch (Exception ex) {
+            // Get a connection to the database
 
-			// DEBUG
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get file id error " + ex.getMessage());
+            // Load the file record
 
-			// Rethrow the exception
+            final ResultSet rs = stmt.executeQuery(sql.toString());
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            if (rs != null && rs.next()) {
 
-			// Close the statement
+                // Create the file informaiton object
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                finfo = new DBFileInfo();
+                finfo.setFileId(fid);
 
-			// Release the database connection
+                // Load the file information
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                switch (infoLevel) {
 
-		// Return the file id, or -1 if not found
+                    // File name only
 
-		return fileId;
-	}
+                    case DBInterface.FileNameOnly:
+                        finfo.setFileName(rs.getString("FileName"));
+                        break;
 
-	/**
-	 * Get information for a file or folder
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param infoLevel int
-	 * @return FileInfo
-	 * @exception DBException
-	 */
-	public DBFileInfo getFileInformation(int dirId, int fid, int infoLevel)
-		throws DBException {
+                    // File ids and name
 
-		// Create a SQL select for the required file information
+                    case DBInterface.FileIds:
+                        finfo.setFileName(rs.getString("FileName"));
+                        finfo.setDirectoryId(rs.getInt("DirId"));
+                        break;
 
-		StringBuffer sql = new StringBuffer(128);
+                    // All file information
 
-		sql.append("SELECT ");
+                    case DBInterface.FileAll:
+                        finfo.setFileName(rs.getString("FileName"));
+                        finfo.setSize(rs.getLong("FileSize"));
+                        finfo.setAllocationSize(finfo.getSize());
+                        finfo.setDirectoryId(rs.getInt("DirId"));
 
-		// Select fields according to the required information level
+                        // Load the various file date/times
 
-		switch (infoLevel) {
+                        Timestamp ts = rs.getTimestamp("CreateDate");
+                        finfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
 
-			// File name only
+                        ts = rs.getTimestamp("ModifyDate");
+                        finfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
 
-			case DBInterface.FileNameOnly:
-				sql.append("FileName");
-				break;
+                        ts = rs.getTimestamp("AccessDate");
+                        finfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
 
-			// File ids and name
+                        ts = rs.getTimestamp("ChangeDate");
+                        finfo.setChangeDateTime(ts != null ? ts.getTime() : 0L);
 
-			case DBInterface.FileIds:
-				sql.append("FileName,FileId,DirId");
-				break;
+                        // Build the file attributes flags
 
-			// All file information
+                        int attr = 0;
 
-			case DBInterface.FileAll:
-				sql.append("*");
-				break;
+                        if (rs.getBoolean("ReadOnlyFile") == true) {
+                            attr += FileAttribute.ReadOnly;
+                        }
 
-			// Unknown information level
+                        if (rs.getBoolean("SystemFile") == true) {
+                            attr += FileAttribute.System;
+                        }
 
-			default:
-				throw new DBException("Invalid information level, " + infoLevel);
-		}
+                        if (rs.getBoolean("HiddenFile") == true) {
+                            attr += FileAttribute.Hidden;
+                        }
 
-		sql.append(" FROM ");
-		sql.append(getFileSysTableName());
-		sql.append(" WHERE FileId = ");
-		sql.append(fid);
+                        if (rs.getBoolean("DirectoryFile") == true) {
+                            attr += FileAttribute.Directory;
+                        }
 
-		// DEBUG
+                        if (rs.getBoolean("ArchivedFile") == true) {
+                            attr += FileAttribute.Archive;
+                        }
 
-		if ( Debug.EnableInfo && hasSQLDebug())
-			Debug.println("[Derby] Get file info SQL: " + sql.toString());
+                        finfo.setFileAttributes(attr);
 
-		// Load the file record
+                        // Get the group/owner id
 
-		Connection conn = null;
-		Statement stmt = null;
+                        finfo.setGid(rs.getInt("OwnerGid"));
+                        finfo.setUid(rs.getInt("OwnerUid"));
 
-		DBFileInfo finfo = null;
+                        finfo.setMode(rs.getInt("FileMode"));
+                        break;
+                }
+            }
+        } catch (final Exception ex) {
 
-		try {
+            // DEBUG
 
-			// Get a connection to the database
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get file information error " + ex.getMessage());
+            }
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // Rethrow the exception
 
-			// Load the file record
+            throw new DBException(ex.toString());
+        } finally {
 
-			ResultSet rs = stmt.executeQuery(sql.toString());
+            // Close the statement
 
-			if ( rs != null && rs.next()) {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-				// Create the file informaiton object
+            // Release the database connection
 
-				finfo = new DBFileInfo();
-				finfo.setFileId(fid);
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-				// Load the file information
+        // Return the file information
 
-				switch (infoLevel) {
+        return finfo;
+    }
 
-					// File name only
+    /**
+     * Get information for a file stream
+     *
+     * @param fid
+     *            int
+     * @param stid
+     *            int
+     * @param infoLevel
+     *            int
+     * @return StreamInfo
+     * @exception DBException
+     */
+    @Override
+    public StreamInfo getStreamInformation(final int fid, final int stid, final int infoLevel) throws DBException {
 
-					case DBInterface.FileNameOnly:
-						finfo.setFileName(rs.getString("FileName"));
-						break;
+        // Create a SQL select for the required stream information
 
-					// File ids and name
+        final StringBuffer sql = new StringBuffer(128);
 
-					case DBInterface.FileIds:
-						finfo.setFileName(rs.getString("FileName"));
-						finfo.setDirectoryId(rs.getInt("DirId"));
-						break;
+        sql.append("SELECT ");
 
-					// All file information
+        // Select fields according to the required information level
 
-					case DBInterface.FileAll:
-						finfo.setFileName(rs.getString("FileName"));
-						finfo.setSize(rs.getLong("FileSize"));
-						finfo.setAllocationSize(finfo.getSize());
-						finfo.setDirectoryId(rs.getInt("DirId"));
+        switch (infoLevel) {
 
-						// Load the various file date/times
+            // Stream name only.
+            //
+            // Also used if ids are requested as we already have the ids
 
-						Timestamp ts = rs.getTimestamp("CreateDate");
-						finfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
+            case DBInterface.StreamNameOnly:
+            case DBInterface.StreamIds:
+                sql.append("StreamName");
+                break;
 
-						ts = rs.getTimestamp("ModifyDate");
-						finfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
+            // All file information
 
-						ts = rs.getTimestamp("AccessDate");
-						finfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
+            case DBInterface.StreamAll:
+                sql.append("*");
+                break;
 
-						ts = rs.getTimestamp("ChangeDate");
-						finfo.setChangeDateTime(ts != null ? ts.getTime() : 0L);
+            // Unknown information level
 
-						// Build the file attributes flags
+            default:
+                throw new DBException("Invalid information level, " + infoLevel);
+        }
 
-						int attr = 0;
+        sql.append(" FROM ");
+        sql.append(getStreamsTableName());
+        sql.append(" WHERE FileId = ");
+        sql.append(fid);
+        sql.append(" AND StreamId = ");
+        sql.append(stid);
 
-						if ( rs.getBoolean("ReadOnlyFile") == true)
-							attr += FileAttribute.ReadOnly;
+        // DEBUG
 
-						if ( rs.getBoolean("SystemFile") == true)
-							attr += FileAttribute.System;
+        if (Debug.EnableInfo && hasSQLDebug()) {
+            Debug.println("[Derby] Get stream info SQL: " + sql.toString());
+        }
 
-						if ( rs.getBoolean("HiddenFile") == true)
-							attr += FileAttribute.Hidden;
+        // Load the stream record
 
-						if ( rs.getBoolean("DirectoryFile") == true)
-							attr += FileAttribute.Directory;
+        Connection conn = null;
+        Statement stmt = null;
 
-						if ( rs.getBoolean("ArchivedFile") == true)
-							attr += FileAttribute.Archive;
+        StreamInfo sinfo = null;
 
-						finfo.setFileAttributes(attr);
+        try {
 
-						// Get the group/owner id
+            // Get a connection to the database
 
-						finfo.setGid(rs.getInt("OwnerGid"));
-						finfo.setUid(rs.getInt("OwnerUid"));
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-						finfo.setMode(rs.getInt("FileMode"));
-						break;
-				}
-			}
-		}
-		catch (Exception ex) {
+            // Load the stream record
 
-			// DEBUG
+            final ResultSet rs = stmt.executeQuery(sql.toString());
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get file information error " + ex.getMessage());
+            if (rs != null && rs.next()) {
 
-			// Rethrow the exception
+                // Create the stream informaiton object
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+                sinfo = new StreamInfo("", fid, stid);
 
-			// Close the statement
+                // Load the file information
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                switch (infoLevel) {
 
-			// Release the database connection
+                    // Stream name only (or name and ids)
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                    case DBInterface.StreamNameOnly:
+                    case DBInterface.StreamIds:
+                        sinfo.setName(rs.getString("StreamName"));
+                        break;
 
-		// Return the file information
+                    // All stream information
 
-		return finfo;
-	}
+                    case DBInterface.FileAll:
+                        sinfo.setName(rs.getString("StreamName"));
+                        sinfo.setSize(rs.getLong("StreamSize"));
 
-	/**
-	 * Get information for a file stream
-	 *
-	 * @param fid int
-	 * @param stid int
-	 * @param infoLevel int
-	 * @return StreamInfo
-	 * @exception DBException
-	 */
-	public StreamInfo getStreamInformation(int fid, int stid, int infoLevel)
-		throws DBException {
+                        // Load the various file date/times
 
-		// Create a SQL select for the required stream information
+                        Timestamp ts = rs.getTimestamp("CreateDate");
+                        sinfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
 
-		StringBuffer sql = new StringBuffer(128);
+                        ts = rs.getTimestamp("ModifyDate");
+                        sinfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
 
-		sql.append("SELECT ");
+                        ts = rs.getTimestamp("AccessDate");
+                        sinfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
+                        break;
+                }
+            }
+        } catch (final Exception ex) {
 
-		// Select fields according to the required information level
+            // DEBUG
 
-		switch (infoLevel) {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get stream information error " + ex.getMessage());
+            }
 
-			// Stream name only.
-			//
-			// Also used if ids are requested as we already have the ids
+            // Rethrow the exception
 
-			case DBInterface.StreamNameOnly:
-			case DBInterface.StreamIds:
-				sql.append("StreamName");
-				break;
+            throw new DBException(ex.toString());
+        } finally {
 
-			// All file information
+            // Close the statement
 
-			case DBInterface.StreamAll:
-				sql.append("*");
-				break;
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Unknown information level
+            // Release the database connection
 
-			default:
-				throw new DBException("Invalid information level, " + infoLevel);
-		}
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-		sql.append(" FROM ");
-		sql.append(getStreamsTableName());
-		sql.append(" WHERE FileId = ");
-		sql.append(fid);
-		sql.append(" AND StreamId = ");
-		sql.append(stid);
+        // Return the stream information
 
-		// DEBUG
+        return sinfo;
+    }
 
-		if ( Debug.EnableInfo && hasSQLDebug())
-			Debug.println("[Derby] Get stream info SQL: " + sql.toString());
+    /**
+     * Return the list of streams for the specified file
+     *
+     * @param fid
+     *            int
+     * @param infoLevel
+     *            int
+     * @return StreamInfoList
+     * @exception DBException
+     */
+    @Override
+    public StreamInfoList getStreamsList(final int fid, final int infoLevel) throws DBException {
 
-		// Load the stream record
+        // Create a SQL select for the required stream information
 
-		Connection conn = null;
-		Statement stmt = null;
+        final StringBuffer sql = new StringBuffer(128);
 
-		StreamInfo sinfo = null;
+        sql.append("SELECT ");
 
-		try {
+        // Select fields according to the required information level
 
-			// Get a connection to the database
+        switch (infoLevel) {
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // Stream name only.
 
-			// Load the stream record
+            case DBInterface.StreamNameOnly:
+                sql.append("StreamName");
+                break;
 
-			ResultSet rs = stmt.executeQuery(sql.toString());
+            // Stream name and ids
 
-			if ( rs != null && rs.next()) {
+            case DBInterface.StreamIds:
+                sql.append("StreamName,FileId,StreamId");
+                break;
 
-				// Create the stream informaiton object
+            // All file information
 
-				sinfo = new StreamInfo("", fid, stid);
+            case DBInterface.StreamAll:
+                sql.append("*");
+                break;
 
-				// Load the file information
+            // Unknown information level
 
-				switch (infoLevel) {
+            default:
+                throw new DBException("Invalid information level, " + infoLevel);
+        }
 
-					// Stream name only (or name and ids)
+        sql.append(" FROM ");
+        sql.append(getStreamsTableName());
+        sql.append(" WHERE FileId = ");
+        sql.append(fid);
 
-					case DBInterface.StreamNameOnly:
-					case DBInterface.StreamIds:
-						sinfo.setName(rs.getString("StreamName"));
-						break;
+        // DEBUG
 
-					// All stream information
+        if (Debug.EnableInfo && hasSQLDebug()) {
+            Debug.println("[Derby] Get stream list SQL: " + sql.toString());
+        }
 
-					case DBInterface.FileAll:
-						sinfo.setName(rs.getString("StreamName"));
-						sinfo.setSize(rs.getLong("StreamSize"));
+        // Load the stream record
 
-						// Load the various file date/times
+        Connection conn = null;
+        Statement stmt = null;
 
-						Timestamp ts = rs.getTimestamp("CreateDate");
-						sinfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
+        StreamInfoList sList = null;
 
-						ts = rs.getTimestamp("ModifyDate");
-						sinfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
+        try {
 
-						ts = rs.getTimestamp("AccessDate");
-						sinfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
-						break;
-				}
-			}
-		}
-		catch (Exception ex) {
+            // Get a connection to the database
 
-			// DEBUG
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get stream information error " + ex.getMessage());
+            // Load the stream records
 
-			// Rethrow the exception
+            final ResultSet rs = stmt.executeQuery(sql.toString());
+            sList = new StreamInfoList();
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            while (rs.next()) {
 
-			// Close the statement
+                // Create the stream informaiton object
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                final StreamInfo sinfo = new StreamInfo("", fid, -1);
 
-			// Release the database connection
+                // Load the file information
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                switch (infoLevel) {
 
-		// Return the stream information
+                    // Stream name only
 
-		return sinfo;
-	}
+                    case DBInterface.StreamNameOnly:
+                        sinfo.setName(rs.getString("StreamName"));
+                        break;
 
-	/**
-	 * Return the list of streams for the specified file
-	 *
-	 * @param fid int
-	 * @param infoLevel int
-	 * @return StreamInfoList
-	 * @exception DBException
-	 */
-	public StreamInfoList getStreamsList(int fid, int infoLevel)
-		throws DBException {
+                    // Stream name and id
 
-		// Create a SQL select for the required stream information
+                    case DBInterface.StreamIds:
+                        sinfo.setName(rs.getString("StreamName"));
+                        sinfo.setStreamId(rs.getInt("StreamId"));
+                        break;
 
-		StringBuffer sql = new StringBuffer(128);
+                    // All stream information
 
-		sql.append("SELECT ");
+                    case DBInterface.FileAll:
+                        sinfo.setName(rs.getString("StreamName"));
+                        sinfo.setStreamId(rs.getInt("StreamId"));
+                        sinfo.setSize(rs.getLong("StreamSize"));
 
-		// Select fields according to the required information level
+                        // Load the various file date/times
 
-		switch (infoLevel) {
+                        Timestamp ts = rs.getTimestamp("CreateDate");
+                        sinfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
 
-			// Stream name only.
+                        ts = rs.getTimestamp("ModifyDate");
+                        sinfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
 
-			case DBInterface.StreamNameOnly:
-				sql.append("StreamName");
-				break;
+                        ts = rs.getTimestamp("AccessDate");
+                        sinfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
+                        break;
+                }
 
-			// Stream name and ids
+                // Add the stream information to the list
 
-			case DBInterface.StreamIds:
-				sql.append("StreamName,FileId,StreamId");
-				break;
+                sList.addStream(sinfo);
+            }
+        } catch (final Exception ex) {
 
-			// All file information
+            // DEBUG
 
-			case DBInterface.StreamAll:
-				sql.append("*");
-				break;
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get stream list error " + ex.getMessage());
+            }
 
-			// Unknown information level
+            // Rethrow the exception
 
-			default:
-				throw new DBException("Invalid information level, " + infoLevel);
-		}
+            throw new DBException(ex.toString());
+        } finally {
 
-		sql.append(" FROM ");
-		sql.append(getStreamsTableName());
-		sql.append(" WHERE FileId = ");
-		sql.append(fid);
+            // Close the statement
 
-		// DEBUG
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-		if ( Debug.EnableInfo && hasSQLDebug())
-			Debug.println("[Derby] Get stream list SQL: " + sql.toString());
+            // Release the database connection
 
-		// Load the stream record
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-		Connection conn = null;
-		Statement stmt = null;
+        // Return the streams list
 
-		StreamInfoList sList = null;
+        return sList;
+    }
 
-		try {
+    /**
+     * Rename a file or folder, may also change the parent directory.
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param newName
+     *            String
+     * @param newDir
+     *            int
+     * @exception DBException
+     * @exception FileNotFoundException
+     */
+    @Override
+    public void renameFileRecord(final int dirId, final int fid, final String newName, final int newDir) throws DBException, FileNotFoundException {
 
-			// Get a connection to the database
+        // Rename a file/folder
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+        Connection conn = null;
+        PreparedStatement stmt = null;
 
-			// Load the stream records
+        try {
 
-			ResultSet rs = stmt.executeQuery(sql.toString());
-			sList = new StreamInfoList();
+            // Get a connection to the database
 
-			while (rs.next()) {
+            conn = getConnection();
 
-				// Create the stream informaiton object
+            // Update the file record
 
-				StreamInfo sinfo = new StreamInfo("", fid, -1);
+            final String sql = "UPDATE " + getFileSysTableName() + " SET FileName = ?, DirId = ?, ChangeDate = ? WHERE FileId = ?";
 
-				// Load the file information
+            stmt = conn.prepareStatement(sql);
+            stmt.setString(1, newName);
+            stmt.setInt(2, newDir);
+            stmt.setTimestamp(3, new Timestamp(System.currentTimeMillis()));
+            stmt.setInt(4, fid);
 
-				switch (infoLevel) {
+            // DEBUG
 
-					// Stream name only
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Rename SQL: " + sql);
+            }
 
-					case DBInterface.StreamNameOnly:
-						sinfo.setName(rs.getString("StreamName"));
-						break;
+            // Rename the file/folder
 
-					// Stream name and id
+            if (stmt.executeUpdate() == 0) {
 
-					case DBInterface.StreamIds:
-						sinfo.setName(rs.getString("StreamName"));
-						sinfo.setStreamId(rs.getInt("StreamId"));
-						break;
+                // Original file not found
 
-					// All stream information
+                throw new FileNotFoundException("" + fid);
+            }
+        } catch (final SQLException ex) {
 
-					case DBInterface.FileAll:
-						sinfo.setName(rs.getString("StreamName"));
-						sinfo.setStreamId(rs.getInt("StreamId"));
-						sinfo.setSize(rs.getLong("StreamSize"));
+            // DEBUG
 
-						// Load the various file date/times
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Rename file error " + ex.getMessage());
+            }
 
-						Timestamp ts = rs.getTimestamp("CreateDate");
-						sinfo.setCreationDateTime(ts != null ? ts.getTime() : 0L);
+            // Rethrow the exception
 
-						ts = rs.getTimestamp("ModifyDate");
-						sinfo.setModifyDateTime(ts != null ? ts.getTime() : 0L);
+            throw new DBException(ex.toString());
+        } finally {
 
-						ts = rs.getTimestamp("AccessDate");
-						sinfo.setAccessDateTime(ts != null ? ts.getTime() : 0L);
-						break;
-				}
+            // Close the statement
 
-				// Add the stream information to the list
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-				sList.addStream(sinfo);
-			}
-		}
-		catch (Exception ex) {
+            // Release the database connection
 
-			// DEBUG
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get stream list error " + ex.getMessage());
+    /**
+     * Rename a file stream
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @param stid
+     *            int
+     * @param newName
+     *            String
+     * @exception DBException
+     */
+    @Override
+    public void renameStreamRecord(final int dirId, final int fid, final int stid, final String newName) throws DBException {
+        // TODO Auto-generated method stub
 
-			// Rethrow the exception
+    }
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+    /**
+     * Return the retention period expiry date/time for the specified file, or zero if the file/folder is not under retention.
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @return RetentionDetails
+     * @exception DBException
+     */
+    @Override
+    public RetentionDetails getFileRetentionDetails(final int dirId, final int fid) throws DBException {
 
-			// Close the statement
+        // Check if retention is enabled
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+        if (isRetentionEnabled() == false) {
+            return null;
+        }
 
-			// Release the database connection
+        // Get the retention record for the file/folder
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+        Connection conn = null;
+        Statement stmt = null;
 
-		// Return the streams list
+        RetentionDetails retDetails = null;
 
-		return sList;
-	}
+        try {
 
-	/**
-	 * Rename a file or folder, may also change the parent directory.
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param newName String
-	 * @param newDir int
-	 * @exception DBException
-	 * @exception FileNotFoundException
-	 */
-	public void renameFileRecord(int dirId, int fid, String newName, int newDir)
-		throws DBException, FileNotFoundException {
+            // Get a connection to the database
 
-		// Rename a file/folder
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-		Connection conn = null;
-		PreparedStatement stmt = null;
+            // Get the retention record, if any
 
-		try {
+            retDetails = getRetentionExpiryDateTime(conn, stmt, fid);
+        } catch (final SQLException ex) {
 
-			// Get a connection to the database
+            // DEBUG
 
-			conn = getConnection();
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get retention error " + ex.getMessage());
+            }
 
-			// Update the file record
+            // Rethrow the exception
 
-			String sql = "UPDATE " + getFileSysTableName() + " SET FileName = ?, DirId = ?, ChangeDate = ? WHERE FileId = ?";
+            throw new DBException(ex.toString());
+        } finally {
 
-			stmt = conn.prepareStatement( sql);
-			stmt.setString( 1, newName);
-			stmt.setInt( 2, newDir);
-			stmt.setTimestamp( 3, new Timestamp(System.currentTimeMillis()));
-			stmt.setInt( 4, fid);
+            // Close the statement
 
-			// DEBUG
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Rename SQL: " + sql);
+            // Release the database connection
 
-			// Rename the file/folder
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			if ( stmt.executeUpdate() == 0) {
+        // Return the retention details
 
-				// Original file not found
+        return retDetails;
+    }
 
-				throw new FileNotFoundException("" + fid);
-			}
-		}
-		catch (SQLException ex) {
+    /**
+     * Start a directory search
+     *
+     * @param dirId
+     *            int
+     * @param searchPath
+     *            String
+     * @param attrib
+     *            int
+     * @param infoLevel
+     *            int
+     * @param maxRecords
+     *            int
+     * @return DBSearchContext
+     * @exception DBException
+     */
+    @Override
+    public DBSearchContext startSearch(final int dirId, final String searchPath, final int attrib, final int infoLevel, final int maxRecords)
+            throws DBException {
 
-			// DEBUG
+        // Search for files/folders in the specified folder
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Rename file error " + ex.getMessage());
+        final StringBuffer sql = new StringBuffer(128);
+        sql.append("SELECT * FROM ");
+        sql.append(getFileSysTableName());
+        sql.append(" WHERE DirId = ? AND IsDeleted = 'N'");
 
-			// Rethrow the exception
+        // Split the search path
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+        final String[] paths = FileName.splitPath(searchPath);
 
-			// Close the statement
+        // Check if the file name contains wildcard characters
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+        WildCard wildCard = null;
+        String searchStr = null;
 
-			// Release the database connection
+        if (WildCard.containsWildcards(searchPath)) {
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            // For the '*.*' and '*' wildcards the SELECT will already return all files/directories
+            // that are attached to the parent directory. For 'name.*' and '*.ext' type wildcards we can use the LIKE clause
+            // to filter the required records, for more complex wildcards we will post-process the search using the
+            // WildCard class to match the file names.
 
-	/**
-	 * Rename a file stream
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @param stid int
-	 * @param newName String
-	 * @exception DBException
-	 */
-	public void renameStreamRecord(int dirId, int fid, int stid, String newName)
-		throws DBException {
-		// TODO Auto-generated method stub
+            if (searchPath.endsWith("\\*.*") == false && searchPath.endsWith("\\*") == false) {
 
-	}
+                // Use a wildcard match either before or after the search string
 
-	/**
-	 * Return the retention period expiry date/time for the specified file, or zero if the
-	 * file/folder is not under retention.
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @return RetentionDetails
-	 * @exception DBException
-	 */
-	public RetentionDetails getFileRetentionDetails(int dirId, int fid)
-		throws DBException {
+                sql.append(" AND FileName LIKE(?)");
 
-		// Check if retention is enabled
+                // Create a wildcard search pattern
 
-		if ( isRetentionEnabled() == false)
-			return null;
+                wildCard = new WildCard(paths[1], true);
 
-		// Get the retention record for the file/folder
+                // Check for a 'name.*' type wildcard
 
-		Connection conn = null;
-		Statement stmt = null;
+                if (wildCard.isType() == WildCard.WILDCARD_EXT) {
 
-		RetentionDetails retDetails = null;
+                    // Set the search string
 
-		try {
+                    searchStr = wildCard.getMatchPart() + "%";
 
-			// Get a connection to the database
+                    // Clear the wildcard object, we do not want it to filter the search results
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+                    wildCard = null;
+                } else if (wildCard.isType() == WildCard.WILDCARD_NAME) {
 
-			// Get the retention record, if any
+                    // Set the search string
 
-			retDetails = getRetentionExpiryDateTime(conn, stmt, fid);
-		}
-		catch (SQLException ex) {
+                    searchStr = "%" + wildCard.getMatchPart();
 
-			// DEBUG
+                    // Clear the wildcard object, we do not want it to filter the search results
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get retention error " + ex.getMessage());
+                    wildCard = null;
+                }
+            }
+        } else {
 
-			// Rethrow the exception
+            // Search for a specific file/directory
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+            sql.append(" AND FileName = ?");
+            searchStr = paths[1];
+        }
 
-			// Close the statement
+        // Return directories first
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+        sql.append(" ORDER BY DirectoryFile DESC");
 
-			// Release the database connection
+        // Start the search
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+        ResultSet rs = null;
+        Connection conn = null;
+        PreparedStatement stmt = null;
 
-		// Return the retention details
+        try {
 
-		return retDetails;
-	}
+            // Get a connection to the database
 
-	/**
-	 * Start a directory search
-	 *
-	 * @param dirId int
-	 * @param searchPath String
-	 * @param attrib int
-	 * @param infoLevel int
-	 * @param maxRecords int
-	 * @return DBSearchContext
-	 * @exception DBException
-	 */
-	public DBSearchContext startSearch(int dirId, String searchPath, int attrib, int infoLevel, int maxRecords)
-		throws DBException {
+            conn = getConnection();
+            stmt = conn.prepareStatement(sql.toString(), ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
 
-		// Search for files/folders in the specified folder
+            stmt.setInt(1, dirId);
+            if (searchStr != null) {
+                stmt.setString(2, searchStr);
+            }
 
-		StringBuffer sql = new StringBuffer(128);
-		sql.append("SELECT * FROM ");
-		sql.append(getFileSysTableName());
-		sql.append(" WHERE DirId = ? AND IsDeleted = 'N'");
+            // DEBUG
 
-		// Split the search path
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Start search SQL: " + sql.toString());
+            }
 
-		String[] paths = FileName.splitPath(searchPath);
+            // Start the folder search
 
-		// Check if the file name contains wildcard characters
+            rs = stmt.executeQuery();
+        } catch (final Exception ex) {
 
-		WildCard wildCard = null;
-		String searchStr = null;
+            // DEBUG
 
-		if ( WildCard.containsWildcards(searchPath)) {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Start search error " + ex.getMessage());
+            }
 
-			// For the '*.*' and '*' wildcards the SELECT will already return all files/directories
-			// that are attached to the parent directory. For 'name.*' and '*.ext' type wildcards we can use the LIKE clause
-			// to filter the required records, for more complex wildcards we will post-process the search using the
-			// WildCard class to match the file names.
+            // Rethrow the exception
 
-			if ( searchPath.endsWith("\\*.*") == false && searchPath.endsWith("\\*") == false) {
+            throw new DBException(ex.toString());
+        } finally {
 
-				// Use a wildcard match either before or after the search string
+            // Release the database connection
 
-				sql.append(" AND FileName LIKE(?)");
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-				// Create a wildcard search pattern
+        // Create the search context, and return
 
-				wildCard = new WildCard(paths[1], true);
+        return new DerbySearchContext(rs, wildCard);
+    }
 
-				// Check for a 'name.*' type wildcard
+    /**
+     * Return the used file space, or -1 if not supported.
+     *
+     * @return long
+     */
+    @Override
+    public long getUsedFileSpace() {
 
-				if ( wildCard.isType() == WildCard.WILDCARD_EXT) {
+        // Calculate the total used file space
 
-					// Set the search string
+        Connection conn = null;
+        Statement stmt = null;
 
-					searchStr = wildCard.getMatchPart() + "%";
+        long usedSpace = -1L;
 
-					// Clear the wildcard object, we do not want it to filter the search results
+        try {
 
-					wildCard = null;
-				}
-				else if ( wildCard.isType() == WildCard.WILDCARD_NAME) {
+            // Get a database connection and statement
 
-					// Set the search string
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-					searchStr = "%" + wildCard.getMatchPart();
+            final String sql = "SELECT SUM(CAST(FileSize as BIGINT)) FROM " + getFileSysTableName();
 
-					// Clear the wildcard object, we do not want it to filter the search results
+            // DEBUG
 
-					wildCard = null;
-				}
-			}
-		}
-		else {
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Get filespace SQL: " + sql);
+            }
 
-			// Search for a specific file/directory
+            // Calculate the currently used disk space
 
-			sql.append(" AND FileName = ?");
-			searchStr = paths[1];
-		}
+            final ResultSet rs = stmt.executeQuery(sql);
 
-		// Return directories first
+            if (rs.next()) {
+                usedSpace = rs.getLong(1);
+            }
+        } catch (final SQLException ex) {
 
-		sql.append(" ORDER BY DirectoryFile DESC");
+            // DEBUG
 
-		// Start the search
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println("[Derby] Get used file space error " + ex.getMessage());
+            }
+        } finally {
 
-		ResultSet rs = null;
-		Connection conn = null;
-		PreparedStatement stmt = null;
+            // Close the prepared statement
 
-		try {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Get a connection to the database
+            // Release the database connection
 
-			conn = getConnection();
-			stmt = conn.prepareStatement( sql.toString(), ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			stmt.setInt( 1, dirId);
-			if ( searchStr != null)
-				stmt.setString( 2, searchStr);
+        // Return the used file space
 
-			// DEBUG
+        return usedSpace;
+    }
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Start search SQL: " + sql.toString());
+    /**
+     * Shutdown the database interface, release resources.
+     *
+     * @param context
+     *            DBDeviceContext
+     */
+    @Override
+    public void shutdownDatabase(final DBDeviceContext context) {
 
-			// Start the folder search
+        // Call the base class
 
-			rs = stmt.executeQuery();
-		}
-		catch (Exception ex) {
+        super.shutdownDatabase(context);
+    }
 
-			// DEBUG
+    /**
+     * Get the retention expiry date/time for a file/folder
+     *
+     * @param conn
+     *            Connection
+     * @param stmt
+     *            Statement
+     * @param fid
+     *            int
+     * @return RetentionDetails
+     * @exception SQLException
+     */
+    private final RetentionDetails getRetentionExpiryDateTime(final Connection conn, final Statement stmt, final int fid) throws SQLException {
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Start search error " + ex.getMessage());
+        // Get the retention expiry date/time for the specified file/folder
 
-			// Rethrow the exception
+        RetentionDetails retDetails = null;
+        final String sql = "SELECT StartDate,EndDate FROM " + getRetentionTableName() + " WHERE FileId = " + fid;
 
-			throw new DBException(ex.toString());
-		}
-		finally {
+        // DEBUG
 
-			// Release the database connection
+        if (Debug.EnableInfo && hasSQLDebug()) {
+            Debug.println("[Derby] Get retention expiry SQL: " + sql);
+        }
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+        // Get the retention record, if any
 
-		// Create the search context, and return
+        final ResultSet rs = stmt.executeQuery(sql);
 
-		return new DerbySearchContext(rs, wildCard);
-	}
+        if (rs.next()) {
 
-	/**
-	 * Return the used file space, or -1 if not supported.
-	 *
-	 * @return long
-	 */
-	public long getUsedFileSpace() {
+            // Get the retention expiry date
 
-		// Calculate the total used file space
+            final Timestamp startDate = rs.getTimestamp("StartDate");
+            final Timestamp endDate = rs.getTimestamp("EndDate");
 
-		Connection conn = null;
-		Statement stmt = null;
+            retDetails = new RetentionDetails(fid, startDate != null ? startDate.getTime() : -1L, endDate.getTime());
+        }
 
-		long usedSpace = -1L;
+        // Return the retention details
 
-		try {
+        return retDetails;
+    }
 
-			// Get a database connection and statement
+    // ***** DBQueueInteface Methods *****
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+    /**
+     * Queue a file request.
+     *
+     * @param req
+     *            FileRequest
+     * @exception DBException
+     */
+    @Override
+    public void queueFileRequest(final FileRequest req) throws DBException {
 
-			String sql = "SELECT SUM(CAST(FileSize as BIGINT)) FROM " + getFileSysTableName();
+        // Make sure the associated file state stays in memory for a short time, if the queue is
+        // small the request may get processed soon.
 
-			// DEBUG
+        if (req instanceof SingleFileRequest) {
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Get filespace SQL: " + sql);
+            // Get the request details
 
-			// Calculate the currently used disk space
+            final SingleFileRequest fileReq = (SingleFileRequest) req;
 
-			ResultSet rs = stmt.executeQuery(sql);
+            try {
 
-			if ( rs.next())
-				usedSpace = rs.getLong(1);
-		}
-		catch (SQLException ex) {
+                // Check if the file request queue database connection is valid
 
-			// DEBUG
+                if (m_dbConn == null || m_dbConn.isClosed() || m_reqStmt == null || m_reqStmt.getConnection().isClosed()) {
+                    createQueueStatements();
+                }
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println("[Derby] Get used file space error " + ex.getMessage());
-		}
-		finally {
+                // Check if the request is part of a transaction, or a standalone request
 
-			// Close the prepared statement
+                if (fileReq.isTransaction() == false) {
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                    // Write the file request record
 
-			// Release the database connection
+                    int recCnt = 0;
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                    synchronized (m_reqStmt) {
 
-		// Return the used file space
+                        // Write the file request to the queue database
 
-		return usedSpace;
-	}
+                        m_reqStmt.clearParameters();
 
-	/**
-	 * Shutdown the database interface, release resources.
-	 *
-	 * @param context DBDeviceContext
-	 */
-	public void shutdownDatabase(DBDeviceContext context) {
+                        m_reqStmt.setInt(1, fileReq.getFileId());
+                        m_reqStmt.setInt(2, fileReq.getStreamId());
+                        m_reqStmt.setInt(3, fileReq.isType());
+                        m_reqStmt.setString(4, fileReq.getTemporaryFile());
+                        m_reqStmt.setString(5, fileReq.getVirtualPath());
 
-		// Call the base class
+                        recCnt = m_reqStmt.executeUpdate();
 
-		super.shutdownDatabase(context);
-	}
+                        // Retrieve the allocated sequence number
 
-	/**
-	 * Get the retention expiry date/time for a file/folder
-	 *
-	 * @param conn Connection
-	 * @param stmt Statement
-	 * @param fid int
-	 * @return RetentionDetails
-	 * @exception SQLException
-	 */
-	private final RetentionDetails getRetentionExpiryDateTime(Connection conn, Statement stmt, int fid)
-		throws SQLException {
+                        if (recCnt > 0) {
 
-		// Get the retention expiry date/time for the specified file/folder
+                            // Get the last insert id
 
-		RetentionDetails retDetails = null;
-		String sql = "SELECT StartDate,EndDate FROM " + getRetentionTableName() + " WHERE FileId = " + fid;
+                            final Statement stmt = m_dbConn.createStatement();
+                            final ResultSet rs2 = stmt.executeQuery("VALUES IDENTITY_VAL_LOCAL()");
 
-		// DEBUG
+                            if (rs2.next()) {
+                                fileReq.setSequenceNumber(rs2.getInt(1));
+                            }
+                        }
+                    }
+                } else {
 
-		if ( Debug.EnableInfo && hasSQLDebug())
-			Debug.println("[Derby] Get retention expiry SQL: " + sql);
+                    // Check if the transaction prepared statement is valid, we may have lost the
+                    // connection to the database.
 
-		// Get the retention record, if any
+                    if (m_tranStmt == null || m_tranStmt.getConnection().isClosed()) {
+                        createQueueStatements();
+                    }
 
-		ResultSet rs = stmt.executeQuery(sql);
+                    // Write the transaction file request to the database
 
-		if ( rs.next()) {
+                    synchronized (m_tranStmt) {
 
-			// Get the retention expiry date
+                        // Write the request record to the database
 
-			Timestamp startDate = rs.getTimestamp("StartDate");
-			Timestamp endDate = rs.getTimestamp("EndDate");
+                        m_tranStmt.clearParameters();
 
-			retDetails = new RetentionDetails(fid, startDate != null ? startDate.getTime() : -1L, endDate.getTime());
-		}
+                        m_tranStmt.setInt(1, fileReq.getFileId());
+                        m_tranStmt.setInt(2, fileReq.getStreamId());
+                        m_tranStmt.setInt(3, fileReq.isType());
+                        m_tranStmt.setInt(4, fileReq.getTransactionId());
+                        m_tranStmt.setString(5, fileReq.getTemporaryFile());
+                        m_tranStmt.setString(6, fileReq.getVirtualPath());
 
-		// Return the retention details
+                        m_tranStmt.executeUpdate();
+                    }
+                }
+            } catch (final SQLException ex) {
 
-		return retDetails;
-	}
+                // If the request is a save then add to a pending queue to retry when the database
+                // is back online
 
-	/**
-	 * Determine if the specified file/folder is still within an active retention period
-	 *
-	 * @param conn Connection
-	 * @param stmt Statement
-	 * @param fid int
-	 * @return boolean
-	 * @exception SQLException
-	 */
-	private final boolean fileHasActiveRetention(Connection conn, Statement stmt, int fid)
-		throws SQLException {
+                if (fileReq.isType() == FileRequest.SAVE || fileReq.isType() == FileRequest.TRANSSAVE) {
+                    queueOfflineSaveRequest(fileReq);
+                }
 
-		// Check if retention is enabled
+                // DEBUG
 
-		if ( isRetentionEnabled() == false)
-			return false;
+                if (Debug.EnableError && hasDebug()) {
+                    Debug.println(ex);
+                }
 
-		// Check if the file/folder is within the retention period
+                // Rethrow the exception
 
-		RetentionDetails retDetails = getRetentionExpiryDateTime(conn, stmt, fid);
-		if ( retDetails == null)
-			return false;
+                throw new DBException(ex.getMessage());
+            }
+        }
+    }
 
-		// Check if the file/folder is within the retention period
+    /**
+     * Perform a queue cleanup deleting temporary cache files that do not have an associated save or transaction request.
+     *
+     * @param tempDir
+     *            File
+     * @param tempDirPrefix
+     *            String
+     * @param tempFilePrefix
+     *            String
+     * @param jarFilePrefix
+     *            String
+     * @return FileRequestQueue
+     * @throws DBException
+     */
+    @Override
+    public FileRequestQueue performQueueCleanup(final File tempDir, final String tempDirPrefix, final String tempFilePrefix, final String jarFilePrefix)
+            throws DBException {
 
-		return retDetails.isWithinRetentionPeriod(System.currentTimeMillis());
-	}
+        // Get a connection to the database
 
-	// ***** DBQueueInteface Methods *****
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        Statement delStmt = null;
 
-	/**
-	 * Queue a file request.
-	 *
-	 * @param req FileRequest
-	 * @exception DBException
-	 */
-	public void queueFileRequest(FileRequest req)
-		throws DBException {
+        int reqCnt = 0;
 
-		// Make sure the associated file state stays in memory for a short time, if the queue is
-		// small the request may get processed soon.
+        try {
 
-		if ( req instanceof SingleFileRequest) {
+            // Get a connection to the database
 
-			// Get the request details
+            conn = getConnection(DBConnectionPool.PermanentLease);
 
-			SingleFileRequest fileReq = (SingleFileRequest) req;
+            // Delete all load requests from the queue
 
-			try {
+            delStmt = conn.createStatement();
+            delStmt.executeUpdate("DELETE FROM " + getQueueTableName() + " WHERE ReqType = " + FileRequest.LOAD);
 
-				// Check if the file request queue database connection is valid
+            // Create a statement to check if a temporary file is part of a save request
 
-				if ( m_dbConn == null || m_dbConn.isClosed() || m_reqStmt == null || m_reqStmt.getConnection().isClosed())
-					createQueueStatements();
+            stmt = conn.prepareStatement("SELECT FileId,SeqNo FROM " + getQueueTableName() + " WHERE TempFile = ?");
 
-				// Check if the request is part of a transaction, or a standalone request
+            // Scan all files/sub-directories within the temporary area looking for files that have
+            // been saved but not
+            // deleted due to a server shutdown or crash.
 
-				if ( fileReq.isTransaction() == false) {
+            final File[] tempFiles = tempDir.listFiles();
 
-					// Write the file request record
+            if (tempFiles != null && tempFiles.length > 0) {
 
-					int recCnt = 0;
+                // Scan the file loader sub-directories for temporary files
 
-					synchronized (m_reqStmt) {
+                for (int i = 0; i < tempFiles.length; i++) {
 
-						// Write the file request to the queue database
+                    // Get the current file/sub-directory
 
-						m_reqStmt.clearParameters();
+                    final File curFile = tempFiles[i];
 
-						m_reqStmt.setInt(1, fileReq.getFileId());
-						m_reqStmt.setInt(2, fileReq.getStreamId());
-						m_reqStmt.setInt(3, fileReq.isType());
-						m_reqStmt.setString(4, fileReq.getTemporaryFile());
-						m_reqStmt.setString(5, fileReq.getVirtualPath());
+                    if (curFile.isDirectory() && curFile.getName().startsWith(tempDirPrefix)) {
 
-						recCnt = m_reqStmt.executeUpdate();
+                        // Check if the sub-directory has any loader temporary files
 
-						// Retrieve the allocated sequence number
+                        final File[] subFiles = curFile.listFiles();
 
-						if ( recCnt > 0) {
+                        if (subFiles != null && subFiles.length > 0) {
 
-							// Get the last insert id
+                            // Check each file to see if it has a pending save request in the file
+                            // request database
 
-							Statement stmt = m_dbConn.createStatement();
-							ResultSet rs2 = stmt.executeQuery("VALUES IDENTITY_VAL_LOCAL()");
+                            for (int j = 0; j < subFiles.length; j++) {
 
-							if ( rs2.next())
-								fileReq.setSequenceNumber(rs2.getInt(1));
-						}
-					}
-				}
-				else {
+                                // Get the current file from the list
 
-					// Check if the transaction prepared statement is valid, we may have lost the
-					// connection to the database.
+                                final File ldrFile = subFiles[j];
 
-					if ( m_tranStmt == null || m_tranStmt.getConnection().isClosed())
-						createQueueStatements();
+                                if (ldrFile.isFile() && ldrFile.getName().startsWith(tempFilePrefix)) {
 
-					// Write the transaction file request to the database
+                                    try {
 
-					synchronized (m_tranStmt) {
+                                        // Get the file details from the file system table
 
-						// Write the request record to the database
+                                        stmt.clearParameters();
+                                        stmt.setString(1, ldrFile.getAbsolutePath());
 
-						m_tranStmt.clearParameters();
+                                        final ResultSet rs = stmt.executeQuery();
 
-						m_tranStmt.setInt(1, fileReq.getFileId());
-						m_tranStmt.setInt(2, fileReq.getStreamId());
-						m_tranStmt.setInt(3, fileReq.isType());
-						m_tranStmt.setInt(4, fileReq.getTransactionId());
-						m_tranStmt.setString(5, fileReq.getTemporaryFile());
-						m_tranStmt.setString(6, fileReq.getVirtualPath());
+                                        if (rs.next()) {
 
-						m_tranStmt.executeUpdate();
-					}
-				}
-			}
-			catch (SQLException ex) {
+                                            // Update the recovery file count
 
-				// If the request is a save then add to a pending queue to retry when the database
-				// is back online
+                                            reqCnt++;
+                                        } else {
 
-				if ( fileReq.isType() == FileRequest.SAVE || fileReq.isType() == FileRequest.TRANSSAVE)
-					queueOfflineSaveRequest(fileReq);
+                                            // There is no pending save for the temporary file,
+                                            // delete it
 
-				// DEBUG
+                                            ldrFile.delete();
 
-				if ( Debug.EnableError && hasDebug())
-					Debug.println(ex);
+                                            // DEBUG
 
-				// Rethrow the exception
+                                            if (Debug.EnableInfo && hasDebug()) {
+                                                Debug.println("[Derby] Deleted unqueued file " + ldrFile.getName());
+                                            }
+                                        }
+                                    } catch (final SQLException ex) {
+                                        Debug.println(ex);
+                                    }
+                                } else {
 
-				throw new DBException(ex.getMessage());
-			}
-		}
-	}
+                                    // DEBUG
 
-	/**
-	 * Perform a queue cleanup deleting temporary cache files that do not have an associated save or
-	 * transaction request.
-	 *
-	 * @param tempDir File
-	 * @param tempDirPrefix String
-	 * @param tempFilePrefix String
-	 * @param jarFilePrefix String
-	 * @return FileRequestQueue
-	 * @throws DBException
-	 */
-	public FileRequestQueue performQueueCleanup(File tempDir, String tempDirPrefix, String tempFilePrefix, String jarFilePrefix)
-		throws DBException {
+                                    if (Debug.EnableInfo && hasDebug()) {
+                                        Debug.println("[Derby] Deleted temporary file " + ldrFile.getName());
+                                    }
 
-		// Get a connection to the database
+                                    // Delete the temporary file
 
-		Connection conn = null;
-		PreparedStatement stmt = null;
-		Statement delStmt = null;
+                                    ldrFile.delete();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (final SQLException ex) {
 
-		int reqCnt = 0;
+            // DEBUG
 
-		try {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
+        } finally {
 
-			// Get a connection to the database
+            // Close the delete statment
 
-			conn = getConnection(DBConnectionPool.PermanentLease);
+            if (delStmt != null) {
+                try {
+                    delStmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Delete all load requests from the queue
+            // Close the prepared statement
 
-			delStmt = conn.createStatement();
-			delStmt.executeUpdate("DELETE FROM " + getQueueTableName() + " WHERE ReqType = " + FileRequest.LOAD);
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Create a statement to check if a temporary file is part of a save request
+            // Release the database connection
 
-			stmt = conn.prepareStatement("SELECT FileId,SeqNo FROM " + getQueueTableName() + " WHERE TempFile = ?");
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			// Scan all files/sub-directories within the temporary area looking for files that have
-			// been saved but not
-			// deleted due to a server shutdown or crash.
+        // DEBUG
 
-			File[] tempFiles = tempDir.listFiles();
+        if (Debug.EnableInfo && hasDebug()) {
+            Debug.println("[Derby] Cleanup recovered " + reqCnt + " file saves from previous run");
+        }
 
-			if ( tempFiles != null && tempFiles.length > 0) {
+        // Return the recovered file save requests
+        //
+        // TODO: Implement recovery logic
 
-				// Scan the file loader sub-directories for temporary files
+        return null;
+    }
 
-				for (int i = 0; i < tempFiles.length; i++) {
+    /**
+     * Check if the specified temporary file has a queued request.
+     *
+     * @param tempFile
+     *            String
+     * @param lastFile
+     *            boolean
+     * @return boolean
+     * @exception DBException
+     */
+    public boolean hasQueuedRequest(final String tempFile, final boolean lastFile) throws DBException {
 
-					// Get the current file/sub-directory
+        Connection conn = null;
+        Statement stmt = null;
 
-					File curFile = tempFiles[i];
+        boolean queued = false;
 
-					if ( curFile.isDirectory() && curFile.getName().startsWith(tempDirPrefix)) {
+        try {
 
-						// Check if the sub-directory has any loader temporary files
+            // Get a connection to the database
 
-						File[] subFiles = curFile.listFiles();
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-						if ( subFiles != null && subFiles.length > 0) {
+            String sql = "SELECT FileId FROM " + getQueueTableName() + " WHERE TempFile = '" + tempFile + "'";
 
-							// Check each file to see if it has a pending save request in the file
-							// request database
+            // DEBUG
 
-							for (int j = 0; j < subFiles.length; j++) {
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Has queued req SQL: " + sql);
+            }
 
-								// Get the current file from the list
+            // Check if there is a queued request using the temporary file
 
-								File ldrFile = subFiles[j];
+            ResultSet rs = stmt.executeQuery(sql);
+            if (rs.next()) {
+                queued = true;
+            } else {
 
-								if ( ldrFile.isFile() && ldrFile.getName().startsWith(tempFilePrefix)) {
+                // Check if there is a transaction using the temporary file
 
-									try {
+                sql = "SELECT FileId FROM " + getTransactionTableName() + " WHERE TempFile = '" + tempFile + "'";
 
-										// Get the file details from the file system table
+                // DEBUG
 
-										stmt.clearParameters();
-										stmt.setString(1, ldrFile.getAbsolutePath());
+                if (Debug.EnableInfo && hasSQLDebug()) {
+                    Debug.println("[Derby] Has queued req SQL: " + sql);
+                }
 
-										ResultSet rs = stmt.executeQuery();
+                // Check the transaction table
 
-										if ( rs.next()) {
+                rs = stmt.executeQuery(sql);
+                if (rs.next()) {
+                    queued = true;
+                }
+            }
+        } catch (final SQLException ex) {
 
-											// Update the recovery file count
+            // DEBUG
 
-											reqCnt++;
-										}
-										else {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-											// There is no pending save for the temporary file,
-											// delete it
+            // Rethrow the exception
 
-											ldrFile.delete();
+            throw new DBException(ex.getMessage());
+        } finally {
 
-											// DEBUG
+            // Close the statement
 
-											if ( Debug.EnableInfo && hasDebug())
-												Debug.println("[Derby] Deleted unqueued file " + ldrFile.getName());
-										}
-									}
-									catch (SQLException ex) {
-										Debug.println(ex);
-									}
-								}
-								else {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-									// DEBUG
+            // Release the database connection
 
-									if ( Debug.EnableInfo && hasDebug())
-										Debug.println("[Derby] Deleted temporary file " + ldrFile.getName());
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-									// Delete the temporary file
+        // Return the queued status
 
-									ldrFile.delete();
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-		catch (SQLException ex) {
+        return queued;
+    }
 
-			// DEBUG
+    /**
+     * Delete a file request from the pending queue.
+     *
+     * @param fileReq
+     *            FileRequest
+     * @exception DBException
+     */
+    @Override
+    public void deleteFileRequest(final FileRequest fileReq) throws DBException {
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
-		}
-		finally {
+        Connection conn = null;
+        Statement stmt = null;
 
-			// Close the delete statment
+        try {
 
-			if ( delStmt != null) {
-				try {
-					delStmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Get a connection to the database
 
-			// Close the prepared statement
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Delete the file request queue entry from the request table or multiple records from
+            // the
+            // transaction table
 
-			// Release the database connection
+            if (fileReq instanceof SingleFileRequest) {
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                // Get the single file request details
 
-		// DEBUG
+                final SingleFileRequest singleReq = (SingleFileRequest) fileReq;
 
-		if ( Debug.EnableInfo && hasDebug())
-			Debug.println("[Derby] Cleanup recovered " + reqCnt + " file saves from previous run");
+                // Delete the request record
 
-		// Return the recovered file save requests
-		//
-		// TODO: Implement recovery logic
+                stmt.executeUpdate("DELETE FROM " + getQueueTableName() + " WHERE SeqNo = " + singleReq.getSequenceNumber());
+            } else {
 
-		return null;
-	}
+                // Delete the transaction records
 
-	/**
-	 * Check if the specified temporary file has a queued request.
-	 *
-	 * @param tempFile String
-	 * @param lastFile boolean
-	 * @return boolean
-	 * @exception DBException
-	 */
-	public boolean hasQueuedRequest(String tempFile, boolean lastFile)
-		throws DBException {
+                stmt.executeUpdate("DELETE FROM " + getTransactionTableName() + " WHERE TranId = " + fileReq.getTransactionId());
+            }
+        } catch (final SQLException ex) {
 
-		Connection conn = null;
-		Statement stmt = null;
+            // DEBUG
 
-		boolean queued = false;
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-		try {
+            // Rethrow the exception
 
-			// Get a connection to the database
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // Close the statement
 
-			String sql = "SELECT FileId FROM " + getQueueTableName() + " WHERE TempFile = '" + tempFile + "'";
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-			// DEBUG
+            // Release the database connection
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Has queued req SQL: " + sql);
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			// Check if there is a queued request using the temporary file
+    /**
+     * Load a block of file request from the database into the specified queue.
+     *
+     * @param fromSeqNo
+     *            int
+     * @param reqType
+     *            int
+     * @param reqQueue
+     *            FileRequestQueue
+     * @param recLimit
+     *            int
+     * @return int
+     * @exception DBException
+     */
+    @Override
+    public int loadFileRequests(final int fromSeqNo, final int reqType, final FileRequestQueue reqQueue, final int recLimit) throws DBException {
 
-			ResultSet rs = stmt.executeQuery(sql);
-			if ( rs.next())
-				queued = true;
-			else {
+        // Load a block of file requests from the loader queue
 
-				// Check if there is a transaction using the temporary file
+        Connection conn = null;
+        Statement stmt = null;
 
-				sql = "SELECT FileId FROM " + getTransactionTableName() + " WHERE TempFile = '" + tempFile + "'";
+        int recCnt = 0;
 
-				// DEBUG
+        try {
 
-				if ( Debug.EnableInfo && hasSQLDebug())
-					Debug.println("[Derby] Has queued req SQL: " + sql);
+            // Get a connection to the database
 
-				// Check the transaction table
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-				rs = stmt.executeQuery(sql);
-				if ( rs.next())
-					queued = true;
-			}
-		}
-		catch (SQLException ex) {
+            // Build the SQL to load the queue records
 
-			// DEBUG
+            final String sql = "SELECT * FROM " + getQueueTableName() + " WHERE SeqNo > " + fromSeqNo + " AND ReqType = " + reqType + " ORDER BY SeqNo";
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+            // DEBUG
 
-			// Rethrow the exception
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Load file requests - " + sql);
+            }
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            // Get a block of file request records
 
-			// Close the statement
+            final ResultSet rs = stmt.executeQuery(sql);
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+            while (rs.next()) {
 
-			// Release the database connection
+                // Get the file request details
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                final int fid = rs.getInt("FileId");
+                final int stid = rs.getInt("StreamId");
+                final int reqTyp = rs.getInt("ReqType");
+                final int seqNo = rs.getInt("SeqNo");
+                final String tempPath = rs.getString("TempFile");
+                final String virtPath = rs.getString("VirtualPath");
 
-		// Return the queued status
+                // Recreate the file request for the in-memory queue
 
-		return queued;
-	}
+                final SingleFileRequest fileReq = new SingleFileRequest(reqTyp, fid, stid, tempPath, virtPath, seqNo, null);
 
-	/**
-	 * Delete a file request from the pending queue.
-	 *
-	 * @param fileReq FileRequest
-	 * @exception DBException
-	 */
-	public void deleteFileRequest(FileRequest fileReq)
-		throws DBException {
+                // Add the request to the callers queue
 
-		Connection conn = null;
-		Statement stmt = null;
+                reqQueue.addRequest(fileReq);
 
-		try {
+                // Update the count of loaded requests
 
-			// Get a connection to the database
+                recCnt++;
+            }
+        } catch (final SQLException ex) {
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // DEBUG
 
-			// Delete the file request queue entry from the request table or multiple records from
-			// the
-			// transaction table
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			if ( fileReq instanceof SingleFileRequest) {
+            // Rethrow the exception
 
-				// Get the single file request details
+            throw new DBException(ex.getMessage());
+        } finally {
 
-				SingleFileRequest singleReq = (SingleFileRequest) fileReq;
+            // Close the statement
 
-				// Delete the request record
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-				stmt.executeUpdate("DELETE FROM " + getQueueTableName() + " WHERE SeqNo = " + singleReq.getSequenceNumber());
-			}
-			else {
+            // Release the database connection
 
-				// Delete the transaction records
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-				stmt.executeUpdate("DELETE FROM " + getTransactionTableName() + " WHERE TranId = " + fileReq.getTransactionId());
-			}
-		}
-		catch (SQLException ex) {
+        // Return the count of file requests loaded
 
-			// DEBUG
+        return recCnt;
+    }
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+    /**
+     * Load a transaction request from the queue.
+     *
+     * @param tranReq
+     *            MultiplFileRequest
+     * @return MultipleFileRequest
+     * @exception DBException
+     */
+    @Override
+    public MultipleFileRequest loadTransactionRequest(final MultipleFileRequest tranReq) throws DBException {
 
-			// Rethrow the exception
+        // Load a transaction request from the transaction loader queue
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+        Connection conn = null;
+        Statement stmt = null;
 
-			// Close the statement
+        try {
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+            // Get a connection to the database
 
-			// Release the database connection
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            final String sql = "SELECT * FROM " + getTransactionTableName() + " WHERE TranId = " + tranReq.getTransactionId();
 
-	/**
-	 * Load a block of file request from the database into the specified queue.
-	 *
-	 * @param fromSeqNo int
-	 * @param reqType int
-	 * @param reqQueue FileRequestQueue
-	 * @param recLimit int
-	 * @return int
-	 * @exception DBException
-	 */
-	public int loadFileRequests(int fromSeqNo, int reqType, FileRequestQueue reqQueue, int recLimit)
-		throws DBException {
+            // DEBUG
 
-		// Load a block of file requests from the loader queue
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Load trans request - " + sql);
+            }
 
-		Connection conn = null;
-		Statement stmt = null;
+            // Get the block of file request records for the current transaction
 
-		int recCnt = 0;
+            final ResultSet rs = stmt.executeQuery(sql);
 
-		try {
+            while (rs.next()) {
 
-			// Get a connection to the database
+                // Get the file request details
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+                final int fid = rs.getInt("FileId");
+                final int stid = rs.getInt("StreamId");
+                final String tempPath = rs.getString("TempFile");
+                final String virtPath = rs.getString("VirtualPath");
 
-			// Build the SQL to load the queue records
+                // Create the cached file information and add to the request
 
-			String sql = "SELECT * FROM " + getQueueTableName() + " WHERE SeqNo > " + fromSeqNo + " AND ReqType = " + reqType
-					+ " ORDER BY SeqNo";
+                final CachedFileInfo finfo = new CachedFileInfo(fid, stid, tempPath, virtPath);
+                tranReq.addFileInfo(finfo);
+            }
+        } catch (final SQLException ex) {
 
-			// DEBUG
+            // DEBUG
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Load file requests - " + sql);
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			// Get a block of file request records
+            // Rethrow the exception
 
-			ResultSet rs = stmt.executeQuery(sql);
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			while (rs.next()) {
+            // Close the statement
 
-				// Get the file request details
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-				int fid = rs.getInt("FileId");
-				int stid = rs.getInt("StreamId");
-				int reqTyp = rs.getInt("ReqType");
-				int seqNo = rs.getInt("SeqNo");
-				String tempPath = rs.getString("TempFile");
-				String virtPath = rs.getString("VirtualPath");
+            // Release the database connection
 
-				// Recreate the file request for the in-memory queue
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-				SingleFileRequest fileReq = new SingleFileRequest(reqTyp, fid, stid, tempPath, virtPath, seqNo, null);
+        // Return the updated file request
 
-				// Add the request to the callers queue
+        return tranReq;
+    }
 
-				reqQueue.addRequest(fileReq);
+    /**
+     * Create the prepared statements used by the file request queueing database
+     *
+     * @exception SQLException
+     */
+    protected final void createQueueStatements() throws SQLException {
 
-				// Update the count of loaded requests
+        // Check if the database connection is valid
 
-				recCnt++;
-			}
-		}
-		catch (SQLException ex) {
+        if (m_dbConn != null) {
 
-			// DEBUG
+            // Close the existing statements
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+            if (m_reqStmt != null) {
+                m_reqStmt.close();
+            }
 
-			// Rethrow the exception
+            if (m_tranStmt != null) {
+                m_tranStmt.close();
+            }
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            // Release the current database connection
 
-			// Close the statement
+            releaseConnection(m_dbConn);
+            m_dbConn = null;
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+        }
 
-			// Release the database connection
+        if (m_dbConn == null) {
+            m_dbConn = getConnection(DBConnectionPool.PermanentLease);
+        }
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+        // Create the prepared statements for accessing the file request queue database
 
-		// Return the count of file requests loaded
+        m_reqStmt = m_dbConn.prepareStatement("INSERT INTO " + getQueueTableName() + "(FileId,StreamId,ReqType,TempFile,VirtualPath) VALUES (?,?,?,?,?)");
 
-		return recCnt;
-	}
+        // Create the prepared statements for accessing the transaction request queue database
 
-	/**
-	 * Load a transaction request from the queue.
-	 *
-	 * @param tranReq MultiplFileRequest
-	 * @return MultipleFileRequest
-	 * @exception DBException
-	 */
-	public MultipleFileRequest loadTransactionRequest(MultipleFileRequest tranReq)
-		throws DBException {
+        m_tranStmt = m_dbConn
+                .prepareStatement("INSERT INTO " + getTransactionTableName() + "(FileId,StreamId,ReqType,TranId,TempFile,VirtualPath) VALUES (?,?,?,?,?,?)");
+    }
 
-		// Load a transaction request from the transaction loader queue
+    // ***** DBDataInterface Methods *****
 
-		Connection conn = null;
-		Statement stmt = null;
+    /**
+     * Return the file data details for the specified file or stream.
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @return DBDataDetails
+     * @throws DBException
+     */
+    @Override
+    public DBDataDetails getFileDataDetails(final int fileId, final int streamId) throws DBException {
 
-		try {
+        // Load the file details from the data table
 
-			// Get a connection to the database
+        Connection conn = null;
+        Statement stmt = null;
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+        DBDataDetails dbDetails = null;
 
-			String sql = "SELECT * FROM " + getTransactionTableName() + " WHERE TranId = " + tranReq.getTransactionId();
+        try {
 
-			// DEBUG
+            // Get a connection to the database
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Load trans request - " + sql);
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			// Get the block of file request records for the current transaction
+            final String sql = "SELECT * FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId + " AND FragNo = 1";
 
-			ResultSet rs = stmt.executeQuery(sql);
+            // DEBUG
 
-			while (rs.next()) {
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Get file data details SQL: " + sql);
+            }
 
-				// Get the file request details
+            // Load the file details
 
-				int fid = rs.getInt("FileId");
-				int stid = rs.getInt("StreamId");
-				String tempPath = rs.getString("TempFile");
-				String virtPath = rs.getString("VirtualPath");
+            final ResultSet rs = stmt.executeQuery(sql);
 
-				// Create the cached file information and add to the request
+            if (rs.next()) {
 
-				CachedFileInfo finfo = new CachedFileInfo(fid, stid, tempPath, virtPath);
-				tranReq.addFileInfo(finfo);
-			}
-		}
-		catch (SQLException ex) {
+                // Create the file details
 
-			// DEBUG
+                dbDetails = new DBDataDetails(fileId, streamId);
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+                if (rs.getBoolean("JarFile") == true) {
+                    dbDetails.setJarId(rs.getInt("JarId"));
+                }
+            }
 
-			// Rethrow the exception
+            // DEBUG
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            if (Debug.EnableInfo && hasDebug()) {
+                Debug.println("[Derby] Get file data details " + dbDetails);
+            }
+        } catch (final SQLException ex) {
 
-			// Close the statement
+            // DEBUG
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			// Release the database connection
+            // Rethrow the exception
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+            throw new DBException(ex.getMessage());
+        } finally {
 
-		// Return the updated file request
+            // Close the statement
 
-		return tranReq;
-	}
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-	/**
-	 * Create the prepared statements used by the file request queueing database
-	 *
-	 * @exception SQLException
-	 */
-	protected final void createQueueStatements()
-		throws SQLException {
+            // Release the database connection
 
-		// Check if the database connection is valid
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-		if ( m_dbConn != null) {
+        // If the file details are not valid throw an exception
 
-			// Close the existing statements
+        if (dbDetails == null) {
+            throw new DBException("Failed to load file details for " + fileId + ":" + streamId);
+        }
 
-			if ( m_reqStmt != null)
-				m_reqStmt.close();
+        // Return the file data details
 
-			if ( m_tranStmt != null)
-				m_tranStmt.close();
+        return dbDetails;
+    }
 
-			// Release the current database connection
+    /**
+     * Return the maximum data fragment size supported
+     *
+     * @return long
+     */
+    @Override
+    public long getMaximumFragmentSize() {
+        return 20 * MemorySize.MEGABYTE;
+    }
 
-			releaseConnection(m_dbConn);
-			m_dbConn = null;
+    /**
+     * Load file data from the database into a temporary/local file
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @param fileSeg
+     *            FileSegment
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public void loadFileData(final int fileId, final int streamId, final FileSegment fileSeg) throws DBException, IOException {
 
-		}
+        // Open the temporary file
 
-		if ( m_dbConn == null)
-			m_dbConn = getConnection(DBConnectionPool.PermanentLease);
+        final FileOutputStream fileOut = new FileOutputStream(fileSeg.getTemporaryFile());
 
-		// Create the prepared statements for accessing the file request queue database
+        // Update the segment status
 
-		m_reqStmt = m_dbConn.prepareStatement("INSERT INTO " + getQueueTableName()
-				+ "(FileId,StreamId,ReqType,TempFile,VirtualPath) VALUES (?,?,?,?,?)");
+        fileSeg.setStatus(FileSegmentInfo.Loading);
 
-		// Create the prepared statements for accessing the transaction request queue database
+        // DEBUG
 
-		m_tranStmt = m_dbConn.prepareStatement("INSERT INTO " + getTransactionTableName()
-				+ "(FileId,StreamId,ReqType,TranId,TempFile,VirtualPath) VALUES (?,?,?,?,?,?)");
-	}
+        long startTime = 0L;
 
-	// ***** DBDataInterface Methods *****
+        if (Debug.EnableInfo && hasDebug()) {
+            startTime = System.currentTimeMillis();
+        }
 
-	/**
-	 * Return the file data details for the specified file or stream.
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @return DBDataDetails
-	 * @throws DBException
-	 */
-	public DBDataDetails getFileDataDetails(int fileId, int streamId)
-		throws DBException {
+        // Load the file data fragments
 
-		// Load the file details from the data table
+        Connection conn = null;
+        Statement stmt = null;
 
-		Connection conn = null;
-		Statement stmt = null;
+        try {
 
-		DBDataDetails dbDetails = null;
+            // Get a connection to the database, create a statement
 
-		try {
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			// Get a connection to the database
+            final String sql = "SELECT * FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId + " ORDER BY FragNo";
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // DEBUG
 
-			String sql = "SELECT * FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId
-					+ " AND FragNo = 1";
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Load file data SQL: " + sql);
+            }
 
-			// DEBUG
+            // Find the data fragments for the file, check if the file is stored in a Jar
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Get file data details SQL: " + sql);
+            final ResultSet rs = stmt.executeQuery(sql);
 
-			// Load the file details
+            // Load the file data from the main file record(s)
 
-			ResultSet rs = stmt.executeQuery(sql);
+            byte[] inbuf = null;
+            int fragNo = -1;
+            int fragSize = -1;
 
-			if ( rs.next()) {
+            long totLen = 0L;
 
-				// Create the file details
+            while (rs.next()) {
 
-				dbDetails = new DBDataDetails(fileId, streamId);
+                // Access the file data
 
-				if ( rs.getBoolean("JarFile") == true)
-					dbDetails.setJarId(rs.getInt("JarId"));
-			}
+                fragNo = rs.getInt("FragNo");
+                fragSize = rs.getInt("FragLen");
 
-			// DEBUG
+                // We must access the BLOB input stream directly, do not get the Blob and call
+                // getBinaryStream() as it
+                // does not work in Cloudscape/Derby
 
-			if ( Debug.EnableInfo && hasDebug())
-				Debug.println("[Derby] Get file data details " + dbDetails);
-		}
-		catch (SQLException ex) {
+                final InputStream dataFrag = rs.getBinaryStream("Data");
 
-			// DEBUG
+                // Allocate the read buffer, if not already allocated
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+                if (inbuf == null) {
+                    inbuf = new byte[BlobReadBuffer];
+                }
 
-			// Rethrow the exception
+                // Read the data from the database record and write to the output file
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+                int rdLen = dataFrag.read(inbuf);
 
-			// Close the statement
+                while (rdLen > 0) {
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+                    // Write a block of data to the temporary file segment
 
-			// Release the database connection
+                    fileOut.write(inbuf, 0, rdLen);
+                    totLen += rdLen;
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+                    // Read another block of data
 
-		// If the file details are not valid throw an exception
+                    rdLen = dataFrag.read(inbuf);
+                }
 
-		if ( dbDetails == null)
-			throw new DBException("Failed to load file details for " + fileId + ":" + streamId);
+                // Signal to waiting threads that data is available
 
-		// Return the file data details
+                fileSeg.setReadableLength(totLen);
+                fileSeg.signalDataAvailable();
 
-		return dbDetails;
-	}
+                // Renew the lease on the database connection
 
-	/**
-	 * Return the maximum data fragment size supported
-	 *
-	 * @return long
-	 */
-	public long getMaximumFragmentSize() {
-		return 20 * MemorySize.MEGABYTE;
-	}
+                getConnectionPool().renewLease(conn);
+            }
 
-	/**
-	 * Load file data from the database into a temporary/local file
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @param fileSeg FileSegment
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public void loadFileData(int fileId, int streamId, FileSegment fileSeg)
-		throws DBException, IOException {
+            // Close the resultset
 
-		// Open the temporary file
+            rs.close();
 
-		FileOutputStream fileOut = new FileOutputStream(fileSeg.getTemporaryFile());
+            // DEBUG
 
-		// Update the segment status
+            if (Debug.EnableInfo && hasDebug()) {
+                final long endTime = System.currentTimeMillis();
+                Debug.println("[Derby] Loaded fid=" + fileId + ", stream=" + streamId + ", frags=" + fragNo + ", time=" + (endTime - startTime) + "ms");
+            }
+        } catch (final SQLException ex) {
 
-		fileSeg.setStatus(FileSegmentInfo.Loading);
+            // DEBUG
 
-		// DEBUG
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-		long startTime = 0L;
+            // Rethrow the exception
 
-		if ( Debug.EnableInfo && hasDebug())
-			startTime = System.currentTimeMillis();
+            throw new DBException(ex.getMessage());
+        } finally {
 
-		// Load the file data fragments
+            // Check if a statement was allocated
 
-		Connection conn = null;
-		Statement stmt = null;
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-		try {
+            // Release the database connection
 
-			// Get a connection to the database, create a statement
+            if (conn != null) {
+                releaseConnection(conn);
+            }
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            // Close the output file
 
-			String sql = "SELECT * FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId
-					+ " ORDER BY FragNo";
+            if (fileOut != null) {
+                try {
+                    fileOut.close();
+                } catch (final Exception ex) {
+                    Debug.println(ex);
+                }
+            }
+        }
 
-			// DEBUG
+        // Signal that the file data is available
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Load file data SQL: " + sql);
+        fileSeg.signalDataAvailable();
+    }
 
-			// Find the data fragments for the file, check if the file is stored in a Jar
+    /**
+     * Load Jar file data from the database into a temporary file
+     *
+     * @param jarId
+     *            int
+     * @param jarSeg
+     *            FileSegment
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public void loadJarData(final int jarId, final FileSegment jarSeg) throws DBException, IOException {
 
-			ResultSet rs = stmt.executeQuery(sql);
+        // Load the Jar file data
 
-			// Load the file data from the main file record(s)
+        Connection conn = null;
+        Statement stmt = null;
 
-			byte[] inbuf = null;
-			int fragNo = -1;
-			int fragSize = -1;
+        FileOutputStream outJar = null;
 
-			long totLen = 0L;
+        try {
 
-			while (rs.next()) {
+            // Get a connection to the database, create a statement
 
-				// Access the file data
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-				fragNo = rs.getInt("FragNo");
-				fragSize = rs.getInt("FragLen");
+            final String sql = "SELECT * FROM " + getJarDataTableName() + " WHERE JarId = " + jarId;
 
-				// We must access the BLOB input stream directly, do not get the Blob and call
-				// getBinaryStream() as it
-				// does not work in Cloudscape/Derby
+            // DEBUG
 
-				InputStream dataFrag = rs.getBinaryStream("Data");
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Load Jar data SQL: " + sql);
+            }
 
-				// Allocate the read buffer, if not already allocated
+            // Create the temporary Jar file
 
-				if ( inbuf == null)
-					inbuf = new byte[BlobReadBuffer];
+            outJar = new FileOutputStream(jarSeg.getTemporaryFile());
 
-				// Read the data from the database record and write to the output file
+            // Get the Jar data record
 
-				int rdLen = dataFrag.read(inbuf);
+            final ResultSet rs = stmt.executeQuery(sql);
 
-				while (rdLen > 0) {
+            if (rs.next()) {
 
-					// Write a block of data to the temporary file segment
+                // Access the Jar file data
 
-					fileOut.write(inbuf, 0, rdLen);
-					totLen += rdLen;
+                final InputStream dataFrag = rs.getBinaryStream("Data");
 
-					// Read another block of data
+                // Allocate the read buffer
 
-					rdLen = dataFrag.read(inbuf);
-				}
+                final byte[] inbuf = new byte[BlobReadBuffer];
 
-				// Signal to waiting threads that data is available
+                // Read the Jar data from the database record and write to the output file
 
-				fileSeg.setReadableLength(totLen);
-				fileSeg.signalDataAvailable();
+                int rdLen = dataFrag.read(inbuf);
+                long totLen = 0L;
 
-				// Renew the lease on the database connection
+                while (rdLen > 0) {
 
-				getConnectionPool().renewLease(conn);
-			}
+                    // Write a block of data to the temporary file segment
 
-			// Close the resultset
+                    outJar.write(inbuf, 0, rdLen);
+                    totLen += rdLen;
 
-			rs.close();
+                    // Read another block of data
 
-			// DEBUG
+                    rdLen = dataFrag.read(inbuf);
+                }
+            }
 
-			if ( Debug.EnableInfo && hasDebug()) {
-				long endTime = System.currentTimeMillis();
-				Debug.println("[Derby] Loaded fid=" + fileId + ", stream=" + streamId + ", frags=" + fragNo + ", time="
-						+ (endTime - startTime) + "ms");
-			}
-		}
-		catch (SQLException ex) {
+            // Close the output Jar file
 
-			// DEBUG
+            outJar.close();
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+            // Set the Jar file segment status to indicate that the data has been loaded
 
-			// Rethrow the exception
+            jarSeg.setStatus(FileSegmentInfo.Available, false);
+        } catch (final SQLException ex) {
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            // DEBUG
 
-			// Check if a statement was allocated
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Rethrow the exception
 
-			// Release the database connection
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			if ( conn != null)
-				releaseConnection(conn);
+            // Check if a statement was allocated
 
-			// Close the output file
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			if ( fileOut != null) {
-				try {
-					fileOut.close();
-				}
-				catch (Exception ex) {
-					Debug.println(ex);
-				}
-			}
-		}
+            // Release the database connection
 
-		// Signal that the file data is available
+            if (conn != null) {
+                releaseConnection(conn);
+            }
 
-		fileSeg.signalDataAvailable();
-	}
+            // Close the output file
 
-	/**
-	 * Load Jar file data from the database into a temporary file
-	 *
-	 * @param jarId int
-	 * @param jarSeg FileSegment
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public void loadJarData(int jarId, FileSegment jarSeg)
-		throws DBException, IOException {
+            if (outJar != null) {
+                try {
+                    outJar.close();
+                } catch (final Exception ex) {
+                    Debug.println(ex);
+                }
+            }
+        }
+    }
 
-		// Load the Jar file data
+    /**
+     * Save the file data from the temporary/local file to the database
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @param fileSeg
+     *            FileSegment
+     * @return int
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public int saveFileData(final int fileId, final int streamId, final FileSegment fileSeg) throws DBException, IOException {
 
-		Connection conn = null;
-		Statement stmt = null;
+        // Determine if we can use an in memory buffer to copy the file fragments
 
-		FileOutputStream outJar = null;
+        boolean useMem = false;
+        byte[] memBuf = null;
 
-		try {
+        if (getDataFragmentSize() <= MaxMemoryBuffer) {
 
-			// Get a connection to the database, create a statement
+            // Use a memory buffer to copy the file data fragments
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            useMem = true;
+            memBuf = new byte[(int) getDataFragmentSize()];
+        }
 
-			String sql = "SELECT * FROM " + getJarDataTableName() + " WHERE JarId = " + jarId;
+        // Get the temporary file size
 
-			// DEBUG
+        final File tempFile = new File(fileSeg.getTemporaryFile());
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Load Jar data SQL: " + sql);
+        // Save the file data
 
-			// Create the temporary Jar file
+        Connection conn = null;
+        Statement delStmt = null;
+        PreparedStatement stmt = null;
+        int fragNo = 1;
 
-			outJar = new FileOutputStream(jarSeg.getTemporaryFile());
+        FileInputStream inFile = null;
 
-			// Get the Jar data record
+        try {
 
-			ResultSet rs = stmt.executeQuery(sql);
+            // Open the temporary file
 
-			if ( rs.next()) {
+            inFile = new FileInputStream(tempFile);
 
-				// Access the Jar file data
+            // Get a connection to the database
 
-				InputStream dataFrag = rs.getBinaryStream("Data");
+            conn = getConnection();
+            delStmt = conn.createStatement();
 
-				// Allocate the read buffer
+            final String sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
 
-				byte[] inbuf = new byte[BlobReadBuffer];
+            // DEBUG
 
-				// Read the Jar data from the database record and write to the output file
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Save file data SQL: " + sql);
+            }
 
-				int rdLen = dataFrag.read(inbuf);
-				long totLen = 0L;
+            // Delete any existing file data records for this file
 
-				while (rdLen > 0) {
+            final int recCnt = delStmt.executeUpdate(sql);
+            delStmt.close();
+            delStmt = null;
 
-					// Write a block of data to the temporary file segment
+            // Turn off auto-commit whilst we save the data
 
-					outJar.write(inbuf, 0, rdLen);
-					totLen += rdLen;
+            conn.setAutoCommit(false);
 
-					// Read another block of data
+            // Add the file data to the database
 
-					rdLen = dataFrag.read(inbuf);
-				}
-			}
+            stmt = conn.prepareStatement("INSERT INTO " + getDataTableName() + " (FileId,StreamId,FragNo,FragLen,Data,JarFile,JarId) VALUES (?,?,?,?,?,'0',0)");
 
-			// Close the output Jar file
+            // DEBUG
 
-			outJar.close();
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Save file data SQL: " + stmt.toString());
+            }
 
-			// Set the Jar file segment status to indicate that the data has been loaded
+            long saveSize = tempFile.length();
 
-			jarSeg.setStatus(FileSegmentInfo.Available, false);
-		}
-		catch (SQLException ex) {
+            while (saveSize > 0) {
 
-			// DEBUG
+                // Determine the current fragment size to store
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+                long fragSize = Math.min(saveSize, getDataFragmentSize());
 
-			// Rethrow the exception
+                // Determine if the data fragment should be copied to a memory buffer or a seperate
+                // temporary file
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+                InputStream fragStream = null;
 
-			// Check if a statement was allocated
+                if (saveSize == fragSize) {
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+                    // Just copy the data from the temporary file, only one fragment
 
-			// Release the database connection
+                    fragStream = inFile;
+                } else if (useMem == true) {
 
-			if ( conn != null)
-				releaseConnection(conn);
+                    // Copy a block of data to the memory buffer
 
-			// Close the output file
+                    fragSize = inFile.read(memBuf);
+                    fragStream = new ByteArrayInputStream(memBuf);
+                } else {
 
-			if ( outJar != null) {
-				try {
-					outJar.close();
-				}
-				catch (Exception ex) {
-					Debug.println(ex);
-				}
-			}
-		}
-	}
+                    // Need to create a temporary file and copy the fragment of data to it
 
-	/**
-	 * Save the file data from the temporary/local file to the database
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @param fileSeg FileSegment
-	 * @return int
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public int saveFileData(int fileId, int streamId, FileSegment fileSeg)
-		throws DBException, IOException {
+                    throw new DBException("File data copy not implemented yet");
+                }
 
-		// Determine if we can use an in memory buffer to copy the file fragments
+                // Store the current fragment
 
-		boolean useMem = false;
-		byte[] memBuf = null;
+                stmt.clearParameters();
+                stmt.setInt(1, fileId);
+                stmt.setInt(2, streamId);
+                stmt.setInt(3, fragNo++);
+                stmt.setInt(4, (int) fragSize);
+                stmt.setBinaryStream(5, fragStream, (int) fragSize);
 
-		if ( getDataFragmentSize() <= MaxMemoryBuffer) {
+                if (stmt.executeUpdate() < 1 && hasDebug()) {
+                    Debug.println("## Derby Failed to update file data, fid=" + fileId + ", stream=" + streamId + ", fragNo=" + (fragNo - 1));
+                }
 
-			// Use a memory buffer to copy the file data fragments
+                conn.commit();
 
-			useMem = true;
-			memBuf = new byte[(int) getDataFragmentSize()];
-		}
+                // Update the remaining data size to be saved
 
-		// Get the temporary file size
+                saveSize -= fragSize;
 
-		File tempFile = new File(fileSeg.getTemporaryFile());
+                // Renew the lease on the database connection so that it does not expire
 
-		// Save the file data
+                getConnectionPool().renewLease(conn);
+            }
+        } catch (final SQLException ex) {
 
-		Connection conn = null;
-		Statement delStmt = null;
-		PreparedStatement stmt = null;
-		int fragNo = 1;
+            // DEBUG
 
-		FileInputStream inFile = null;
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-		try {
+            // Rethrow the exception
 
-			// Open the temporary file
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			inFile = new FileInputStream(tempFile);
+            // Close the delete statement
 
-			// Get a connection to the database
+            if (delStmt != null) {
+                try {
+                    delStmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			conn = getConnection();
-			delStmt = conn.createStatement();
+            // Close the insert statement
 
-			String sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// DEBUG
+            // Turn auto-commit back on
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Save file data SQL: " + sql);
+            try {
+                conn.setAutoCommit(true);
+            } catch (final Exception ex) {
+            }
 
-			// Delete any existing file data records for this file
+            // Release the database connection
 
-			int recCnt = delStmt.executeUpdate(sql);
-			delStmt.close();
-			delStmt = null;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
 
-			// Turn off auto-commit whilst we save the data
+            // Close the input file
 
-			conn.setAutoCommit(false);
+            if (inFile != null) {
+                try {
+                    inFile.close();
+                } catch (final Exception ex) {
+                }
+            }
+        }
 
-			// Add the file data to the database
+        // Return the number of data fragments used to save the file data
 
-			stmt = conn.prepareStatement("INSERT INTO " + getDataTableName()
-					+ " (FileId,StreamId,FragNo,FragLen,Data,JarFile,JarId) VALUES (?,?,?,?,?,'0',0)");
+        return fragNo;
+    }
 
-			// DEBUG
+    /**
+     * Save the file data from a Jar file to the database
+     *
+     * @param jarPath
+     *            String
+     * @param fileList
+     *            DBDataDetailsList
+     * @return int
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public int saveJarData(final String jarPath, final DBDataDetailsList fileList) throws DBException, IOException {
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Save file data SQL: " + stmt.toString());
+        // Write the Jar file to the blob field in the Jar data table
 
-			long saveSize = tempFile.length();
+        Connection conn = null;
+        PreparedStatement istmt = null;
+        Statement stmt = null;
 
-			while (saveSize > 0) {
+        int jarId = -1;
 
-				// Determine the current fragment size to store
+        try {
 
-				long fragSize = Math.min(saveSize, getDataFragmentSize());
+            // Get a connection to the database
 
-				// Determine if the data fragment should be copied to a memory buffer or a seperate
-				// temporary file
+            conn = getConnection();
 
-				InputStream fragStream = null;
+            // Open the Jar file
 
-				if ( saveSize == fragSize) {
+            final File jarFile = new File(jarPath);
+            final FileInputStream inJar = new FileInputStream(jarFile);
 
-					// Just copy the data from the temporary file, only one fragment
+            // Add the Jar file data to the database
 
-					fragStream = inFile;
-				}
-				else if ( useMem == true) {
+            istmt = conn.prepareStatement("INSERT INTO " + getJarDataTableName() + " (Data) VALUES (?)");
 
-					// Copy a block of data to the memory buffer
+            // DEBUG
 
-					fragSize = inFile.read(memBuf);
-					fragStream = new ByteArrayInputStream(memBuf);
-				}
-				else {
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Save Jar data SQL: " + istmt.toString());
+            }
 
-					// Need to create a temporary file and copy the fragment of data to it
+            // Set the Jar data field
 
-					throw new DBException("File data copy not implemented yet");
-				}
+            istmt.setBinaryStream(1, inJar, (int) jarFile.length());
 
-				// Store the current fragment
+            if (istmt.executeUpdate() < 1 && hasDebug()) {
+                Debug.println("## Derby Failed to store Jar data");
+            }
 
-				stmt.clearParameters();
-				stmt.setInt(1, fileId);
-				stmt.setInt(2, streamId);
-				stmt.setInt(3, fragNo++);
-				stmt.setInt(4, (int) fragSize);
-				stmt.setBinaryStream(5, fragStream, (int) fragSize);
+            // Get the unique jar id allocated to the new Jar record
 
-				if ( stmt.executeUpdate() < 1 && hasDebug())
-					Debug.println("## Derby Failed to update file data, fid=" + fileId + ", stream=" + streamId + ", fragNo="
-							+ (fragNo - 1));
+            stmt = conn.createStatement();
+            final ResultSet rs = stmt.executeQuery("VALUES IDENTITY_VAL_LOCAL()");
 
-				conn.commit();
+            if (rs.next()) {
+                jarId = rs.getInt(1);
+            }
 
-				// Update the remaining data size to be saved
+            // Update the jar id record for each file in the Jar
 
-				saveSize -= fragSize;
+            for (int i = 0; i < fileList.numberOfFiles(); i++) {
 
-				// Renew the lease on the database connection so that it does not expire
+                // Get the current file details
 
-				getConnectionPool().renewLease(conn);
-			}
-		}
-		catch (SQLException ex) {
+                final DBDataDetails dbDetails = fileList.getFileAt(i);
 
-			// DEBUG
+                // Add the file data record(s) to the database
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+                stmt.executeUpdate(
+                        "DELETE FROM " + getDataTableName() + " WHERE FileId = " + dbDetails.getFileId() + " AND StreamId = " + dbDetails.getStreamId());
+                stmt.executeUpdate("INSERT INTO " + getDataTableName() + " (FileId,StreamId,FragNo,JarId,JarFile) VALUES (" + dbDetails.getFileId() + ","
+                        + dbDetails.getStreamId() + ", 1," + jarId + ",'1')");
+            }
+        } catch (final SQLException ex) {
 
-			// Rethrow the exception
+            // DEBUG
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			// Close the delete statement
+            // Rethrow the exception
 
-			if ( delStmt != null) {
-				try {
-					delStmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			// Close the insert statement
+            // Close the statement
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-			// Turn auto-commit back on
+            // Close the insert statement
 
-			try {
-				conn.setAutoCommit(true);
-			}
-			catch (Exception ex) {
-			}
+            if (istmt != null) {
+                try {
+                    istmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			// Release the database connection
+            // Release the database connection
 
-			if ( conn != null)
-				releaseConnection(conn);
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			// Close the input file
+        // Return the allocated Jar id
 
-			if ( inFile != null) {
-				try {
-					inFile.close();
-				}
-				catch (Exception ex) {
-				}
-			}
-		}
+        return jarId;
+    }
 
-		// Return the number of data fragments used to save the file data
+    /**
+     * Delete the file data for the specified file/stream
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public void deleteFileData(final int fileId, final int streamId) throws DBException, IOException {
 
-		return fragNo;
-	}
+        // Delete the file data records for the file or stream
 
-	/**
-	 * Save the file data from a Jar file to the database
-	 *
-	 * @param jarPath String
-	 * @param fileList DBDataDetailsList
-	 * @return int
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public int saveJarData(String jarPath, DBDataDetailsList fileList)
-		throws DBException, IOException {
+        Connection conn = null;
+        Statement delStmt = null;
 
-		// Write the Jar file to the blob field in the Jar data table
+        try {
 
-		Connection conn = null;
-		PreparedStatement istmt = null;
-		Statement stmt = null;
+            // Get a connection to the database
 
-		int jarId = -1;
+            conn = getConnection();
 
-		try {
+            // Need to delete the existing data
 
-			// Get a connection to the database
+            delStmt = conn.createStatement();
+            String sql = null;
 
-			conn = getConnection();
+            // Check if the main file stream is being deleted, if so then delete all stream data too
 
-			// Open the Jar file
+            if (streamId == 0) {
+                sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId;
+            } else {
+                sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
+            }
 
-			File jarFile = new File(jarPath);
-			FileInputStream inJar = new FileInputStream(jarFile);
+            // DEBUG
 
-			// Add the Jar file data to the database
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Delete file data SQL: " + sql);
+            }
 
-			istmt = conn.prepareStatement("INSERT INTO " + getJarDataTableName() + " (Data) VALUES (?)");
+            // Delete the file data records
 
-			// DEBUG
+            final int recCnt = delStmt.executeUpdate(sql);
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Save Jar data SQL: " + istmt.toString());
+            // Debug
 
-			// Set the Jar data field
+            if (Debug.EnableInfo && hasDebug() && recCnt > 0) {
+                Debug.println("[Derby] Deleted file data fid=" + fileId + ", stream=" + streamId + ", records=" + recCnt);
+            }
+        } catch (final SQLException ex) {
 
-			istmt.setBinaryStream(1, inJar, (int) jarFile.length());
+            // DEBUG
 
-			if ( istmt.executeUpdate() < 1 && hasDebug())
-				Debug.println("## Derby Failed to store Jar data");
+            if (Debug.EnableInfo && hasDebug()) {
+                Debug.println(ex);
+            }
+        } finally {
 
-			// Get the unique jar id allocated to the new Jar record
+            // Close the delete statement
 
-			stmt = conn.createStatement();
-			ResultSet rs = stmt.executeQuery("VALUES IDENTITY_VAL_LOCAL()");
+            if (delStmt != null) {
+                try {
+                    delStmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-			if ( rs.next())
-				jarId = rs.getInt(1);
+            // Release the database connection
 
-			// Update the jar id record for each file in the Jar
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			for (int i = 0; i < fileList.numberOfFiles(); i++) {
+    /**
+     * Delete the file data for the specified Jar file
+     *
+     * @param jarId
+     *            int
+     * @throws DBException
+     * @throws IOException
+     */
+    @Override
+    public void deleteJarData(final int jarId) throws DBException, IOException {
 
-				// Get the current file details
+        // Delete the data records for the Jar file data
 
-				DBDataDetails dbDetails = fileList.getFileAt(i);
+        Connection conn = null;
+        Statement delStmt = null;
 
-				// Add the file data record(s) to the database
+        try {
 
-				stmt.executeUpdate("DELETE FROM " + getDataTableName() + " WHERE FileId = " + dbDetails.getFileId()
-						+ " AND StreamId = " + dbDetails.getStreamId());
-				stmt.executeUpdate("INSERT INTO " + getDataTableName() + " (FileId,StreamId,FragNo,JarId,JarFile) VALUES ("
-						+ dbDetails.getFileId() + "," + dbDetails.getStreamId() + ", 1," + jarId + ",'1')");
-			}
-		}
-		catch (SQLException ex) {
+            // Get a connection to the database
 
-			// DEBUG
+            conn = getConnection();
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+            // Need to delete the existing data
 
-			// Rethrow the exception
+            delStmt = conn.createStatement();
+            final String sql = "DELETE FROM " + getJarDataTableName() + " WHERE JarId = " + jarId;
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            // DEBUG
 
-			// Close the statement
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Delete Jar data SQL: " + sql);
+            }
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+            // Delete the Jar data records
 
-			// Close the insert statement
+            final int recCnt = delStmt.executeUpdate(sql);
 
-			if ( istmt != null) {
-				try {
-					istmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            // Debug
 
-			// Release the database connection
+            if (Debug.EnableInfo && hasDebug() && recCnt > 0) {
+                Debug.println("[Derby] Deleted Jar data jarId=" + jarId + ", records=" + recCnt);
+            }
+        } catch (final SQLException ex) {
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
+            // DEBUG
 
-		// Return the allocated Jar id
+            if (Debug.EnableInfo && hasDebug()) {
+                Debug.println(ex);
+            }
+        } finally {
 
-		return jarId;
-	}
+            // Close the delete statement
 
-	/**
-	 * Delete the file data for the specified file/stream
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public void deleteFileData(int fileId, int streamId)
-		throws DBException, IOException {
+            if (delStmt != null) {
+                try {
+                    delStmt.close();
+                } catch (final Exception ex) {
+                }
+            }
 
-		// Delete the file data records for the file or stream
+            // Release the database connection
 
-		Connection conn = null;
-		Statement delStmt = null;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-		try {
+    // ***** DBObjectIdInterface Methods *****
 
-			// Get a connection to the database
+    /**
+     * Create a file id to object id mapping
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @param objectId
+     *            String
+     * @exception DBException
+     */
+    @Override
+    public void saveObjectId(final int fileId, final int streamId, final String objectId) throws DBException {
 
-			conn = getConnection();
+        // Create a new file id/object id mapping record
 
-			// Need to delete the existing data
+        Connection conn = null;
+        Statement stmt = null;
 
-			delStmt = conn.createStatement();
-			String sql = null;
+        try {
 
-			// Check if the main file stream is being deleted, if so then delete all stream data too
+            // Get a connection to the database
 
-			if ( streamId == 0)
-				sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId;
-			else
-				sql = "DELETE FROM " + getDataTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			// DEBUG
+            // Delete any current mapping record for the object
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Delete file data SQL: " + sql);
+            String sql = "DELETE FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
 
-			// Delete the file data records
+            // DEBUG
 
-			int recCnt = delStmt.executeUpdate(sql);
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Save object id SQL: " + sql);
+            }
 
-			// Debug
+            // Delete any current mapping record
 
-			if ( Debug.EnableInfo && hasDebug() && recCnt > 0)
-				Debug.println("[Derby] Deleted file data fid=" + fileId + ", stream=" + streamId + ", records=" + recCnt);
-		}
-		catch (SQLException ex) {
+            stmt.executeUpdate(sql);
 
-			// DEBUG
+            // Insert the new mapping record
 
-			if ( Debug.EnableInfo && hasDebug())
-				Debug.println(ex);
-		}
-		finally {
+            sql = "INSERT INTO " + getObjectIdTableName() + " (FileId,StreamId,ObjectID) VALUES(" + fileId + "," + streamId + ",'" + objectId + "')";
 
-			// Close the delete statement
+            // DEBUG
 
-			if ( delStmt != null) {
-				try {
-					delStmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Save object id SQL: " + sql);
+            }
 
-			// Release the database connection
+            // Create the mapping record
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            if (stmt.executeUpdate(sql) == 0) {
+                throw new DBException("Failed to add object id record, fid=" + fileId + ", objId=" + objectId);
+            }
+        } catch (final SQLException ex) {
 
-	/**
-	 * Delete the file data for the specified Jar file
-	 *
-	 * @param jarId int
-	 * @throws DBException
-	 * @throws IOException
-	 */
-	public void deleteJarData(int jarId)
-		throws DBException, IOException {
+            // DEBUG
 
-		// Delete the data records for the Jar file data
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-		Connection conn = null;
-		Statement delStmt = null;
+            // Rethrow the exception
 
-		try {
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			// Get a connection to the database
+            // Close the statement
 
-			conn = getConnection();
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-			// Need to delete the existing data
+            // Release the database connection
 
-			delStmt = conn.createStatement();
-			String sql = "DELETE FROM " + getJarDataTableName() + " WHERE JarId = " + jarId;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-			// DEBUG
+    /**
+     * Load the object id for the specified file id
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @return String
+     * @exception DBException
+     */
+    @Override
+    public String loadObjectId(final int fileId, final int streamId) throws DBException {
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Delete Jar data SQL: " + sql);
+        // Load the object id for the specified file id
 
-			// Delete the Jar data records
+        Connection conn = null;
+        Statement stmt = null;
 
-			int recCnt = delStmt.executeUpdate(sql);
+        String objectId = null;
 
-			// Debug
+        try {
 
-			if ( Debug.EnableInfo && hasDebug() && recCnt > 0)
-				Debug.println("[Derby] Deleted Jar data jarId=" + jarId + ", records=" + recCnt);
-		}
-		catch (SQLException ex) {
+            // Get a connection to the database
 
-			// DEBUG
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			if ( Debug.EnableInfo && hasDebug())
-				Debug.println(ex);
-		}
-		finally {
+            final String sql = "SELECT ObjectId FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
 
-			// Close the delete statement
+            // DEBUG
 
-			if ( delStmt != null) {
-				try {
-					delStmt.close();
-				}
-				catch (Exception ex) {
-				}
-			}
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Load object id SQL: " + sql);
+            }
 
-			// Release the database connection
+            // Load the mapping record
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            final ResultSet rs = stmt.executeQuery(sql);
 
-	// ***** DBObjectIdInterface Methods *****
+            if (rs.next()) {
+                objectId = rs.getString("ObjectId");
+            }
+        } catch (final SQLException ex) {
 
-	/**
-	 * Create a file id to object id mapping
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @param objectId String
-	 * @exception DBException
-	 */
-	public void saveObjectId(int fileId, int streamId, String objectId)
-		throws DBException {
+            // DEBUG
 
-		// Create a new file id/object id mapping record
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-		Connection conn = null;
-		Statement stmt = null;
+            // Rethrow the exception
 
-		try {
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			// Get a connection to the database
+            // Close the statement
 
-			conn = getConnection();
-			stmt = conn.createStatement();
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-			// Delete any current mapping record for the object
+            // Release the database connection
 
-			String sql = "DELETE FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
 
-			// DEBUG
+        // Return the object id
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Save object id SQL: " + sql);
+        return objectId;
+    }
 
-			// Delete any current mapping record
+    /**
+     * Delete a file id/object id mapping
+     *
+     * @param fileId
+     *            int
+     * @param streamId
+     *            int
+     * @param objectId
+     *            String
+     * @exception DBException
+     */
+    @Override
+    public void deleteObjectId(final int fileId, final int streamId, final String objectId) throws DBException {
 
-			stmt.executeUpdate(sql);
+        // Delete a file id/object id mapping record
 
-			// Insert the new mapping record
+        Connection conn = null;
+        Statement stmt = null;
 
-			sql = "INSERT INTO " + getObjectIdTableName() + " (FileId,StreamId,ObjectID) VALUES(" + fileId + "," + streamId
-					+ ",'" + objectId + "')";
+        try {
 
-			// DEBUG
+            // Get a connection to the database
 
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Save object id SQL: " + sql);
+            conn = getConnection();
+            stmt = conn.createStatement();
 
-			// Create the mapping record
+            final String sql = "DELETE FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
 
-			if ( stmt.executeUpdate(sql) == 0)
-				throw new DBException("Failed to add object id record, fid=" + fileId + ", objId=" + objectId);
-		}
-		catch (SQLException ex) {
+            // DEBUG
 
-			// DEBUG
+            if (Debug.EnableInfo && hasSQLDebug()) {
+                Debug.println("[Derby] Delete object id SQL: " + sql);
+            }
 
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
+            // Delete the mapping record
 
-			// Rethrow the exception
+            stmt.executeUpdate(sql);
+        } catch (final SQLException ex) {
 
-			throw new DBException(ex.getMessage());
-		}
-		finally {
+            // DEBUG
 
-			// Close the statement
+            if (Debug.EnableError && hasDebug()) {
+                Debug.println(ex);
+            }
 
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
+            // Rethrow the exception
 
-			// Release the database connection
+            throw new DBException(ex.getMessage());
+        } finally {
 
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
+            // Close the statement
 
-	/**
-	 * Load the object id for the specified file id
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @return String
-	 * @exception DBException
-	 */
-	public String loadObjectId(int fileId, int streamId)
-		throws DBException {
+            if (stmt != null) {
+                try {
+                    stmt.close();
+                } catch (final SQLException ex) {
+                }
+            }
 
-		// Load the object id for the specified file id
+            // Release the database connection
 
-		Connection conn = null;
-		Statement stmt = null;
+            if (conn != null) {
+                releaseConnection(conn);
+            }
+        }
+    }
 
-		String objectId = null;
+    /**
+     * Return the data for a symbolic link
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @return String
+     * @exception DBException
+     */
+    @Override
+    public String readSymbolicLink(final int dirId, final int fid) throws DBException {
 
-		try {
+        throw new DBException("Symbolic links not supported");
+    }
 
-			// Get a connection to the database
+    /**
+     * Delete a symbolic link record
+     *
+     * @param dirId
+     *            int
+     * @param fid
+     *            int
+     * @exception DBException
+     */
+    @Override
+    public void deleteSymbolicLinkRecord(final int dirId, final int fid) throws DBException {
 
-			conn = getConnection();
-			stmt = conn.createStatement();
-
-			String sql = "SELECT ObjectId FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = "
-					+ streamId;
-
-			// DEBUG
-
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Load object id SQL: " + sql);
-
-			// Load the mapping record
-
-			ResultSet rs = stmt.executeQuery(sql);
-
-			if ( rs.next())
-				objectId = rs.getString("ObjectId");
-		}
-		catch (SQLException ex) {
-
-			// DEBUG
-
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
-
-			// Rethrow the exception
-
-			throw new DBException(ex.getMessage());
-		}
-		finally {
-
-			// Close the statement
-
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
-
-			// Release the database connection
-
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-
-		// Return the object id
-
-		return objectId;
-	}
-
-	/**
-	 * Delete a file id/object id mapping
-	 *
-	 * @param fileId int
-	 * @param streamId int
-	 * @param objectId String
-	 * @exception DBException
-	 */
-	public void deleteObjectId(int fileId, int streamId, String objectId)
-		throws DBException {
-
-		// Delete a file id/object id mapping record
-
-		Connection conn = null;
-		Statement stmt = null;
-
-		try {
-
-			// Get a connection to the database
-
-			conn = getConnection();
-			stmt = conn.createStatement();
-
-			String sql = "DELETE FROM " + getObjectIdTableName() + " WHERE FileId = " + fileId + " AND StreamId = " + streamId;
-
-			// DEBUG
-
-			if ( Debug.EnableInfo && hasSQLDebug())
-				Debug.println("[Derby] Delete object id SQL: " + sql);
-
-			// Delete the mapping record
-
-			stmt.executeUpdate(sql);
-		}
-		catch (SQLException ex) {
-
-			// DEBUG
-
-			if ( Debug.EnableError && hasDebug())
-				Debug.println(ex);
-
-			// Rethrow the exception
-
-			throw new DBException(ex.getMessage());
-		}
-		finally {
-
-			// Close the statement
-
-			if ( stmt != null) {
-				try {
-					stmt.close();
-				}
-				catch (SQLException ex) {
-				}
-			}
-
-			// Release the database connection
-
-			if ( conn != null)
-				releaseConnection(conn);
-		}
-	}
-
-	/**
-	 * Return the data for a symbolic link
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @return String
-	 * @exception DBException
-	 */
-	public String readSymbolicLink(int dirId, int fid)
-		throws DBException {
-
-		throw new DBException("Symbolic links not supported");
-	}
-
-	/**
-	 * Delete a symbolic link record
-	 *
-	 * @param dirId int
-	 * @param fid int
-	 * @exception DBException
-	 */
-	public void deleteSymbolicLinkRecord(int dirId, int fid)
-		throws DBException {
-
-		throw new DBException("Symbolic links not supported");
-	}
+        throw new DBException("Symbolic links not supported");
+    }
 }

@@ -23,11 +23,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileAttribute;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.db.DBSearchContext;
 import org.alfresco.jlan.util.WildCard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Derby Database Search Context Class
@@ -35,139 +36,153 @@ import org.alfresco.jlan.util.WildCard;
  * @author gkspencer
  */
 public class DerbySearchContext extends DBSearchContext {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DerbySearchContext.class);
 
-  /**
-	 * Class constructor
-	 *
-	 * @param rs ResultSet
-	 * @param filter WildCard
-   */
-  protected DerbySearchContext(ResultSet rs, WildCard filter) {
-    super(rs, filter);
-  }
-
-  /**
-   * Return the next file from the search, or return false if there are no more files
-   *
-   * @param info FileInfo
-   * @return boolean
-   */
-  public boolean nextFileInfo(FileInfo info) {
-
-    //	Get the next file from the search
-
-    try {
-
-    	//	Return the next file details or loop until a match is found if a complex wildcard filter
-    	//	has been specified
-
-      while ( m_rs != null && m_rs.next()) {
-
-        //	Get the file name for the next file
-
-        info.setFileId(m_rs.getInt("FileId"));
-        info.setFileName(m_rs.getString("FileName"));
-        info.setSize(m_rs.getLong("FileSize"));
-
-        Timestamp createDate = m_rs.getTimestamp("CreateDate");
-        if ( createDate != null)
-        	info.setCreationDateTime(createDate.getTime());
-        else
-        	info.setCreationDateTime(System.currentTimeMillis());
-
-        Timestamp modifyDate = m_rs.getTimestamp("ModifyDate");
-        if ( modifyDate != null)
-        	info.setModifyDateTime(modifyDate.getTime());
-        else
-        	info.setModifyDateTime(System.currentTimeMillis());
-
-				Timestamp accessDate = m_rs.getTimestamp("AccessDate");
-				if ( accessDate != null)
-					info.setAccessDateTime(accessDate.getTime());
-
-				Timestamp changeDate = m_rs.getTimestamp("ChangeDate");
-				if ( changeDate != null)
-				  info.setChangeDateTime( changeDate.getTime());
-
-        //	Build the file attributes flags
-
-        int attr = 0;
-
-        if ( m_rs.getBoolean("ReadOnlyFile") == true)
-        	attr += FileAttribute.ReadOnly;
-
-        if ( m_rs.getBoolean("SystemFile") == true)
-        	attr += FileAttribute.System;
-
-        if ( m_rs.getBoolean("HiddenFile") == true)
-        	attr += FileAttribute.Hidden;
-
-        if ( m_rs.getBoolean("DirectoryFile") == true)
-        	attr += FileAttribute.Directory;
-
-				if ( m_rs.getBoolean("ArchivedFile") == true)
-					attr += FileAttribute.Archive;
-
-        info.setFileAttributes(attr);
-
-				//	Get the group/owner id
-
-				info.setGid(m_rs.getInt("OwnerGid"));
-				info.setUid(m_rs.getInt("OwnerUid"));
-
-				info.setMode(m_rs.getInt("FileMode"));
-
-        //	Check if there is a complex wildcard filter
-
-        if ( m_filter == null || m_filter.matchesPattern(info.getFileName()) == true)
-        	return true;
-      }
-    }
-    catch (SQLException ex) {
-      Debug.println(ex);
+    /**
+     * Class constructor
+     *
+     * @param rs
+     *            ResultSet
+     * @param filter
+     *            WildCard
+     */
+    protected DerbySearchContext(final ResultSet rs, final WildCard filter) {
+        super(rs, filter);
     }
 
-		//	No more files, clear the resultset
+    /**
+     * Return the next file from the search, or return false if there are no more files
+     *
+     * @param info
+     *            FileInfo
+     * @return boolean
+     */
+    @Override
+    public boolean nextFileInfo(final FileInfo info) {
 
-    m_rs = null;
-    return false;
-  }
+        // Get the next file from the search
 
-  /**
-   * Return the file name of the next file in the active search. Returns
-   * null if the search is complete.
-   *
-   * @return String
-   */
-  public String nextFileName() {
+        try {
 
-    //	Get the next file from the search
+            // Return the next file details or loop until a match is found if a complex wildcard filter
+            // has been specified
 
-    try {
+            while (m_rs != null && m_rs.next()) {
 
-			//	Return the next file details or loop until a match is found if a complex wildcard filter
-			//	has been specified
+                // Get the file name for the next file
 
-			String fileName = null;
+                info.setFileId(m_rs.getInt("FileId"));
+                info.setFileName(m_rs.getString("FileName"));
+                info.setSize(m_rs.getLong("FileSize"));
 
-      while ( m_rs != null && m_rs.next()) {
+                final Timestamp createDate = m_rs.getTimestamp("CreateDate");
+                if (createDate != null) {
+                    info.setCreationDateTime(createDate.getTime());
+                } else {
+                    info.setCreationDateTime(System.currentTimeMillis());
+                }
 
-        //	Get the file name for the next file
+                final Timestamp modifyDate = m_rs.getTimestamp("ModifyDate");
+                if (modifyDate != null) {
+                    info.setModifyDateTime(modifyDate.getTime());
+                } else {
+                    info.setModifyDateTime(System.currentTimeMillis());
+                }
 
-        fileName = m_rs.getString("FileName");
+                final Timestamp accessDate = m_rs.getTimestamp("AccessDate");
+                if (accessDate != null) {
+                    info.setAccessDateTime(accessDate.getTime());
+                }
 
-				//	Check if there is a complex wildcard filter
+                final Timestamp changeDate = m_rs.getTimestamp("ChangeDate");
+                if (changeDate != null) {
+                    info.setChangeDateTime(changeDate.getTime());
+                }
 
-				if ( m_filter == null || m_filter.matchesPattern(fileName) == true)
-					return fileName;
-      }
+                // Build the file attributes flags
+
+                int attr = 0;
+
+                if (m_rs.getBoolean("ReadOnlyFile") == true) {
+                    attr += FileAttribute.ReadOnly;
+                }
+
+                if (m_rs.getBoolean("SystemFile") == true) {
+                    attr += FileAttribute.System;
+                }
+
+                if (m_rs.getBoolean("HiddenFile") == true) {
+                    attr += FileAttribute.Hidden;
+                }
+
+                if (m_rs.getBoolean("DirectoryFile") == true) {
+                    attr += FileAttribute.Directory;
+                }
+
+                if (m_rs.getBoolean("ArchivedFile") == true) {
+                    attr += FileAttribute.Archive;
+                }
+
+                info.setFileAttributes(attr);
+
+                // Get the group/owner id
+
+                info.setGid(m_rs.getInt("OwnerGid"));
+                info.setUid(m_rs.getInt("OwnerUid"));
+
+                info.setMode(m_rs.getInt("FileMode"));
+
+                // Check if there is a complex wildcard filter
+
+                if (m_filter == null || m_filter.matchesPattern(info.getFileName()) == true) {
+                    return true;
+                }
+            }
+        } catch (final SQLException ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
+
+        // No more files, clear the resultset
+
+        m_rs = null;
+        return false;
     }
-    catch (SQLException ex) {
+
+    /**
+     * Return the file name of the next file in the active search. Returns null if the search is complete.
+     *
+     * @return String
+     */
+    @Override
+    public String nextFileName() {
+
+        // Get the next file from the search
+
+        try {
+
+            // Return the next file details or loop until a match is found if a complex wildcard filter
+            // has been specified
+
+            String fileName = null;
+
+            while (m_rs != null && m_rs.next()) {
+
+                // Get the file name for the next file
+
+                fileName = m_rs.getString("FileName");
+
+                // Check if there is a complex wildcard filter
+
+                if (m_filter == null || m_filter.matchesPattern(fileName) == true) {
+                    return fileName;
+                }
+            }
+        } catch (final SQLException ex) {
+        }
+
+        // No more files, clear the resultset
+
+        m_rs = null;
+        return null;
     }
-
-    //	No more files, clear the resultset
-
-    m_rs = null;
-    return null;
-  }
 }
