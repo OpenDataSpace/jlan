@@ -38,6 +38,8 @@ import org.alfresco.jlan.smb.SMBDate;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
 import org.alfresco.jlan.util.DataPacker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Authenticate Session Class
@@ -47,123 +49,89 @@ import org.alfresco.jlan.util.DataPacker;
  * @author gkspencer
  */
 public class AuthenticateSession {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticateSession.class);
 
-  //	Default packet size
-
+    //	Default packet size
   private static final int DefaultPacketSize	=	1024;
 
 	//	Session security mode
-
 	public static final int SecurityModeUser	= 1;
 	public static final int SecurityModeShare	= 2;
 
 	//	Tree identifier that indicates that the disk session has been closed
-
   protected final static int Closed = -1;
 
-	//	Debug flags
-
-  public final static int DBGPacketType 	= 0x0001;
-  public final static int DBGDumpPacket 	= 0x0002;
-  public final static int DBGHexDump 			= 0x0004;
-
 	//	Default SMB packet size to allocate
-
   public static final int DEFAULT_BUFSIZE = 4096;
 
 	//	SMB dialect id and string for this session
-
   private int m_dialect;
   private String m_diaStr;
 
 	//	Network session
-
   private NetworkSession m_netSession;
 
 	//	SMB packet for protocol exhanges
-
   protected SMBPacket m_pkt;
 
 	//	Default packet flags
-
 	private int m_defFlags 	= SMBPacket.FLG_CASELESS;
 	private int m_defFlags2 = SMBPacket.FLG2_LONGFILENAMES;
 
 	//	Server connection details
-
   private PCShare m_remoteShr;
 
 	//	Domain name
-
   private String m_domain;
 
 	//	Remote operating system and LAN manager type
-
   private String m_srvOS;
   private String m_srvLM;
 
 	//	Security mode (user or share)
-
 	private int m_secMode;
 
 	//	Challenge encryption key
-
   private byte[] m_encryptKey;
 
 	//	SMB session information
-
   private int m_sessIdx;
   private int m_userId;
   private int m_processId;
 
 	//	Tree identifier for this connection
-
   protected int m_treeid;
 
 	//	Device type that this session is connected to
-
   private int m_devtype;
 
 	//	Maximum transmit buffer size allowed
-
   private int m_maxPktSize;
 
 	//	Session capabilities
-
   private int m_sessCaps;
 
 	//	Maximum virtual circuits allowed on this session, and maximum multiplxed read/writes
-
 	private int m_maxVCs;
 	private int m_maxMPX;
 
 	//	Indicate if the session was created as a guest rather than using the supplied username/password
-
 	private boolean m_guest;
 
   // Flag to indicate extended security exchange is being used
-
   private boolean m_extendedSec;
 
   // Server GUID, if using extended security
-
   private byte[] m_serverGUID;
 
   // Type 2 security blob from the server
-
   private Type2NTLMMessage m_type2Msg;
 
 	//	Global session id
-
   private static int m_sessionIdx = 1;
 
 	//	Multiplex id
-
 	private static int m_multiplexId = 1;
-
-	//	Debug support
-
-  private static int m_debug = 0;
 
 	/**
 	 * Class constructor
@@ -594,35 +562,12 @@ public class AuthenticateSession {
   }
 
   /**
-   * Determine if the specified debugging option is enabled
-   *
-   * @param opt    Debug option bit mask
-   * @return       true if the debug option is enabled, else false
-   */
-  public static boolean hasDebugOption(int opt) {
-    if (m_debug == 0)
-      return false;
-    if ((m_debug & opt) != 0)
-      return true;
-    return false;
-  }
-
-  /**
    * Determine if the session is valid, ie. still open.
    *
    * @return   true if the session is still active, else false.
    */
   public final boolean isActive() {
     return (m_netSession == null) ? false : true;
-  }
-
-  /**
-   * Determine if SMB session debugging is enabled
-   *
-   * @return   true if debugging is enabled, else false.
-   */
-  public static boolean hasDebug() {
-    return m_debug != 0 ? true : false;
   }
 
   /**
@@ -708,15 +653,6 @@ public class AuthenticateSession {
 
       cnt--;
     }
-  }
-
-  /**
-   * Enable/disable SMB session debugging
-   *
-   * @param dbg    Bit mask of debug options to enable, or zero to disable
-   */
-  public static void setDebug(int dbg) {
-    m_debug = dbg;
   }
 
   /**
@@ -936,13 +872,10 @@ public class AuthenticateSession {
 	 * @param pkt SMBPacket
 	 */
 	protected void processAsynchResponse(SMBPacket pkt) {
-
 		//	Default is to ignore the packet
 		//
 		//	This method is overridden by SMB dialects that can generate asynchronous responses
-
-		if ( Debug.EnableInfo && hasDebug())
-			Debug.println("++ Asynchronous response received, command = 0x" + pkt.getCommand());
+	    LOGGER.info("++ Asynchronous response received, command = 0x{}", pkt.getCommand());
 	}
 
   /**
