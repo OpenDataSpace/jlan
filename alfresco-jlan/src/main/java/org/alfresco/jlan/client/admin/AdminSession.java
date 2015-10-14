@@ -19,8 +19,11 @@
 
 package org.alfresco.jlan.client.admin;
 
-import java.util.*;
-import java.io.*;
+import java.io.IOException;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Vector;
 
 import org.alfresco.jlan.client.IPCSession;
 import org.alfresco.jlan.client.SMBPacket;
@@ -67,19 +70,17 @@ import org.alfresco.jlan.util.StringList;
 /**
  * SMB admin session class
  *
- * <p>The AdminSession class implements the Remote Administration Protocol (RAP)
- * as defined in the draft protocol specification.
+ * <p>
+ * The AdminSession class implements the Remote Administration Protocol (RAP) as defined in the draft protocol specification.
  *
- * <p>The class can return the list of nodes on the network, get remote user information,
- * get the list of shares on the remote server, list of printer queues on the remote server,
- * and can manipulate individual print jobs.
+ * <p>
+ * The class can return the list of nodes on the network, get remote user information, get the list of shares on the remote server, list of printer queues on
+ * the remote server, and can manipulate individual print jobs.
  *
- * <p>An AdminSession is created, as with all SMB sessions, via the SessionFactory
- * static class. The SessionFactory.OpenAdminSession() method requires a PCShare
- * object that provides the remote server node name, the share name will be ignored as
- * an admin session is always made to the IPC$ named pipe. User name and/or a password
- * may be required depending upon the requests being made, and whether the 'GUEST'
- * account is available on the remote server.
+ * <p>
+ * An AdminSession is created, as with all SMB sessions, via the SessionFactory static class. The SessionFactory.OpenAdminSession() method requires a PCShare
+ * object that provides the remote server node name, the share name will be ignored as an admin session is always made to the IPC$ named pipe. User name and/or
+ * a password may be required depending upon the requests being made, and whether the 'GUEST' account is available on the remote server.
  *
  * @see org.alfresco.jlan.client.SessionFactory
  *
@@ -87,3115 +88,3089 @@ import org.alfresco.jlan.util.StringList;
  */
 public final class AdminSession {
 
-	// User information levels that may be requested
+    // User information levels that may be requested
 
-	private static final int UserInfo0 = 0;
-	private static final int UserInfo1 = 1;
-	private static final int UserInfo11 = 11;
+    private static final int UserInfo0 = 0;
+    private static final int UserInfo11 = 11;
 
-	// Printer informatoin levels that may be requested
+    // Printer informatoin levels that may be requested
 
-	private static final int PrintQInfo1 = 1;
-	private static final int PrintQInfo2 = 2;
-	private static final int PrintQInfo3 = 3;
-	private static final int PrintQInfo4 = 4;
-	private static final int PrintQInfo5 = 5;
+    private static final int PrintQInfo1 = 1;
+    private static final int PrintQInfo3 = 3;
 
-	// Print job information levels that may be requested
+    // Print job information levels that may be requested
 
-	private static final int PrintJobInfo0 = 0;
-	private static final int PrintJobInfo1 = 1;
-	private static final int PrintJobInfo2 = 2;
-	private static final int PrintJobInfo3 = 3;
+    private static final int PrintJobInfo2 = 2;
 
-	//	Service information levels that may be requested
+    // Service information levels that may be requested
 
-	private static final int ServiceInfo0 = 0;
-  	private static final int ServiceInfo2 = 2;
+    private static final int ServiceInfo2 = 2;
 
-  	//	Disk information levels that may be requested
+    // Disk information levels that may be requested
 
-  	private static final int DiskInfo0 = 0;
+    private static final int DiskInfo0 = 0;
 
-  	//	Group information levels that may be requested
+    // Group information levels that may be requested
 
-  	private static final int GroupInfo0 = 0;
-  	private static final int GroupInfo1 = 1;
+    private static final int GroupInfo0 = 0;
 
-  	//	Workstation information levels
+    // Workstation information levels
 
-  	private static final int WorkStation10 = 10;
+    private static final int WorkStation10 = 10;
 
-  	// IPC session attached to the remote server IPC$ pipe
+    // IPC session attached to the remote server IPC$ pipe
 
-  	private IPCSession m_sess;
+    private final IPCSession m_sess;
 
-  	//	Default buffer size to use
+    // Default buffer size to use
 
-  	private int m_defBufSize = 8192;
+    private int m_defBufSize = 8192;
 
-  	//	DCE/RPC pipe cache
+    // DCE/RPC pipe cache
 
-  	private Hashtable m_pipeCache;
+    private final Hashtable<String, IPCPipeFile> m_pipeCache;
 
-	//	SAMR policy handle
+    // SAMR policy handle
 
-	private SamrPolicyHandle m_samrHandle;
+    private SamrPolicyHandle m_samrHandle;
 
-	//	Local domain SID
+    // Local domain SID
 
-	private SID m_localDomain;
+    private SID m_localDomain;
 
-	//	Use DCE/RPC calls rather than RAP calls if the server supports them
+    // Use DCE/RPC calls rather than RAP calls if the server supports them
 
-	private boolean m_useDCERPC = true;
+    private boolean m_useDCERPC = true;
 
-	/**
-	 * Class constructor
-	 *
-	 * @param sess IPCSession
-	 */
-	public AdminSession(IPCSession sess) {
+    /**
+     * Class constructor
+     *
+     * @param sess
+     *            IPCSession
+     */
+    public AdminSession(final IPCSession sess) {
 
-		// Save the session
+        // Save the session
 
-		m_sess = sess;
+        m_sess = sess;
 
-		// Allocate the DCE/RPC pipe cache
+        // Allocate the DCE/RPC pipe cache
 
-		m_pipeCache = new Hashtable();
+        m_pipeCache = new Hashtable<>();
 
-		// Set the maximum buffer size using the session negotiated buffer size
+        // Set the maximum buffer size using the session negotiated buffer size
 
-		if ( m_sess.getMaximumPacketSize() < m_defBufSize)
-			m_defBufSize = m_sess.getMaximumPacketSize();
-	}
+        if (m_sess.getMaximumPacketSize() < m_defBufSize) {
+            m_defBufSize = m_sess.getMaximumPacketSize();
+        }
+    }
 
-	/**
-	 * Return the use DCE/RPC flag
-	 *
-	 * @return boolean
-	 */
-	public final boolean useDceRpc() {
-		return m_useDCERPC;
-	}
+    /**
+     * Return the use DCE/RPC flag
+     *
+     * @return boolean
+     */
+    public final boolean useDceRpc() {
+        return m_useDCERPC;
+    }
 
-	/**
-	 * Set the use DCE/RPC flag to enable/disable the use of the newer DCE/RPC calls if the server
-	 * supports them
-	 *
-	 * @param ena boolean
-	 */
-	public final void setUseDceRpc(boolean ena) {
-		m_useDCERPC = ena;
-	}
-
-	/**
-	 * Close the session to the remote server
-	 *
-	 * @exception IOException If an I/O error occurs
-	 * @exception SMBException If an SMB level error occurs
-	 */
-	public void CloseSession()
-		throws java.io.IOException, SMBException {
-
-		// Close the cached DCE/RPC pipes
-
-		closePipes();
-
-		// Close the associated IPC pipe session
-
-		m_sess.CloseSession();
-	}
+    /**
+     * Set the use DCE/RPC flag to enable/disable the use of the newer DCE/RPC calls if the server supports them
+     *
+     * @param ena
+     *            boolean
+     */
+    public final void setUseDceRpc(final boolean ena) {
+        m_useDCERPC = ena;
+    }
 
-	/**
-	 * Continue, unpause, the specified print job
-	 *
-	 * @param job PrintJob containing the details of the print job to continue
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
+    /**
+     * Close the session to the remote server
+     *
+     * @exception IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB level error occurs
+     */
+    public void CloseSession() throws java.io.IOException, SMBException {
+
+        // Close the cached DCE/RPC pipes
+
+        closePipes();
+
+        // Close the associated IPC pipe session
+
+        m_sess.CloseSession();
+    }
+
+    /**
+     * Continue, unpause, the specified print job
+     *
+     * @param job
+     *            PrintJob containing the details of the print job to continue
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+
+    public final void ContinuePrintJob(final PrintJob job) throws java.io.IOException, SMBException {
 
-	public final void ContinuePrintJob(PrintJob job)
-		throws java.io.IOException, SMBException {
+        // Continue, unpause, the specified print job
+
+        ManagePrintJob(job, PacketType.NetPrintJobContinue);
+    }
 
-		// Continue, unpause, the specified print job
+    /**
+     * Start, unpause, the specified remote printer queue.
+     *
+     * @param qname
+     *            Remote print queue to continue
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
 
-		ManagePrintJob(job, PacketType.NetPrintJobContinue);
-	}
+    public final void ContinuePrintQueue(final String qname) throws java.io.IOException, SMBException {
 
-	/**
-	 * Start, unpause, the specified remote printer queue.
-	 *
-	 * @param qname Remote print queue to continue
-	 * @exception java.io.IOException If an I/O error occurs.
-	 * @exception SMBException If an SMB error occurs
-	 */
+        // Continue, unpause, the specified print queue
 
-	public final void ContinuePrintQueue(String qname)
-		throws java.io.IOException, SMBException {
+        ManagePrintQueue(qname, PacketType.NetPrintQContinue);
+    }
 
-		// Continue, unpause, the specified print queue
+    /**
+     * Delete the specified print job
+     *
+     * @param job
+     *            PrintJob containing the details of the print job to pause
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
 
-		ManagePrintQueue(qname, PacketType.NetPrintQContinue);
-	}
+    public final void DeletePrintJob(final PrintJob job) throws java.io.IOException, SMBException {
 
-	/**
-	 * Delete the specified print job
-	 *
-	 * @param job PrintJob containing the details of the print job to pause
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
+        // Delete the specified print job
 
-	public final void DeletePrintJob(PrintJob job)
-		throws java.io.IOException, SMBException {
+        ManagePrintJob(job, PacketType.NetPrintJobDelete);
+    }
 
-		// Delete the specified print job
+    /**
+     * Return the transaction buffer size.
+     *
+     * @return int
+     */
+    public int getBufferSize() {
+        return m_defBufSize;
+    }
 
-		ManagePrintJob(job, PacketType.NetPrintJobDelete);
-	}
+    /**
+     * Return a list of the disk devices available on the remote server.
+     *
+     * @return Disk name strings.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    public final StringList getDiskList() throws SMBException, java.io.IOException {
 
-	/**
-	 * Return the transaction buffer size.
-	 *
-	 * @return int
-	 */
-	public int getBufferSize() {
-		return m_defBufSize;
-	}
+        // Create an SMB transaction packet for the disk enum request
 
-	/**
-	 * Return a list of the disk devices available on the remote server.
-	 *
-	 * @return Disk name strings.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	public final StringList getDiskList()
-		throws SMBException, java.io.IOException {
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create an SMB transaction packet for the disk enum request
+        // Build the NetServerDiskEnum parameter block
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetServerDiskEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B3", params, pos, true);
+        DataPacker.putIntelShort(DiskInfo0, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Build the NetServerDiskEnum parameter block
+        // Initialize the transaction packet
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetServerDiskEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B3", params, pos, true);
-		DataPacker.putIntelShort(DiskInfo0, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Initialize the transaction packet
+        // Set various transaction parameters
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Set various transaction parameters
+        // Set the user id and tree id
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the user id and tree id
+        // Exchanged the SMB packet
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Exchanged the SMB packet
+        // Check if we received a valid response
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Check if we received a valid response
+        // Unpack the parameter block
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		// Unpack the parameter block
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Unpack the disk information structure
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Unpack the disk information structure
+        // Unpack the disk information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final StringList diskList = new StringList();
 
-		// Unpack the disk information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        int cnt = prms[2];
 
-		StringList diskList = new StringList();
+        while (cnt-- > 0) {
 
-		int cnt = (int) prms[2];
+            // Unpack the disk information structure
 
-		while (cnt-- > 0) {
+            final Vector<String> objs = new Vector<>();
+            pos = DataDecoder.DecodeData(buf, pos, "B3", objs, conv);
 
-			// Unpack the disk information structure
+            // Copy the values to a disk information object
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "B3", objs, conv);
+            final String name = objs.elementAt(0);
+            diskList.addString(name);
+        }
 
-			// Copy the values to a disk information object
+        // Return the disk information
 
-			String name = (String) objs.elementAt(0);
-			diskList.addString(name);
-		}
+        return diskList;
+    }
 
-		// Return the disk information
+    /**
+     * Return a list of the groups on the remote server.
+     *
+     * @return List of groups on the remote server.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     * @exception DCEException
+     *                If a DCE/RPC exception occurs
+     */
+    public final StringList getGroupList() throws SMBException, java.io.IOException, DCEException {
 
-		return diskList;
-	}
+        // Check if the server supports DCE/RPC requests
 
-	/**
-	 * Return a list of the groups on the remote server.
-	 *
-	 * @return List of groups on the remote server.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 * @exception DCEException If a DCE/RPC exception occurs
-	 */
-	public final StringList getGroupList()
-		throws SMBException, java.io.IOException, DCEException {
+        StringList groupList = null;
 
-		// Check if the server supports DCE/RPC requests
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-		StringList groupList = null;
+            // Open the SAMR DCE/RPC pipe
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+            final SamrPipeFile samrPipe = openSecurityAccountsManagerPipe();
 
-			// Open the SAMR DCE/RPC pipe
+            // Get a list of the available domains
 
-			SamrPipeFile samrPipe = openSecurityAccountsManagerPipe();
+            final StringList domains = samrPipe.enumerateDomains();
 
-			// Get a list of the available domains
+            // Get the groups list
 
-			StringList domains = samrPipe.enumerateDomains();
+            if (domains != null && domains.numberOfStrings() > 0) {
+                groupList = samrPipe.enumerateGroups(domains.getStringAt(0));
+            }
+        } else {
 
-			// Get the groups list
+            // Use the older RAP call to get the groups list
 
-			if ( domains != null && domains.numberOfStrings() > 0)
-				groupList = samrPipe.enumerateGroups(domains.getStringAt(0));
-		}
-		else {
+            groupList = getRAPGroupList();
+        }
 
-			// Use the older RAP call to get the groups list
+        // Return the groups list
 
-			groupList = getRAPGroupList();
-		}
+        return groupList;
+    }
 
-		// Return the groups list
+    /**
+     * Get a list of users that are in the specified group.
+     *
+     * @param grpName
+     *            java.lang.String Group name to return user list for.
+     * @return List of user names.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    public final StringList getGroupUsers(final String grpName) throws SMBException, java.io.IOException {
 
-		return groupList;
-	}
+        // Use the RAP call for now
 
-	/**
-	 * Get a list of users that are in the specified group.
-	 *
-	 * @param grpName java.lang.String Group name to return user list for.
-	 * @return List of user names.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	public final StringList getGroupUsers(String grpName)
-		throws SMBException, java.io.IOException {
+        return getRAPGroupUsers(grpName);
+    }
 
-		// Use the RAP call for now
+    /**
+     * Get a list of groups for the specified user.
+     *
+     * @param userName
+     *            java.lang.String USer name to return group list for.
+     * @return List of group names.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    public final StringList getUserGroups(final String userName) throws SMBException, java.io.IOException {
 
-		return getRAPGroupUsers(grpName);
-	}
+        // Use the RAP call for now
 
-	/**
-	 * Get a list of groups for the specified user.
-	 *
-	 * @param userName java.lang.String USer name to return group list for.
-	 * @return List of group names.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	public final StringList getUserGroups(String userName)
-		throws SMBException, java.io.IOException {
+        return getRAPUserGroups(userName);
+    }
 
-		// Use the RAP call for now
+    /**
+     * Return printer queue information for the specified printer queue.
+     *
+     * @param printerName
+     *            Name of the remote printer to return information for.
+     * @return PrintQueueInfo
+     * @exception SMBException
+     *                If an SMB error occurs
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     */
+    public final PrintQueueInfo getPrinterInfo(final String printerName) throws java.io.IOException, SMBException {
 
-		return getRAPUserGroups(userName);
-	}
+        // Create an SMB transaction packet for the get printer information request
 
-	/**
-	 * Return printer queue information for the specified printer queue.
-	 *
-	 * @param printerName Name of the remote printer to return information for.
-	 * @return PrintQueueInfo
-	 * @exception SMBException If an SMB error occurs
-	 * @exception java.io.IOException If an I/O error occurs
-	 */
-	public final PrintQueueInfo getPrinterInfo(String printerName)
-		throws java.io.IOException, SMBException {
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create an SMB transaction packet for the get printer information request
+        // Build the NetPrintQGetInfo parameter block
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetPrintQGetInfo, params, 0);
+        int pos = DataPacker.putString("zWrLh", params, 2, true);
+        // pos = DataPacker.putString ( "B13BWWWzzzzzWW", params, pos, true);
+        pos = DataPacker.putString("zWWWWzzzzWWzzl", params, pos, true);
+        pos = DataPacker.putString(printerName, params, pos, true);
+        // DataPacker.putIntelShort ( PrintQInfo2, params, pos);
+        DataPacker.putIntelShort(PrintQInfo3, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Build the NetPrintQGetInfo parameter block
+        // Initialize the transaction packet
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetPrintQGetInfo, params, 0);
-		int pos = DataPacker.putString("zWrLh", params, 2, true);
-		// pos = DataPacker.putString ( "B13BWWWzzzzzWW", params, pos, true);
-		pos = DataPacker.putString("zWWWWzzzzWWzzl", params, pos, true);
-		pos = DataPacker.putString(printerName, params, pos, true);
-		// DataPacker.putIntelShort ( PrintQInfo2, params, pos);
-		DataPacker.putIntelShort(PrintQInfo3, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Initialize the transaction packet
+        // Set various transaction parameters
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Set various transaction parameters
+        // Set the user id and tree id
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the user id and tree id
+        // Exchanged the SMB packet
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Exchanged the SMB packet
+        // Check if we received a valid response
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Check if we received a valid response
+        // Unpack the parameter block
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Unpack the parameter block
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Unpack the printer list
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Unpack the printer list
+        // Unpack the printer information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final Vector objs = new Vector();
+        // pos = SMBDataDecoder.DecodeData ( buf, pos, "B13.WWWzzzzzWW", objs, conv);
+        pos = DataDecoder.DecodeData(buf, pos, "zWWWWzzzzWWzzl", objs, conv);
 
-		// Unpack the printer information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        // Create a printer information object to hold the current printer details
 
-		Vector objs = new Vector();
-		// pos = SMBDataDecoder.DecodeData ( buf, pos, "B13.WWWzzzzzWW", objs, conv);
-		pos = DataDecoder.DecodeData(buf, pos, "zWWWWzzzzWWzzl", objs, conv);
+        String str = (String) objs.elementAt(0);
+        if (str == null || str.length() == 0) {
+            str = printerName;
+        }
+        final PrintQueueInfo qinfo = new PrintQueueInfo(str);
 
-		// Create a printer information object to hold the current printer details
+        // Set the print queue parameters
 
-		String str = (String) objs.elementAt(0);
-		if ( str == null || str.length() == 0)
-			str = printerName;
-		PrintQueueInfo qinfo = new PrintQueueInfo(str);
+        Short sval = (Short) objs.elementAt(1);
+        qinfo.setPriority(sval.intValue());
+        qinfo.setSeperatorPage((String) objs.elementAt(5));
+        qinfo.setPreProcessor((String) objs.elementAt(6));
+        qinfo.setPrinterList((String) objs.elementAt(11));
+        qinfo.setParameterString((String) objs.elementAt(7));
+        qinfo.setComment((String) objs.elementAt(8));
 
-		// Set the print queue parameters
+        sval = (Short) objs.elementAt(9);
+        qinfo.setStatus(sval.intValue());
 
-		Short sval = (Short) objs.elementAt(1);
-		qinfo.setPriority(sval.intValue());
-		qinfo.setSeperatorPage((String) objs.elementAt(5));
-		qinfo.setPreProcessor((String) objs.elementAt(6));
-		qinfo.setPrinterList((String) objs.elementAt(11));
-		qinfo.setParameterString((String) objs.elementAt(7));
-		qinfo.setComment((String) objs.elementAt(8));
+        sval = (Short) objs.elementAt(10);
+        qinfo.setJobCount(sval.intValue());
 
-		sval = (Short) objs.elementAt(9);
-		qinfo.setStatus(sval.intValue());
+        sval = (Short) objs.elementAt(2);
+        qinfo.setStartTime(sval.intValue());
 
-		sval = (Short) objs.elementAt(10);
-		qinfo.setJobCount(sval.intValue());
+        sval = (Short) objs.elementAt(3);
+        qinfo.setStopTime(sval.intValue());
 
-		sval = (Short) objs.elementAt(2);
-		qinfo.setStartTime(sval.intValue());
+        // Return the printer information
 
-		sval = (Short) objs.elementAt(3);
-		qinfo.setStopTime(sval.intValue());
+        return qinfo;
+    }
 
-		// Return the printer information
+    /**
+     * Return the list of printer queues available on this server.
+     *
+     * @return PrinterList containing the list of available printers
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
 
-		return qinfo;
-	}
+    public final PrinterList getPrinterList() throws java.io.IOException, SMBException {
 
-	/**
-	 * Return the list of printer queues available on this server.
-	 *
-	 * @return PrinterList containing the list of available printers
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
+        // Create an SMB transaction packet for the get printer list request
 
-	public final PrinterList getPrinterList()
-		throws java.io.IOException, SMBException {
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create an SMB transaction packet for the get printer list request
+        // Build the NetUserGetInfo parameter block
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetPrintQEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B13BWWWzzzzzWW", params, pos, true);
+        DataPacker.putIntelShort(PrintQInfo1, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Build the NetUserGetInfo parameter block
+        // Initialize the transaction packet
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetPrintQEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B13BWWWzzzzzWW", params, pos, true);
-		DataPacker.putIntelShort(PrintQInfo1, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Initialize the transaction packet
+        // Set various transaction parameters
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Set various transaction parameters
+        // Set the user id and tree id
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the user id and tree id
+        // Exchanged the SMB packet
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Exchanged the SMB packet
+        // Check if we received a valid response
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Check if we received a valid response
+        // Unpack the parameter block
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		// Unpack the parameter block
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        int cnt = prms[2]; // number of entries returned
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Unpack the printer list
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int cnt = (int) prms[2]; // number of entries returned
-		int tot = (int) prms[3]; // total number of entries available
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Unpack the printer list
+        // Unpack the printer information structures, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final PrinterList prnList = new PrinterList();
 
-		// Unpack the printer information structures, padding bytes are indicated by
-		// '.'s and will not return objects
+        while (cnt-- > 0) {
 
-		PrinterList prnList = new PrinterList();
+            // Get the current printer information
 
-		while (cnt-- > 0) {
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "B13.WWWzzzzzWW", objs, conv);
 
-			// Get the current printer information
+            // Create a printer information object to hold the current printer details
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "B13.WWWzzzzzWW", objs, conv);
+            final String str = (String) objs.elementAt(0);
+            final PrintQueueInfo qinfo = new PrintQueueInfo(str);
 
-			// Create a printer information object to hold the current printer details
+            // Set the print queue parameters
 
-			String str = (String) objs.elementAt(0);
-			PrintQueueInfo qinfo = new PrintQueueInfo(str);
+            Short sval = (Short) objs.elementAt(1);
+            qinfo.setPriority(sval.intValue());
+            qinfo.setSeperatorPage((String) objs.elementAt(4));
+            qinfo.setPreProcessor((String) objs.elementAt(5));
+            qinfo.setPrinterList((String) objs.elementAt(6));
+            qinfo.setParameterString((String) objs.elementAt(7));
 
-			// Set the print queue parameters
+            sval = (Short) objs.elementAt(9);
+            qinfo.setStatus(sval.intValue());
+            sval = (Short) objs.elementAt(10);
+            qinfo.setJobCount(sval.intValue());
 
-			Short sval = (Short) objs.elementAt(1);
-			qinfo.setPriority(sval.intValue());
-			qinfo.setSeperatorPage((String) objs.elementAt(4));
-			qinfo.setPreProcessor((String) objs.elementAt(5));
-			qinfo.setPrinterList((String) objs.elementAt(6));
-			qinfo.setParameterString((String) objs.elementAt(7));
+            // Add the current printer queue to the list
 
-			sval = (Short) objs.elementAt(9);
-			qinfo.setStatus(sval.intValue());
-			sval = (Short) objs.elementAt(10);
-			qinfo.setJobCount(sval.intValue());
+            prnList.addPrinterInfo(qinfo);
 
-			// Add the current printer queue to the list
+        } // end while printers
 
-			prnList.addPrinterInfo(qinfo);
+        // Return the printer list
 
-		} // end while printers
+        return prnList;
+    }
 
-		// Return the printer list
+    /**
+     * Return information for the specified print job.
+     *
+     * @param id
+     *            Id of the print job to return information for
+     * @return PrintJob
+     * @exception SMBException
+     *                The exception description.
+     * @exception java.io.IOException
+     *                The exception description.
+     */
+    public final PrintJob getPrintJobInfo(final int id) throws SMBException, java.io.IOException {
 
-		return prnList;
-	}
+        // Create an SMB transaction packet for the get printer list request
 
-	/**
-	 * Return information for the specified print job.
-	 *
-	 * @param id Id of the print job to return information for
-	 * @return PrintJob
-	 * @exception SMBException The exception description.
-	 * @exception java.io.IOException The exception description.
-	 */
-	public final PrintJob getPrintJobInfo(int id)
-		throws SMBException, java.io.IOException {
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create an SMB transaction packet for the get printer list request
+        // Build the DosPrintJobEnum parameter block
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetPrintJobGetInfo, params, 0);
+        int pos = DataPacker.putString("WWrLh", params, 2, true);
+        pos = DataPacker.putString("WWzWWDDzz", params, pos, true);
 
-		// Build the DosPrintJobEnum parameter block
+        DataPacker.putIntelShort(id, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(PrintJobInfo2, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetPrintJobGetInfo, params, 0);
-		int pos = DataPacker.putString("WWrLh", params, 2, true);
-		pos = DataPacker.putString("WWzWWDDzz", params, pos, true);
+        // Initialize the transaction packet
 
-		DataPacker.putIntelShort(id, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(PrintJobInfo2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Initialize the transaction packet
+        // Set various transaction parameters
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Set various transaction parameters
+        // Set the user id and tree id
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the user id and tree id
+        // Exchanged the SMB packet
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Exchanged the SMB packet
+        // Check if we received a valid response
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Check if we received a valid response
+        // Unpack the parameter block
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Unpack the parameter block
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Unpack the print job list
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Unpack the print job list
+        // Unpack the print job information, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final Vector objs = new Vector();
+        pos = DataDecoder.DecodeData(buf, pos, "WWzWWDDzz", objs, conv);
 
-		// Unpack the print job information, padding bytes are indicated by
-		// '.'s and will not return objects
+        // Create a print job information object to hold the current job details
 
-		Vector objs = new Vector();
-		pos = DataDecoder.DecodeData(buf, pos, "WWzWWDDzz", objs, conv);
+        Short sval = (Short) objs.elementAt(0);
+        final PrintJob prnJob = new PrintJob(sval.intValue());
 
-		// Create a print job information object to hold the current job details
+        sval = (Short) objs.elementAt(1);
+        prnJob.setPriority(sval.intValue());
+        prnJob.setUserName((String) objs.elementAt(2));
 
-		Short sval = (Short) objs.elementAt(0);
-		PrintJob prnJob = new PrintJob(sval.intValue());
+        sval = (Short) objs.elementAt(3);
+        prnJob.setPrintPosition(sval.intValue());
 
-		sval = (Short) objs.elementAt(1);
-		prnJob.setPriority(sval.intValue());
-		prnJob.setUserName((String) objs.elementAt(2));
+        sval = (Short) objs.elementAt(4);
+        prnJob.setStatus(sval.intValue());
 
-		sval = (Short) objs.elementAt(3);
-		prnJob.setPrintPosition(sval.intValue());
+        Integer ival = (Integer) objs.elementAt(5);
+        prnJob.setQueuedDateTime(new Date(ival.longValue() * 1000));
 
-		sval = (Short) objs.elementAt(4);
-		prnJob.setStatus(sval.intValue());
+        ival = (Integer) objs.elementAt(6);
+        prnJob.setSpoolFileSize(ival.intValue());
 
-		Integer ival = (Integer) objs.elementAt(5);
-		prnJob.setQueuedDateTime(new Date(ival.longValue() * 1000));
+        prnJob.setComment((String) objs.elementAt(7));
+        prnJob.setDocument((String) objs.elementAt(8));
 
-		ival = (Integer) objs.elementAt(6);
-		prnJob.setSpoolFileSize(ival.intValue());
+        // Return the print job information
 
-		prnJob.setComment((String) objs.elementAt(7));
-		prnJob.setDocument((String) objs.elementAt(8));
+        return prnJob;
+    }
 
-		// Return the print job information
+    /**
+     * Return the list of print jobs in the specified printer queue.
+     *
+     * @param qnam
+     *            Name of the queue to return jobs for
+     * @return PrintJobList containing the list of jobs in the queue
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    public final PrintJobList getPrintJobs(final String qnam) throws java.io.IOException, SMBException {
 
-		return prnJob;
-	}
+        // Create an SMB transaction packet for the get printer list request
 
-	/**
-	 * Return the list of print jobs in the specified printer queue.
-	 *
-	 * @param qnam Name of the queue to return jobs for
-	 * @return PrintJobList containing the list of jobs in the queue
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	public final PrintJobList getPrintJobs(String qnam)
-		throws java.io.IOException, SMBException {
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create an SMB transaction packet for the get printer list request
+        // Build the DosPrintJobEnum parameter block
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetPrintQGetInfo, params, 0);
+        int pos = DataPacker.putString("zWrLh", params, 2, true);
+        pos = DataPacker.putString("B13BWWWzzzzzWN", params, pos, true);
+        pos = DataPacker.putString(qnam, params, pos, true);
+        DataPacker.putIntelShort(PrintJobInfo2, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
+        pos = DataPacker.putString("WB21BB16B10zWWzDDz", params, pos, true);
 
-		// Build the DosPrintJobEnum parameter block
+        // Initialize the transaction packet
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetPrintQGetInfo, params, 0);
-		int pos = DataPacker.putString("zWrLh", params, 2, true);
-		pos = DataPacker.putString("B13BWWWzzzzzWN", params, pos, true);
-		pos = DataPacker.putString(qnam, params, pos, true);
-		DataPacker.putIntelShort(PrintJobInfo2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
-		pos = DataPacker.putString("WB21BB16B10zWWzDDz", params, pos, true);
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Initialize the transaction packet
+        // Set various transaction parameters
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Set various transaction parameters
+        // Set the user id and tree id
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the user id and tree id
+        // Exchanged the SMB packet
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Exchanged the SMB packet
+        // Check if we received a valid response
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Check if we received a valid response
+        // Unpack the parameter block
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Unpack the parameter block
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+        if (prms[1] == 0) {
+            return null;
+        }
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		if ( prms[1] == 0)
-			return null;
+        // Unpack the print job list
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Unpack the print job list
+        // Unpack the print job list, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final PrintJobList jobList = new PrintJobList();
 
-		// Unpack the print job list, padding bytes are indicated by
-		// '.'s and will not return objects
+        final Vector qobj = new Vector();
+        pos = DataDecoder.DecodeData(buf, pos, "B13BWWWzzzzzWN", qobj, conv);
 
-		PrintJobList jobList = new PrintJobList();
+        // Get the count for the second block of data, the queue list
 
-		Vector qobj = new Vector();
-		pos = DataDecoder.DecodeData(buf, pos, "B13BWWWzzzzzWN", qobj, conv);
+        int cnt = DataPacker.getIntelShort(buf, pos);
+        pos += 2;
 
-		// Get the count for the second block of data, the queue list
+        while (cnt-- > 0) {
 
-		int cnt = DataPacker.getIntelShort(buf, pos);
-		pos += 2;
+            // Get the current print job information
 
-		while (cnt-- > 0) {
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "WB21BB16B10zWWzDDz", objs, conv);
 
-			// Get the current print job information
+            // Create a print job information object to hold the current job details
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "WB21BB16B10zWWzDDz", objs, conv);
+            Short sval = (Short) objs.elementAt(0);
+            final PrintJob prnJob = new PrintJob(sval.intValue());
 
-			// Create a print job information object to hold the current job details
+            sval = (Short) objs.elementAt(6);
+            prnJob.setPriority(sval.intValue());
+            prnJob.setUserName((String) objs.elementAt(1));
 
-			Short sval = (Short) objs.elementAt(0);
-			PrintJob prnJob = new PrintJob(sval.intValue());
+            objs.elementAt(2);
+            prnJob.setPrintPosition(sval.intValue());
 
-			sval = (Short) objs.elementAt(6);
-			prnJob.setPriority(sval.intValue());
-			prnJob.setUserName((String) objs.elementAt(1));
+            sval = (Short) objs.elementAt(7);
+            prnJob.setStatus(sval.intValue());
 
-			Byte bval = (Byte) objs.elementAt(2);
-			prnJob.setPrintPosition(sval.intValue());
+            Integer ival = (Integer) objs.elementAt(9);
+            prnJob.setQueuedDateTime(new Date(ival.longValue() * 1000));
 
-			sval = (Short) objs.elementAt(7);
-			prnJob.setStatus(sval.intValue());
+            ival = (Integer) objs.elementAt(10);
+            prnJob.setSpoolFileSize(ival.intValue());
 
-			Integer ival = (Integer) objs.elementAt(9);
-			prnJob.setQueuedDateTime(new Date(ival.longValue() * 1000));
+            prnJob.setComment((String) objs.elementAt(8));
+            prnJob.setDocument((String) objs.elementAt(11));
 
-			ival = (Integer) objs.elementAt(10);
-			prnJob.setSpoolFileSize(ival.intValue());
+            // Add the print job to the job list
 
-			prnJob.setComment((String) objs.elementAt(8));
-			prnJob.setDocument((String) objs.elementAt(11));
+            jobList.addPrintJob(prnJob);
 
-			// Add the print job to the job list
+        } // end while printers
 
-			jobList.addPrintJob(prnJob);
+        // Return the print job list
 
-		} // end while printers
+        return jobList;
+    }
 
-		// Return the print job list
+    /**
+     * Return the server information for the server we are connected to
+     *
+     * @return ServerInfo containing the server information
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    public final ServerInfo getServerInfo() throws java.io.IOException, SMBException {
 
-		return jobList;
-	}
+        // Use the RAP call for now
 
-	/**
-	 * Return the list of print jobs in the specified print queue.
-	 *
-	 * @param qnam Name of the print queue
-	 * @return PrintJobList
-	 * @exception SMBException The exception description.
-	 * @exception java.io.IOException The exception description.
-	 */
-	private PrintJobList getPrintJobsOld(String qnam)
-		throws SMBException, IOException {
+        return getRAPServerInfo();
+    }
 
-		// Create an SMB transaction packet for the get printer list request
+    /**
+     * Return the server information for the specified server.
+     *
+     * @param node
+     *            Node name of the server to return information for.
+     * @return ServerInfo
+     * @exception SMBException
+     *                An SMB exception has occurred.
+     * @exception java.io.IOException
+     *                An I/O exception has occurred.
+     */
+    public final ServerInfo getServerInfo(final String node) throws SMBException, java.io.IOException {
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Use the RAP call for now
 
-		// Build the DosPrintJobEnum parameter block
+        return getRAPServerInfo(node);
+    }
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetPrintJobEnum, params, 0);
-		int pos = DataPacker.putString("zWrLeh", params, 2, true);
-		pos = DataPacker.putString("WWzWWDDzz", params, pos, true);
-		pos = DataPacker.putString(qnam, params, pos, true);
-		DataPacker.putIntelShort(PrintJobInfo2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+    /**
+     * Return the list of available servers on the network
+     *
+     * @param flags
+     *            Server enumerate flags.
+     * @return List of available servers, as a ServerList, else null if there are no servers available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+    public final ServerList getServerList(final int flags) throws java.io.IOException, SMBException {
 
-		// Initialize the transaction packet
+        // Use the RAP call for now
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        return getRAPServerList(flags);
+    }
 
-		// Set various transaction parameters
+    /**
+     * Return the list of available servers on the network
+     *
+     * @param flags
+     *            Server enumerate flags.
+     * @return List of available servers, as a Vector of Strings, else null if there are no servers available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+    public final StringList getServerNames(final int flags) throws java.io.IOException, SMBException {
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Use the RAP call for now
 
-		// Set the user id and tree id
+        return getRAPServerNames(flags);
+    }
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+    /**
+     * Return a list of services installed on the remote node.
+     *
+     * @return List of service name strings.
+     * @exception SMBException
+     *                SMB error occurred.
+     * @exception java.io.IOException
+     *                I/O exception.
+     */
+    public final StringList getServiceList() throws SMBException, java.io.IOException {
 
-		// Exchanged the SMB packet
+        // Use the RAP call for now
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        return getRAPServiceList();
+    }
 
-		// Check if we received a valid response
+    /**
+     * Return the associated session.
+     *
+     * @return Session
+     */
+    public Session getSession() {
+        return m_sess;
+    }
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+    /**
+     * Return a list of open sessions on the remote server.
+     *
+     * @return SessionInfoList
+     * @exception SMBException
+     * @exception DCEException
+     * @exception java.io.IOException
+     */
+    public final SessionInfoList getSessionList() throws SMBException, DCEException, java.io.IOException {
 
-		// Unpack the parameter block
+        // Check if the server supports DCE/RPC requests
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        SessionInfoList sessList = null;
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int cnt = (int) prms[2]; // number of entries returned
-		int tot = (int) prms[3]; // total number of entries available
+            // Open the server DCE/RPC pipe
 
-		// Unpack the print job list
+            final SrvsvcPipeFile srvPipe = openServerPipe();
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+            // Get the session list
 
-		// Unpack the print job list, padding bytes are indicated by
-		// '.'s and will not return objects
+            sessList = srvPipe.getSessionList(null, null);
+        } else {
 
-		PrintJobList jobList = new PrintJobList();
+            // Use the older RAP call to get the session list
 
-		while (cnt-- > 0) {
+            sessList = getRAPSessionList();
+        }
 
-			// Get the current print job information
+        // Return the session list
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "WWzWWDDzz", objs, conv);
+        return sessList;
+    }
 
-			// Create a print job information object to hold the current job details
+    /**
+     * Return the full share information for the specified share
+     *
+     * @param shr
+     *            Remote share name to return information for.
+     * @return ShareInfo containing the full share details
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     * @exception DCEException
+     */
 
-			Short sval = (Short) objs.elementAt(0);
-			PrintJob prnJob = new PrintJob(sval.intValue());
+    public final ShareInfo getShareInfo(final String shr) throws java.io.IOException, SMBException, DCEException {
 
-			sval = (Short) objs.elementAt(1);
-			prnJob.setPriority(sval.intValue());
-			prnJob.setUserName((String) objs.elementAt(2));
+        // Check if the server supports DCE/RPC requests
 
-			sval = (Short) objs.elementAt(3);
-			prnJob.setPrintPosition(sval.intValue());
+        ShareInfo shrInfo = null;
 
-			sval = (Short) objs.elementAt(4);
-			prnJob.setStatus(sval.intValue());
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-			Integer ival = (Integer) objs.elementAt(5);
-			prnJob.setQueuedDateTime(new Date(ival.longValue() * 1000));
+            // Open the server DCE/RPC pipe
 
-			ival = (Integer) objs.elementAt(6);
-			prnJob.setSpoolFileSize(ival.intValue());
+            final SrvsvcPipeFile srvPipe = openServerPipe();
 
-			prnJob.setComment((String) objs.elementAt(7));
-			prnJob.setDocument((String) objs.elementAt(8));
+            // Get the share list
 
-			// Add the print job to the job list
+            shrInfo = srvPipe.getShareInformation(shr);
+        } else {
 
-			jobList.addPrintJob(prnJob);
+            // Use the RAP call for now
 
-		} // end while printers
+            shrInfo = getRAPShareInfo(shr);
+        }
 
-		// Return the print job list
+        // Return the share information
 
-		return jobList;
-	}
+        return shrInfo;
+    }
 
-	/**
-	 * Return the server information for the server we are connected to
-	 *
-	 * @return ServerInfo containing the server information
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	public final ServerInfo getServerInfo()
-		throws java.io.IOException, SMBException {
+    /**
+     * Return the list of available shares on the remote server
+     *
+     * @return List of available shares, as a ShareList, else null if there are no shares available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final ShareInfoList getShareList() throws java.io.IOException, SMBException, DCEException {
 
-		// Use the RAP call for now
+        // Check if the server supports DCE/RPC requests
 
-		return getRAPServerInfo();
-	}
+        ShareInfoList shareList = null;
 
-	/**
-	 * Return the server information for the specified server.
-	 *
-	 * @param node Node name of the server to return information for.
-	 * @return ServerInfo
-	 * @exception SMBException An SMB exception has occurred.
-	 * @exception java.io.IOException An I/O exception has occurred.
-	 */
-	public final ServerInfo getServerInfo(String node)
-		throws SMBException, java.io.IOException {
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-		// Use the RAP call for now
+            // Open the server DCE/RPC pipe
 
-		return getRAPServerInfo(node);
-	}
+            final SrvsvcPipeFile srvPipe = openServerPipe();
 
-	/**
-	 * Return the list of available servers on the network
-	 *
-	 * @param flags Server enumerate flags.
-	 * @return List of available servers, as a ServerList, else null if there are no servers
-	 *         available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
-	public final ServerList getServerList(int flags)
-		throws java.io.IOException, SMBException {
+            // Get the share list
 
-		// Use the RAP call for now
+            shareList = srvPipe.getShareList(true);
+        } else {
 
-		return getRAPServerList(flags);
-	}
+            // Use the older RAP call to get the share list
 
-	/**
-	 * Return the list of available servers on the network
-	 *
-	 * @param flags Server enumerate flags.
-	 * @return List of available servers, as a Vector of Strings, else null if there are no servers
-	 *         available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
-	public final StringList getServerNames(int flags)
-		throws java.io.IOException, SMBException {
+            shareList = getRAPShareList();
+        }
 
-		// Use the RAP call for now
+        // Return the share list
 
-		return getRAPServerNames(flags);
-	}
+        return shareList;
+    }
 
-	/**
-	 * Return a list of services installed on the remote node.
-	 *
-	 * @return List of service name strings.
-	 * @exception SMBException SMB error occurred.
-	 * @exception java.io.IOException I/O exception.
-	 */
-	public final StringList getServiceList()
-		throws SMBException, java.io.IOException {
+    /**
+     * Return the user information for the specified user
+     *
+     * @param usr
+     *            User name of the user to return information for.
+     * @return UserInfo containing the user details
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    public final UserInfo getUserInfo(final String usr) throws java.io.IOException, SMBException {
 
-		// Use the RAP call for now
+        // Use the RAP call for now
 
-		return getRAPServiceList();
-	}
+        return getRAPUserInfo(usr);
+    }
 
-	/**
-	 * Return the associated session.
-	 *
-	 * @return Session
-	 */
-	public Session getSession() {
-		return m_sess;
-	}
+    /**
+     * Return the list of users on the remote server.
+     *
+     * @return Vector of user name strings.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     * @exception DCEException
+     *                If a DCE/RPC error occurs
+     */
+    public final StringList getUserList() throws java.io.IOException, SMBException, DCEException {
 
-	/**
-	 * Return a list of open sessions on the remote server.
-	 *
-	 * @return SessionInfoList
-	 * @exception SMBException
-	 * @exception DCEException
-	 * @exception java.io.IOException
-	 */
-	public final SessionInfoList getSessionList()
-		throws SMBException, DCEException, java.io.IOException {
+        // Check if the server supports DCE/RPC requests
 
-		// Check if the server supports DCE/RPC requests
+        StringList userList = null;
 
-		SessionInfoList sessList = null;
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+            // Open the SAMR DCE/RPC pipe
 
-			// Open the server DCE/RPC pipe
+            final SamrPipeFile samrPipe = openSecurityAccountsManagerPipe();
 
-			SrvsvcPipeFile srvPipe = openServerPipe();
+            // Get a list of the available domains
 
-			// Get the session list
+            final StringList domains = samrPipe.enumerateDomains();
 
-			sessList = srvPipe.getSessionList(null, null);
-		}
-		else {
+            // Get the user list
 
-			// Use the older RAP call to get the session list
+            if (domains != null && domains.numberOfStrings() > 0) {
+                userList = samrPipe.enumerateUsers(domains.getStringAt(0));
+            }
+        } else {
 
-			sessList = getRAPSessionList();
-		}
+            // Use the older RAP call to get the user list
 
-		// Return the session list
+            userList = getRAPUserList();
+        }
 
-		return sessList;
-	}
+        // Reutrn the user list
 
-	/**
-	 * Return the full share information for the specified share
-	 *
-	 * @param shr Remote share name to return information for.
-	 * @return ShareInfo containing the full share details
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 * @exception DCEException
-	 */
+        return userList;
+    }
 
-	public final ShareInfo getShareInfo(String shr)
-		throws java.io.IOException, SMBException, DCEException {
+    /**
+     * Return the server type/information for the server we are connected to
+     *
+     * @return WorkStationInfo containing the information
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     * @exception DCEException
+     *                If a DCE/RPC error occurs
+     */
+    public final WorkstationInfo getWorkstationInfo() throws java.io.IOException, SMBException, DCEException {
 
-		// Check if the server supports DCE/RPC requests
+        // Check if the server supports DCE/RPC requests
 
-		ShareInfo shrInfo = null;
+        WorkstationInfo wksInfo = null;
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+        if (useDceRpc() && getSession().supportsRPCAPIs()) {
 
-			// Open the server DCE/RPC pipe
+            // Open the Workstation service DCE/RPC pipe
 
-			SrvsvcPipeFile srvPipe = openServerPipe();
+            final WkssvcPipeFile wksPipe = openWorkstationPipe();
 
-			// Get the share list
+            // Get the workstation information
 
-			shrInfo = srvPipe.getShareInformation(shr);
-		}
-		else {
+            wksInfo = wksPipe.getWorkstationInformation();
+        } else {
 
-			// Use the RAP call for now
+            // Use the older RAP call
 
-			shrInfo = getRAPShareInfo(shr);
-		}
+            wksInfo = getRAPWorkstationInfo();
+        }
 
-		// Return the share information
+        // Return the workstation information
 
-		return shrInfo;
-	}
+        return wksInfo;
+    }
 
-	/**
-	 * Return the list of available shares on the remote server
-	 *
-	 * @return List of available shares, as a ShareList, else null if there are no shares available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final ShareInfoList getShareList()
-		throws java.io.IOException, SMBException, DCEException {
+    /**
+     * Return the account type for the specified user name
+     *
+     * @param userName
+     *            String
+     * @return int
+     * @throws java.io.IOException
+     * @throws SMBException
+     * @throws DCEException
+     */
+    public final int getAccountType(final String userName) throws IOException, SMBException, DCEException {
 
-		// Check if the server supports DCE/RPC requests
+        // Open the SAMR DCE/RPC pipe, if not already open
 
-		ShareInfoList shareList = null;
+        final SamrPipeFile samrPipe = (SamrPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SAMR);
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+        if (m_samrHandle == null) {
 
-			// Open the server DCE/RPC pipe
+            // Get a handle to the service
 
-			SrvsvcPipeFile srvPipe = openServerPipe();
+            m_samrHandle = samrPipe.openService();
+        }
 
-			// Get the share list
+        // Get the user account details and determine if the user is a guest, normal user or
+        // administrator
 
-			shareList = srvPipe.getShareList(true);
-		}
-		else {
+        PolicyHandle domainHandle = null;
+        PolicyHandle builtinHandle = null;
+        PolicyHandle userHandle = null;
 
-			// Use the older RAP call to get the share list
+        int userType = -1;
 
-			shareList = getRAPShareList();
-		}
+        try {
 
-		// Return the share list
+            // Get the local domain SID
 
-		return shareList;
-	}
+            if (m_localDomain == null) {
 
-	/**
-	 * Return the user information for the specified user
-	 *
-	 * @param usr User name of the user to return information for.
-	 * @return UserInfo containing the user details
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	public final UserInfo getUserInfo(String usr)
-		throws java.io.IOException, SMBException {
+                // Get a list of the domains
 
-		// Use the RAP call for now
+                final StringList domains = samrPipe.enumerateDomains();
+                if (domains != null && domains.numberOfStrings() > 0) {
 
-		return getRAPUserInfo(usr);
-	}
+                    // Get a handle to the domain
 
-	/**
-	 * Return the list of users on the remote server.
-	 *
-	 * @return Vector of user name strings.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 * @exception DCEException If a DCE/RPC error occurs
-	 */
-	public final StringList getUserList()
-		throws java.io.IOException, SMBException, DCEException {
+                    m_localDomain = samrPipe.lookupDomain(domains.getStringAt(0));
+                }
+            }
 
-		// Check if the server supports DCE/RPC requests
+            // Open the domain
 
-		StringList userList = null;
+            domainHandle = samrPipe.openDomain(m_localDomain);
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+            // Open the builtin domain
 
-			// Open the SAMR DCE/RPC pipe
+            builtinHandle = samrPipe.openDomain(WellKnownSID.SIDBuiltinDomain);
 
-			SamrPipeFile samrPipe = openSecurityAccountsManagerPipe();
+            // Find the user relative-id
 
-			// Get a list of the available domains
+            final RIDList rids = samrPipe.lookupName(domainHandle, userName);
+            final RID userRID = rids.findRID(userName, RID.TypeUser);
 
-			StringList domains = samrPipe.enumerateDomains();
+            if (userRID != null) {
 
-			// Get the user list
+                // Get a handle to the user
 
-			if ( domains != null && domains.numberOfStrings() > 0)
-				userList = samrPipe.enumerateUsers(domains.getStringAt(0));
-		}
-		else {
+                userHandle = samrPipe.openUser(domainHandle, userRID);
 
-			// Use the older RAP call to get the user list
+                // Get a list of groups that the user is a member of
 
-			userList = getRAPUserList();
-		}
+                final RIDList groups = samrPipe.getGroupsForUser(userHandle);
+                if (groups != null) {
 
-		// Reutrn the user list
+                    // Check if the user is a member of the administrators, users or guests group
 
-		return userList;
-	}
+                    if (groups.findRID(WellKnownRID.DomainGroupAdmins, RID.TypeWellKnownGroup) != null) {
 
-	/**
-	 * Return the server type/information for the server we are connected to
-	 *
-	 * @return WorkStationInfo containing the information
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 * @exception DCEException If a DCE/RPC error occurs
-	 */
-	public final WorkstationInfo getWorkstationInfo()
-		throws java.io.IOException, SMBException, DCEException {
+                        // User in an administrator
 
-		// Check if the server supports DCE/RPC requests
+                        userType = UserInfo.PrivAdmin;
+                    } else if (groups.findRID(WellKnownRID.DomainGroupUsers, RID.TypeWellKnownGroup) != null) {
 
-		WorkstationInfo wksInfo = null;
+                        // User is a normal user
 
-		if ( useDceRpc() && getSession().supportsRPCAPIs()) {
+                        userType = UserInfo.PrivUser;
+                    } else if (groups.findRID(WellKnownRID.DomainGroupGuests, RID.TypeWellKnownGroup) != null) {
 
-			// Open the Workstation service DCE/RPC pipe
+                        // User is a guest
 
-			WkssvcPipeFile wksPipe = openWorkstationPipe();
+                        userType = UserInfo.PrivGuest;
+                    }
+                }
 
-			// Get the workstation information
+                // Make a SID for the user
 
-			wksInfo = wksPipe.getWorkstationInformation();
-		}
-		else {
+                final SID userSID = new SID(m_localDomain);
+                userSID.setRID(userRID.getRID());
 
-			// Use the older RAP call
+                // Get a list of aliases that the user is a member of
 
-			wksInfo = getRAPWorkstationInfo();
-		}
+                final RIDList aliases = samrPipe.getAliasesForUser(builtinHandle, userSID);
+                if (aliases != null) {
 
-		// Return the workstation information
+                    // Check if the user is a member of the administrators alias group
 
-		return wksInfo;
-	}
+                    if (aliases.findRID(WellKnownRID.DomainAliasAdmins, RID.TypeAlias) != null) {
 
-	/**
-	 * Return the account type for the specified user name
-	 *
-	 * @param userName String
-	 * @return int
-	 * @throws java.io.IOException
-	 * @throws SMBException
-	 * @throws DCEException
-	 */
-	public final int getAccountType(String userName)
-		throws IOException, SMBException, DCEException {
+                        // User is an administrator
 
-		// Open the SAMR DCE/RPC pipe, if not already open
+                        userType = UserInfo.PrivAdmin;
+                    } else if (aliases.findRID(WellKnownRID.DomainAliasUsers, RID.TypeAlias) != null) {
 
-		SamrPipeFile samrPipe = (SamrPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SAMR);
+                        // User is a normal user
 
-		if ( m_samrHandle == null) {
+                        userType = UserInfo.PrivUser;
+                    } else if (aliases.findRID(WellKnownRID.DomainAliasGuests, RID.TypeAlias) != null) {
 
-			// Get a handle to the service
+                        // User is a guest
 
-			m_samrHandle = samrPipe.openService();
-		}
+                        userType = UserInfo.PrivGuest;
+                    }
+                }
+            }
+        } finally {
 
-		// Get the user account details and determine if the user is a guest, normal user or
-		// administrator
+            // Make sure all handles are released
 
-		PolicyHandle domainHandle = null;
-		PolicyHandle builtinHandle = null;
-		PolicyHandle userHandle = null;
+            if (samrPipe != null) {
 
-		int userType = -1;
+                // Close the domain handle
 
-		try {
+                if (domainHandle != null) {
+                    samrPipe.closeHandle(domainHandle);
+                }
 
-			// Get the local domain SID
+                // Close the builtin domain handle
 
-			if ( m_localDomain == null) {
+                if (builtinHandle != null) {
+                    samrPipe.closeHandle(builtinHandle);
+                }
 
-				// Get a list of the domains
+                // Close the user handle
 
-				StringList domains = samrPipe.enumerateDomains();
-				if ( domains != null && domains.numberOfStrings() > 0) {
+                if (userHandle != null) {
+                    samrPipe.closeHandle(userHandle);
+                }
+            }
+        }
 
-					// Get a handle to the domain
+        // Return the user account type
 
-					m_localDomain = samrPipe.lookupDomain(domains.getStringAt(0));
-				}
-			}
+        return userType;
+    }
 
-			// Open the domain
+    /**
+     * Pause/continue or delete the specified print job
+     *
+     * @param job
+     *            Print job to manage
+     * @param func
+     *            Print job function
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final void ManagePrintJob(final PrintJob job, final int func) throws java.io.IOException, SMBException {
 
-			domainHandle = samrPipe.openDomain(m_localDomain);
+        // Create an SMB transaction packet for the print management job request
 
-			// Open the builtin domain
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-			builtinHandle = samrPipe.openDomain(WellKnownSID.SIDBuiltinDomain);
+        // Build the DosPrintJobEnum parameter block
 
-			// Find the user relative-id
+        final byte[] params = new byte[64];
+        DataPacker.putIntelShort(func, params, 0);
+        int pos = DataPacker.putString("W", params, 2, true);
+        pos = DataPacker.putString("", params, pos, true);
+        DataPacker.putIntelShort(job.getJobNumber(), params, pos);
+        pos += 2;
 
-			RIDList rids = samrPipe.lookupName(domainHandle, userName);
-			RID userRID = rids.findRID(userName, RID.TypeUser);
+        // Initialize the transaction packet
 
-			if ( userRID != null) {
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-				// Get a handle to the user
+        // Set various transaction parameters
 
-				userHandle = samrPipe.openUser(domainHandle, userRID);
+        pkt.setParameter(2, 2); // maximum parameter bytes to return, 1 short
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-				// Get a list of groups that the user is a member of
+        // Set the user id and tree id
 
-				RIDList groups = samrPipe.getGroupsForUser(userHandle);
-				if ( groups != null) {
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-					// Check if the user is a member of the administrators, users or guests group
+        // Exchanged the SMB packet
 
-					if ( groups.findRID(WellKnownRID.DomainGroupAdmins, RID.TypeWellKnownGroup) != null) {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-						// User in an administrator
+        // Check if we received a valid response
 
-						userType = UserInfo.PrivAdmin;
-					}
-					else if ( groups.findRID(WellKnownRID.DomainGroupUsers, RID.TypeWellKnownGroup) != null) {
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-						// User is a normal user
+        // Unpack the parameter block
 
-						userType = UserInfo.PrivUser;
-					}
-					else if ( groups.findRID(WellKnownRID.DomainGroupGuests, RID.TypeWellKnownGroup) != null) {
+        final short[] prms = new short[2];
+        pkt.getParameterBlock(prms);
 
-						// User is a guest
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
+    }
 
-						userType = UserInfo.PrivGuest;
-					}
-				}
+    /**
+     * Pause, continue or delete the specified printer queue.
+     *
+     * @param qname
+     *            Print queue to manage
+     * @param func
+     *            int Function to perform (pause/continue/delete)
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs.
+     */
+    private void ManagePrintQueue(final String qname, final int func) throws java.io.IOException, SMBException {
 
-				// Make a SID for the user
+        // Create an SMB transaction packet for the print queue management request
 
-				SID userSID = new SID(m_localDomain);
-				userSID.setRID(userRID.getRID());
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-				// Get a list of aliases that the user is a member of
+        // Build the transact parameter block
 
-				RIDList aliases = samrPipe.getAliasesForUser(builtinHandle, userSID);
-				if ( aliases != null) {
+        final byte[] params = new byte[64];
+        DataPacker.putIntelShort(func, params, 0);
+        int pos = DataPacker.putString("z", params, 2, true);
+        pos = DataPacker.putString("", params, pos, true);
+        pos = DataPacker.putString(qname, params, pos, true);
 
-					// Check if the user is a member of the administrators alias group
+        // Initialize the transaction packet
 
-					if ( aliases.findRID(WellKnownRID.DomainAliasAdmins, RID.TypeAlias) != null) {
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-						// User is an administrator
+        // Set various transaction parameters
 
-						userType = UserInfo.PrivAdmin;
-					}
-					else if ( aliases.findRID(WellKnownRID.DomainAliasUsers, RID.TypeAlias) != null) {
+        pkt.setParameter(2, 2); // maximum parameter bytes to return, 1 short
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-						// User is a normal user
+        // Set the user id and tree id
 
-						userType = UserInfo.PrivUser;
-					}
-					else if ( aliases.findRID(WellKnownRID.DomainAliasGuests, RID.TypeAlias) != null) {
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-						// User is a guest
+        // Exchanged the SMB packet
 
-						userType = UserInfo.PrivGuest;
-					}
-				}
-			}
-		}
-		finally {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-			// Make sure all handles are released
+        // Check if we received a valid response
 
-			if ( samrPipe != null) {
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-				// Close the domain handle
+        // Unpack the parameter block
 
-				if ( domainHandle != null)
-					samrPipe.closeHandle(domainHandle);
+        final short[] prms = new short[2];
+        pkt.getParameterBlock(prms);
 
-				// Close the builtin domain handle
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
+    }
 
-				if ( builtinHandle != null)
-					samrPipe.closeHandle(builtinHandle);
+    /**
+     * Pause the specified print job
+     *
+     * @param job
+     *            PrintJob containing the details of the print job to pause
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+    public final void PausePrintJob(final PrintJob job) throws java.io.IOException, SMBException {
 
-				// Close the user handle
+        // Pause the specified print job
 
-				if ( userHandle != null)
-					samrPipe.closeHandle(userHandle);
-			}
-		}
+        ManagePrintJob(job, PacketType.NetPrintJobPause);
+    }
 
-		// Return the user account type
+    /**
+     * Pause the specified print queue.
+     *
+     * @param qname
+     *            Remote print queue to be paused
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    public final void PausePrintQueue(final String qname) throws java.io.IOException, SMBException {
 
-		return userType;
-	}
+        // Pause the specified print queue
 
-	/**
-	 * Pause/continue or delete the specified print job
-	 *
-	 * @param job Print job to manage
-	 * @param func Print job function
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final void ManagePrintJob(PrintJob job, int func)
-		throws java.io.IOException, SMBException {
+        ManagePrintQueue(qname, PacketType.NetPrintQPause);
+    }
 
-		// Create an SMB transaction packet for the print management job request
+    /**
+     * Open the Windows registry DCE/RPC pipe
+     *
+     * @return WinregPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final WinregPipeFile openWindowsRegistryPipe() throws IOException, SMBException, DCEException {
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Open the remote Windows registry DCE/RPC service
 
-		// Build the DosPrintJobEnum parameter block
+        return (WinregPipeFile) openDCERPCPipe(DCEPipeType.PIPE_WINREG);
+    }
 
-		byte[] params = new byte[64];
-		DataPacker.putIntelShort(func, params, 0);
-		int pos = DataPacker.putString("W", params, 2, true);
-		pos = DataPacker.putString("", params, pos, true);
-		DataPacker.putIntelShort(job.getJobNumber(), params, pos);
-		pos += 2;
+    /**
+     * Open the server DCE/RPC pipe
+     *
+     * @return SrvsvcPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final SrvsvcPipeFile openServerPipe() throws IOException, SMBException, DCEException {
 
-		// Initialize the transaction packet
+        // Open the DCE/RPC service
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        return (SrvsvcPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SRVSVC);
+    }
 
-		// Set various transaction parameters
+    /**
+     * Open the workstation DCE/RPC pipe
+     *
+     * @return WkssvcPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final WkssvcPipeFile openWorkstationPipe() throws IOException, SMBException, DCEException {
 
-		pkt.setParameter(2, 2); // maximum parameter bytes to return, 1 short
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Open the DCE/RPC service
 
-		// Set the user id and tree id
+        return (WkssvcPipeFile) openDCERPCPipe(DCEPipeType.PIPE_WKSSVC);
+    }
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+    /**
+     * Open the event log DCE/RPC pipe
+     *
+     * @return EventlogPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final EventlogPipeFile openEventLogPipe() throws IOException, SMBException, DCEException {
 
-		// Exchanged the SMB packet
+        // Open the DCE/RPC service
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        return (EventlogPipeFile) openDCERPCPipe(DCEPipeType.PIPE_EVENTLOG);
+    }
 
-		// Check if we received a valid response
+    /**
+     * Open the service manager DCE/RPC pipe
+     *
+     * @return SvcctlPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final SvcctlPipeFile openServiceManagerPipe() throws IOException, SMBException, DCEException {
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Open the DCE/RPC service
 
-		// Unpack the parameter block
+        return (SvcctlPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SVCCTL);
+    }
 
-		short[] prms = new short[2];
-		pkt.getParameterBlock(prms);
+    /**
+     * Open the security accounts manager DCE/RPC pipe (SAMR)
+     *
+     * @return SamrPipeFile
+     */
+    public final SamrPipeFile openSecurityAccountsManagerPipe() throws IOException, SMBException, DCEException {
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
-	}
+        // Open the DCE/RPC service
 
-	/**
-	 * Pause, continue or delete the specified printer queue.
-	 *
-	 * @param qname Print queue to manage
-	 * @param func int Function to perform (pause/continue/delete)
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs.
-	 */
-	private void ManagePrintQueue(String qname, int func)
-		throws java.io.IOException, SMBException {
+        return (SamrPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SAMR);
+    }
 
-		// Create an SMB transaction packet for the print queue management request
+    /**
+     * Open the shutdown service DCE/RPC pipe
+     *
+     * @return InitShutPipeFile
+     */
+    public final InitShutPipeFile openInitShutdownPipe() throws IOException, SMBException, DCEException {
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Open the DCE/RPC service
 
-		// Build the transact parameter block
+        return (InitShutPipeFile) openDCERPCPipe(DCEPipeType.PIPE_INITSHUT);
+    }
 
-		byte[] params = new byte[64];
-		DataPacker.putIntelShort(func, params, 0);
-		int pos = DataPacker.putString("z", params, 2, true);
-		pos = DataPacker.putString("", params, pos, true);
-		pos = DataPacker.putString(qname, params, pos, true);
+    /**
+     * Set the buffer size to use for transactions. The minimum is 8K, and maximum is 64K.
+     *
+     * @param siz
+     *            int
+     */
+    public void setBufferSize(final int siz) {
 
-		// Initialize the transaction packet
+        // Check the buffer size for a valid range
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        if (siz >= 8192 && siz <= 65535) {
+            m_defBufSize = siz;
+        }
+    }
 
-		// Set various transaction parameters
+    /**
+     * Open the specifed named pipe file and setup the pipe.
+     *
+     * @param pipeId
+     *            DCE/RPC pipe type
+     * @return IPCPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    public final IPCPipeFile openPipe(final int pipeId) throws IOException, SMBException, DCEException {
 
-		pkt.setParameter(2, 2); // maximum parameter bytes to return, 1 short
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Check if the server supports DCE/RPC
 
-		// Set the user id and tree id
+        if (getSession().supportsRPCAPIs() == false) {
+            throw new DCEException("Server does not support DCE/RPC");
+        }
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Check if the pipe id is valid
 
-		// Exchanged the SMB packet
+        final String pipeName = DCEPipeType.getTypeAsStringShort(pipeId);
+        if (pipeName == null) {
+            throw new DCEException("Invalid pipe id " + pipeId);
+        }
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Initialize the SMB request to open the required named pipe file
 
-		// Check if we received a valid response
+        final SMBPacket pkt = new SMBPacket();
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Build the NTCreateAndX SMB packet
 
-		// Unpack the parameter block
+        pkt.setFlags(m_sess.getDefaultFlags());
+        pkt.setFlags2(m_sess.getDefaultFlags2());
 
-		short[] prms = new short[2];
-		pkt.getParameterBlock(prms);
+        pkt.setCommand(PacketType.NTCreateAndX);
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
-	}
+        pkt.setParameterCount(24);
+        pkt.resetParameterPointer();
 
-	/**
-	 * Pause the specified print job
-	 *
-	 * @param job PrintJob containing the details of the print job to pause
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
-	public final void PausePrintJob(PrintJob job)
-		throws java.io.IOException, SMBException {
+        pkt.packByte(0xFF); // no chained command
+        pkt.packByte(0); // reserved
+        pkt.packWord(0); // AndX offset
+        pkt.packByte(0); // reserved
 
-		// Pause the specified print job
+        int nameLen = pipeName.length();
+        if (pkt.isUnicode()) {
+            nameLen = (nameLen * 2) + 2;
+        }
 
-		ManagePrintJob(job, PacketType.NetPrintJobPause);
-	}
+        pkt.packWord(nameLen);// name length in bytes, inc null
+        pkt.packInt(0); // flags
+        pkt.packInt(0); // root FID
+        pkt.packInt(0x2019F); // desired access mode
+        pkt.packLong(0); // allocation size
+        pkt.packInt(0); // file attributes
+        pkt.packInt(SharingMode.READWRITE); // share access mode
+        pkt.packInt(0x01); // action to take if file exists
+        pkt.packInt(0); // file create options
+        pkt.packInt(2); // impersonation level, 0=anonymous, 2=impersonation
+        pkt.packByte(0); // security flags
 
-	/**
-	 * Pause the specified print queue.
-	 *
-	 * @param qname Remote print queue to be paused
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	public final void PausePrintQueue(String qname)
-		throws java.io.IOException, SMBException {
+        pkt.resetBytePointer();
+        pkt.packString(pipeName, pkt.isUnicode());
 
-		// Pause the specified print queue
+        pkt.setByteCount();
 
-		ManagePrintQueue(qname, PacketType.NetPrintQPause);
-	}
+        // Send/receive the NT create andX request
 
-	/**
-	 * Open the Windows registry DCE/RPC pipe
-	 *
-	 * @return WinregPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final WinregPipeFile openWindowsRegistryPipe()
-		throws IOException, SMBException, DCEException {
+        pkt.ExchangeSMB(m_sess, pkt, true);
 
-		// Open the remote Windows registry DCE/RPC service
+        // Unpack the file/directory details
 
-		return (WinregPipeFile) openDCERPCPipe(DCEPipeType.PIPE_WINREG);
-	}
+        pkt.resetParameterPointer();
+        pkt.skipBytes(5);
 
-	/**
-	 * Open the server DCE/RPC pipe
-	 *
-	 * @return SrvsvcPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final SrvsvcPipeFile openServerPipe()
-		throws IOException, SMBException, DCEException {
+        final int pipeHandle = pkt.unpackWord();
 
-		// Open the DCE/RPC service
+        // Bind the pipe file
 
-		return (SrvsvcPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SRVSVC);
-	}
+        final DCEPacket dcePkt = new DCEPacket(65535, pkt);
+        dcePkt.initializeDCEBind(pipeHandle, 4280, 4280, pipeId, 1);
 
-	/**
-	 * Open the workstation DCE/RPC pipe
-	 *
-	 * @return WkssvcPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final WkssvcPipeFile openWorkstationPipe()
-		throws IOException, SMBException, DCEException {
+        // Set the user id and tree id
 
-		// Open the DCE/RPC service
+        dcePkt.setUserId(m_sess.getUserId());
+        dcePkt.setTreeId(m_sess.getTreeId());
 
-		return (WkssvcPipeFile) openDCERPCPipe(DCEPipeType.PIPE_WKSSVC);
-	}
+        // Set the header flags
 
-	/**
-	 * Open the event log DCE/RPC pipe
-	 *
-	 * @return EventlogPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final EventlogPipeFile openEventLogPipe()
-		throws IOException, SMBException, DCEException {
+        // dcePkt.setFlags(m_sess.getDefaultFlags());
+        // dcePkt.setFlags2(m_sess.getDefaultFlags2());
 
-		// Open the DCE/RPC service
+        // Exchanged the SMB packet
 
-		return (EventlogPipeFile) openDCERPCPipe(DCEPipeType.PIPE_EVENTLOG);
-	}
+        dcePkt.ExchangeSMB(m_sess, dcePkt);
 
-	/**
-	 * Open the service manager DCE/RPC pipe
-	 *
-	 * @return SvcctlPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final SvcctlPipeFile openServiceManagerPipe()
-		throws IOException, SMBException, DCEException {
+        // Check if we received a valid response
 
-		// Open the DCE/RPC service
+        if (dcePkt.isValidResponse() == false) {
+            throw new SMBException(dcePkt.getErrorClass(), dcePkt.getErrorCode());
+        }
 
-		return (SvcctlPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SVCCTL);
-	}
+        // Get the maximum transmit/receive buffer sizes from the bind acknowledge
 
-	/**
-	 * Open the security accounts manager DCE/RPC pipe (SAMR)
-	 *
-	 * @return SamrPipeFile
-	 */
-	public final SamrPipeFile openSecurityAccountsManagerPipe()
-		throws IOException, SMBException, DCEException {
+        final DCEBuffer ackBuf = new DCEBuffer(dcePkt.getBuffer(), dcePkt.getDCEDataOffset());
+        int maxTxSize = -1;
+        int maxRxSize = -1;
 
-		// Open the DCE/RPC service
+        try {
+            maxTxSize = ackBuf.getShort();
+            maxRxSize = ackBuf.getShort();
+        } catch (final DCEBufferException ex) {
+        }
 
-		return (SamrPipeFile) openDCERPCPipe(DCEPipeType.PIPE_SAMR);
-	}
+        // Create a pipe file for the new pipe connection
 
-	/**
-	 * Open the shutdown service DCE/RPC pipe
-	 *
-	 * @return InitShutPipeFile
-	 */
-	public final InitShutPipeFile openInitShutdownPipe()
-		throws IOException, SMBException, DCEException {
+        IPCPipeFile pipeFile = null;
 
-		// Open the DCE/RPC service
+        switch (pipeId) {
 
-		return (InitShutPipeFile) openDCERPCPipe(DCEPipeType.PIPE_INITSHUT);
-	}
+            // Server service
 
-	/**
-	 * Set the buffer size to use for transactions. The minimum is 8K, and maximum is 64K.
-	 *
-	 * @param siz int
-	 */
-	public void setBufferSize(int siz) {
+            case DCEPipeType.PIPE_SRVSVC:
+                pipeFile = new SrvsvcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		// Check the buffer size for a valid range
+            // Windows registry
 
-		if ( siz >= 8192 && siz <= 65535)
-			m_defBufSize = siz;
-	}
+            case DCEPipeType.PIPE_WINREG:
+                pipeFile = new WinregPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-	/**
-	 * Open the specifed named pipe file and setup the pipe.
-	 *
-	 * @param pipeId DCE/RPC pipe type
-	 * @return IPCPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	public final IPCPipeFile openPipe(int pipeId)
-		throws IOException, SMBException, DCEException {
+            // Service control
 
-		// Check if the server supports DCE/RPC
+            case DCEPipeType.PIPE_SVCCTL:
+                pipeFile = new SvcctlPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		if ( getSession().supportsRPCAPIs() == false)
-			throw new DCEException("Server does not support DCE/RPC");
+            // Eventlog
 
-		// Check if the pipe id is valid
+            case DCEPipeType.PIPE_EVENTLOG:
+                pipeFile = new EventlogPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		String pipeName = DCEPipeType.getTypeAsStringShort(pipeId);
-		if ( pipeName == null)
-			throw new DCEException("Invalid pipe id " + pipeId);
+            // Local Security Authority
 
-		// Initialize the SMB request to open the required named pipe file
+            case DCEPipeType.PIPE_LSARPC:
+                pipeFile = new LsarpcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		SMBPacket pkt = new SMBPacket();
+            // Security Accounts Manager
 
-		// Build the NTCreateAndX SMB packet
+            case DCEPipeType.PIPE_SAMR:
+                pipeFile = new SamrPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		pkt.setFlags(m_sess.getDefaultFlags());
-		pkt.setFlags2(m_sess.getDefaultFlags2());
+            // NetLogon
 
-		pkt.setCommand(PacketType.NTCreateAndX);
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+            case DCEPipeType.PIPE_NETLOGON:
+                pipeFile = new NetLogonPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		pkt.setParameterCount(24);
-		pkt.resetParameterPointer();
+            // InitShutdown
 
-		pkt.packByte(0xFF); // no chained command
-		pkt.packByte(0); // reserved
-		pkt.packWord(0); // AndX offset
-		pkt.packByte(0); // reserved
+            case DCEPipeType.PIPE_INITSHUT:
+                pipeFile = new InitShutPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
 
-		int nameLen = pipeName.length();
-		if ( pkt.isUnicode())
-			nameLen = (nameLen * 2) + 2;
+            // Workstation service
 
-		pkt.packWord(nameLen);// name length in bytes, inc null
-		pkt.packInt(0); // flags
-		pkt.packInt(0); // root FID
-		pkt.packInt(0x2019F); // desired access mode
-		pkt.packLong(0); // allocation size
-		pkt.packInt(0); // file attributes
-		pkt.packInt(SharingMode.READWRITE); // share access mode
-		pkt.packInt(0x01); // action to take if file exists
-		pkt.packInt(0); // file create options
-		pkt.packInt(2); // impersonation level, 0=anonymous, 2=impersonation
-		pkt.packByte(0); // security flags
+            case DCEPipeType.PIPE_WKSSVC:
+                pipeFile = new WkssvcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
+                break;
+        }
 
-		pkt.resetBytePointer();
-		pkt.packString(pipeName, pkt.isUnicode());
+        // Return the named pipe file
 
-		pkt.setByteCount();
+        return pipeFile;
+    }
 
-		// Send/receive the NT create andX request
+    /**
+     * Open a DCE/RPC pipe, or re-use a pipe file cached in the pipe cache.
+     *
+     * @param pipeType
+     *            int
+     * @return IPCPipeFile
+     * @exception IOException
+     * @exception SMBException
+     * @exception DCEException
+     */
+    private final IPCPipeFile openDCERPCPipe(final int pipeType) throws IOException, SMBException, DCEException {
 
-		pkt.ExchangeSMB(m_sess, pkt, true);
+        // Check if the server supports DCE/RPC
 
-		// Unpack the file/directory details
+        if (getSession().supportsRPCAPIs() == false) {
+            throw new DCEException("Server does not support DCE/RPC");
+        }
 
-		pkt.resetParameterPointer();
-		pkt.skipBytes(5);
+        // Get the pipe type as a string, the name is used to index the cached pipe files
 
-		int pipeHandle = pkt.unpackWord();
+        final String pipeName = DCEPipeType.getTypeAsString(pipeType);
 
-		// Bind the pipe file
+        // Check if there is a pipe file already in the cache
 
-		DCEPacket dcePkt = new DCEPacket(65535, pkt);
-		dcePkt.initializeDCEBind(pipeHandle, 4280, 4280, pipeId, 1);
+        IPCPipeFile pipeFile = m_pipeCache.get(pipeName);
+        if (pipeFile != null && pipeFile.isClosed()) {
 
-		// Set the user id and tree id
+            // Remove the pipe file from the cache as the file has been closed
 
-		dcePkt.setUserId(m_sess.getUserId());
-		dcePkt.setTreeId(m_sess.getTreeId());
+            m_pipeCache.remove(pipeName);
+            pipeFile = null;
+        }
 
-		// Set the header flags
+        // Check if the pipe file is valid
 
-		// dcePkt.setFlags(m_sess.getDefaultFlags());
-		// dcePkt.setFlags2(m_sess.getDefaultFlags2());
+        if (pipeFile != null) {
+            return pipeFile;
+        }
 
-		// Exchanged the SMB packet
+        // Open the required DCE/RPC pipe
 
-		dcePkt.ExchangeSMB(m_sess, dcePkt);
+        pipeFile = openPipe(pipeType);
+        if (pipeFile != null) {
 
-		// Check if we received a valid response
+            // Cache the pipe file
 
-		if ( dcePkt.isValidResponse() == false)
-			throw new SMBException(dcePkt.getErrorClass(), dcePkt.getErrorCode());
+            m_pipeCache.put(pipeName, pipeFile);
+        }
 
-		// Get the maximum transmit/receive buffer sizes from the bind acknowledge
+        // Return the DCE/RPC pipe file
 
-		DCEBuffer ackBuf = new DCEBuffer(dcePkt.getBuffer(), dcePkt.getDCEDataOffset());
-		int maxTxSize = -1;
-		int maxRxSize = -1;
+        return pipeFile;
+    }
 
-		try {
-			maxTxSize = ackBuf.getShort();
-			maxRxSize = ackBuf.getShort();
-		}
-		catch (DCEBufferException ex) {
-		}
+    /**
+     * Close the cached pipe files
+     */
+    public final void closePipes() {
 
-		// Create a pipe file for the new pipe connection
+        // If the SAMR handle is valid then close the handle before closing the pipes
 
-		IPCPipeFile pipeFile = null;
+        if (m_samrHandle != null) {
 
-		switch (pipeId) {
+            // Get the SAMR pipe, if cached
 
-			// Server service
+            final SamrPipeFile samrPipe = (SamrPipeFile) m_pipeCache.get(DCEPipeType.getTypeAsString(DCEPipeType.PIPE_SAMR));
+            if (samrPipe != null && samrPipe.isClosed() == false) {
+                try {
+                    samrPipe.closeHandle(m_samrHandle);
+                } catch (final Exception ex) {
+                }
 
-			case DCEPipeType.PIPE_SRVSVC:
-				pipeFile = new SrvsvcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+                // Clear the handle and domain SID
 
-			// Windows registry
+                m_samrHandle = null;
+                m_localDomain = null;
+            }
+        }
+        // Enumerate the pipe files in the cache
 
-			case DCEPipeType.PIPE_WINREG:
-				pipeFile = new WinregPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+        final Enumeration<IPCPipeFile> enm = m_pipeCache.elements();
 
-			// Service control
+        while (enm.hasMoreElements()) {
 
-			case DCEPipeType.PIPE_SVCCTL:
-				pipeFile = new SvcctlPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+            // Get a pipe file from the cache
 
-			// Eventlog
+            final IPCPipeFile pipeFile = (IPCPipeFile) enm.nextElement();
 
-			case DCEPipeType.PIPE_EVENTLOG:
-				pipeFile = new EventlogPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+            // Close the pipe file
 
-			// Local Security Authority
+            if (pipeFile.isClosed() == false) {
+                try {
+                    pipeFile.ClosePipe();
+                } catch (final Exception ex) {
+                }
+            }
+        }
 
-			case DCEPipeType.PIPE_LSARPC:
-				pipeFile = new LsarpcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+        // Clear the pipe cache of all objects
 
-			// Security Accounts Manager
+        m_pipeCache.clear();
+    }
 
-			case DCEPipeType.PIPE_SAMR:
-				pipeFile = new SamrPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+    /**
+     * Get a list of the available groups using the older RAP call.
+     *
+     * @return List of groups on the remote server.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    private final StringList getRAPGroupList() throws SMBException, java.io.IOException {
 
-			// NetLogon
+        // Create an SMB transaction packet for the get group info request
 
-			case DCEPipeType.PIPE_NETLOGON:
-				pipeFile = new NetLogonPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-			// InitShutdown
+        // Build the NetGroupEnum parameter block
 
-			case DCEPipeType.PIPE_INITSHUT:
-				pipeFile = new InitShutPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetGroupEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B21", params, pos, true);
+        DataPacker.putIntelShort(GroupInfo0, params, pos);
+        // pos = DataPacker.putString ( "B21z", params, pos, true);
+        // DataPacker.putIntelShort ( GroupInfo1, params, pos);
+        // pos = DataPacker.putString ( "B21BzWW", params, pos, true);
+        // DataPacker.putIntelShort ( 2, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-			// Workstation service
+        // Initialize the transaction packet
 
-			case DCEPipeType.PIPE_WKSSVC:
-				pipeFile = new WkssvcPipeFile(m_sess, dcePkt, pipeHandle, pipeName, maxTxSize, maxRxSize);
-				break;
-		}
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Return the named pipe file
+        // Set various transaction parameters
 
-		return pipeFile;
-	}
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-	/**
-	 * Open a DCE/RPC pipe, or re-use a pipe file cached in the pipe cache.
-	 *
-	 * @param pipeType int
-	 * @return IPCPipeFile
-	 * @exception IOException
-	 * @exception SMBException
-	 * @exception DCEException
-	 */
-	private final IPCPipeFile openDCERPCPipe(int pipeType)
-		throws IOException, SMBException, DCEException {
+        // Set the user id and tree id
 
-		// Check if the server supports DCE/RPC
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		if ( getSession().supportsRPCAPIs() == false)
-			throw new DCEException("Server does not support DCE/RPC");
+        // Exchanged the SMB packet
 
-		// Get the pipe type as a string, the name is used to index the cached pipe files
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		String pipeName = DCEPipeType.getTypeAsString(pipeType);
+        // Check if we received a valid response
 
-		// Check if there is a pipe file already in the cache
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		IPCPipeFile pipeFile = (IPCPipeFile) m_pipeCache.get(pipeName);
-		if ( pipeFile != null && pipeFile.isClosed()) {
+        // Unpack the parameter block
 
-			// Remove the pipe file from the cache as the file has been closed
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-			m_pipeCache.remove(pipeName);
-			pipeFile = null;
-		}
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Check if the pipe file is valid
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		if ( pipeFile != null)
-			return pipeFile;
+        // Unpack the group information structure
 
-		// Open the required DCE/RPC pipe
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		pipeFile = openPipe(pipeType);
-		if ( pipeFile != null) {
+        // Unpack the group information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-			// Cache the pipe file
+        final Vector grpList = new Vector();
 
-			m_pipeCache.put(pipeName, pipeFile);
-		}
+        int cnt = prms[3];
 
-		// Return the DCE/RPC pipe file
+        while (cnt-- > 0) {
 
-		return pipeFile;
-	}
+            // Decode a group name string from the return buffer
 
-	/**
-	 * Close the cached pipe files
-	 */
-	public final void closePipes() {
+            pos = DataDecoder.DecodeData(buf, pos, "B21", grpList, conv);
+        }
 
-		// If the SAMR handle is valid then close the handle before closing the pipes
+        // Return the group information
 
-		if ( m_samrHandle != null) {
+        return new StringList(grpList);
+    }
 
-			// Get the SAMR pipe, if cached
+    /**
+     * Get a list of users that are in the specified group, using the older RAP call.
+     *
+     * @param grpName
+     *            java.lang.String Group name to return user list for.
+     * @return List of user names.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    private final StringList getRAPGroupUsers(final String grpName) throws SMBException, java.io.IOException {
 
-			SamrPipeFile samrPipe = (SamrPipeFile) m_pipeCache.get(DCEPipeType.getTypeAsString(DCEPipeType.PIPE_SAMR));
-			if ( samrPipe != null && samrPipe.isClosed() == false) {
-				try {
-					samrPipe.closeHandle(m_samrHandle);
-				}
-				catch (Exception ex) {
-				}
+        // Create an SMB transaction packet for the get group users info request
 
-				// Clear the handle and domain SID
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-				m_samrHandle = null;
-				m_localDomain = null;
-			}
-		}
-		// Enumerate the pipe files in the cache
+        // Build the NetGroupGetUser parameter block
 
-		Enumeration enm = m_pipeCache.elements();
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetGroupGetUsers, params, 0);
+        int pos = DataPacker.putString("zWrLeh", params, 2, true);
+        pos = DataPacker.putString("B21", params, pos, true);
+        pos = DataPacker.putString(grpName, params, pos, true);
+        DataPacker.putIntelShort(UserInfo0, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		while (enm.hasMoreElements()) {
+        // Initialize the transaction packet
 
-			// Get a pipe file from the cache
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-			IPCPipeFile pipeFile = (IPCPipeFile) enm.nextElement();
+        // Set various transaction parameters
 
-			// Close the pipe file
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-			if ( pipeFile.isClosed() == false) {
-				try {
-					pipeFile.ClosePipe();
-				}
-				catch (Exception ex) {
-				}
-			}
-		}
+        // Set the user id and tree id
 
-		// Clear the pipe cache of all objects
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		m_pipeCache.clear();
-	}
+        // Exchanged the SMB packet
 
-	/**
-	 * Get a list of the available groups using the older RAP call.
-	 *
-	 * @return List of groups on the remote server.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	private final StringList getRAPGroupList()
-		throws SMBException, java.io.IOException {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Create an SMB transaction packet for the get group info request
+        // Check if we received a valid response
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Build the NetGroupEnum parameter block
+        // Unpack the parameter block
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetGroupEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B21", params, pos, true);
-		DataPacker.putIntelShort(GroupInfo0, params, pos);
-		// pos = DataPacker.putString ( "B21z", params, pos, true);
-		// DataPacker.putIntelShort ( GroupInfo1, params, pos);
-		// pos = DataPacker.putString ( "B21BzWW", params, pos, true);
-		// DataPacker.putIntelShort ( 2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		// Initialize the transaction packet
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		// Set various transaction parameters
+        // Unpack the user information structure
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Set the user id and tree id
+        // Unpack the user information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        final Vector usrList = new Vector();
 
-		// Exchanged the SMB packet
+        int cnt = prms[3];
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        while (cnt-- > 0) {
 
-		// Check if we received a valid response
+            // Decode a user name string from the return buffer
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+            pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
+        }
 
-		// Unpack the parameter block
+        // Return the user information
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        return new StringList(usrList);
+    }
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+    /**
+     * Return the server information for the server we are connected to, using the older RAP call.
+     *
+     * @return ServerInfo containing the server information
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final ServerInfo getRAPServerInfo() throws java.io.IOException, SMBException {
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        // Create an SMB transaction packet for the get server info request
 
-		// Unpack the group information structure
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        // Build the NetServerGetInfo parameter block
 
-		// Unpack the group information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.RAPServerGetInfo, params, 0);
+        int pos = DataPacker.putString("WrLh", params, 2, true);
+        pos = DataPacker.putString("B16BBDz", params, pos, true);
+        DataPacker.putIntelShort(ServerInfo.InfoLevel1, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		Vector grpList = new Vector();
+        // Initialize the transaction packet
 
-		int cnt = (int) prms[3];
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		while (cnt-- > 0) {
+        // Set various transaction parameters
 
-			// Decode a group name string from the return buffer
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-			pos = DataDecoder.DecodeData(buf, pos, "B21", grpList, conv);
-		}
+        // Set the user id and tree id
 
-		// Return the group information
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		return new StringList(grpList);
-	}
+        // Exchanged the SMB packet
 
-	/**
-	 * Get a list of users that are in the specified group, using the older RAP call.
-	 *
-	 * @param grpName java.lang.String Group name to return user list for.
-	 * @return List of user names.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	private final StringList getRAPGroupUsers(String grpName)
-		throws SMBException, java.io.IOException {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Create an SMB transaction packet for the get group users info request
+        // Check if we received a valid response
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Build the NetGroupGetUser parameter block
+        // Unpack the parameter block
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetGroupGetUsers, params, 0);
-		int pos = DataPacker.putString("zWrLeh", params, 2, true);
-		pos = DataPacker.putString("B21", params, pos, true);
-		pos = DataPacker.putString(grpName, params, pos, true);
-		DataPacker.putIntelShort(UserInfo0, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Initialize the transaction packet
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		// Set various transaction parameters
+        // Unpack the share information structure
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Set the user id and tree id
+        // Unpack the server information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        final Vector objs = new Vector();
+        DataDecoder.DecodeData(buf, pos, "B16BBDz", objs, conv);
 
-		// Exchanged the SMB packet
+        // Copy the values to a full server information object
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        final RAPServerInfo srvinfo = new RAPServerInfo(ServerInfo.InfoLevel1, objs, false);
 
-		// Check if we received a valid response
+        // Return the server information
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        return srvinfo;
+    }
 
-		// Unpack the parameter block
+    /**
+     * Return the server information for the specified server, using the older RAP call.
+     *
+     * @param node
+     *            Node name of the server to return information for.
+     * @return ServerInfo
+     * @exception SMBException
+     *                An SMB exception has occurred.
+     * @exception java.io.IOException
+     *                An I/O exception has occurred.
+     */
+    private final ServerInfo getRAPServerInfo(final String node) throws SMBException, java.io.IOException {
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        // Check if we want server information for the local node
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        if (node.equalsIgnoreCase(m_sess.getServer())) {
+            return getRAPServerInfo();
+        }
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        // Open an admin session to the required node
 
-		// Unpack the user information structure
+        final PCShare srvShr = new PCShare(node, "", "", "");
+        final AdminSession admSess = SessionFactory.OpenAdminSession(srvShr);
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        // Get the server information
 
-		// Unpack the user information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        final ServerInfo srvInfo = admSess.getRAPServerInfo();
 
-		Vector usrList = new Vector();
+        // Close the session
 
-		int cnt = (int) prms[3];
+        admSess.CloseSession();
 
-		while (cnt-- > 0) {
+        // Return the server information
 
-			// Decode a user name string from the return buffer
+        return srvInfo;
+    }
 
-			pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
-		}
+    /**
+     * Return the list of available servers on the network, using the older RAP call.
+     *
+     * @param flags
+     *            Server enumerate flags.
+     * @return List of available servers, as a ServerList, else null if there are no servers available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+    private final ServerList getRAPServerList(final int flags) throws java.io.IOException, SMBException {
 
-		// Return the user information
+        // Create an SMB transaction packet for the server enum request
 
-		return new StringList(usrList);
-	}
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-	/**
-	 * Return the server information for the server we are connected to, using the older RAP call.
-	 *
-	 * @return ServerInfo containing the server information
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final ServerInfo getRAPServerInfo()
-		throws java.io.IOException, SMBException {
+        // Build the NetServerEnum parameter block
 
-		// Create an SMB transaction packet for the get server info request
+        final byte[] params = new byte[128];
+        DataPacker.putIntelShort(PacketType.RAPServerEnum2, params, 0);
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        int pos = 0;
 
-		// Build the NetServerGetInfo parameter block
+        pos = DataPacker.putString("WrLehDz", params, 2, true);
+        pos = DataPacker.putString("B16BBDz", params, pos, true);
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.RAPServerGetInfo, params, 0);
-		int pos = DataPacker.putString("WrLh", params, 2, true);
-		pos = DataPacker.putString("B16BBDz", params, pos, true);
-		DataPacker.putIntelShort(ServerInfo.InfoLevel1, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        DataPacker.putIntelShort(ServerInfo.InfoLevel1, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize - SMBPacket.TRANS_HEADERLEN, params, pos);
+        pos += 2;
+        DataPacker.putIntelInt(flags, params, pos);
+        pos += 4;
 
-		// Initialize the transaction packet
+        // Set the domain enumeration flag
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        boolean domainEnum = false;
 
-		// Set various transaction parameters
+        if ((flags & ServerType.DomainEnum) != 0) {
+            domainEnum = true;
+        }
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Check for the domain enum flag, if set then specify a null domain
+        // name string.
 
-		// Set the user id and tree id
+        if (m_sess.getDomain() == null || domainEnum == true) {
+            pos = DataPacker.putString("", params, pos, true);
+        } else {
+            pos = DataPacker.putString(m_sess.getDomain(), params, pos, true);
+        }
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Initialize the transaction packet
 
-		// Exchanged the SMB packet
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Set various transaction parameters
 
-		// Check if we received a valid response
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Set the user id and tree id
 
-		// Unpack the parameter block
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+        // Exchanged the SMB packet
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        // Check if we received a valid response
 
-		// Unpack the share information structure
+        if (pkt.isValidResponse() == false) {
+            throw new java.io.IOException("Transaction failed");
+        }
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        // Unpack the parameter block
 
-		// Unpack the server information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		Vector objs = new Vector();
-		DataDecoder.DecodeData(buf, pos, "B16BBDz", objs, conv);
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Copy the values to a full server information object
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        int nsrv = prms[2]; // number of server infos in this packet
 
-		RAPServerInfo srvinfo = new RAPServerInfo(ServerInfo.InfoLevel1, objs, false);
+        // Create a server list to return the server information
 
-		// Return the server information
+        final ServerList srvList = new ServerList();
 
-		return srvinfo;
-	}
+        // Unpack the server information structures
 
-	/**
-	 * Return the server information for the specified server, using the older RAP call.
-	 *
-	 * @param node Node name of the server to return information for.
-	 * @return ServerInfo
-	 * @exception SMBException An SMB exception has occurred.
-	 * @exception java.io.IOException An I/O exception has occurred.
-	 */
-	private final ServerInfo getRAPServerInfo(String node)
-		throws SMBException, java.io.IOException {
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Check if we want server information for the local node
+        while (nsrv-- > 0) {
 
-		if ( node.equalsIgnoreCase(m_sess.getServer()))
-			return getRAPServerInfo();
+            // Unpack the server information structure
 
-		// Open an admin session to the required node
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "B16BBDz", objs, conv);
 
-		PCShare srvShr = new PCShare(node, "", "", "");
-		AdminSession admSess = SessionFactory.OpenAdminSession(srvShr);
+            // Copy the values to a full server information object
 
-		// Get the server information
+            final RAPServerInfo srvinfo = new RAPServerInfo(ServerInfo.InfoLevel1, objs, domainEnum);
 
-		ServerInfo srvInfo = admSess.getRAPServerInfo();
+            // Add the server info to the list
 
-		// Close the session
+            srvList.addServerInfo(srvinfo);
+        }
 
-		admSess.CloseSession();
+        // Return the server information list
 
-		// Return the server information
+        return srvList;
+    }
 
-		return srvInfo;
-	}
+    /**
+     * Return the list of available servers on the network, using the older RAP call.
+     *
+     * @param flags
+     *            Server enumerate flags.
+     * @return List of available servers, as a Vector of Strings, else null if there are no servers available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB exception occurs
+     */
+    private final StringList getRAPServerNames(final int flags) throws java.io.IOException, SMBException {
 
-	/**
-	 * Return the list of available servers on the network, using the older RAP call.
-	 *
-	 * @param flags Server enumerate flags.
-	 * @return List of available servers, as a ServerList, else null if there are no servers
-	 *         available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
-	private final ServerList getRAPServerList(int flags)
-		throws java.io.IOException, SMBException {
+        // Create an SMB transaction packet for the server enum request
 
-		// Create an SMB transaction packet for the server enum request
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Build the NetServerEnum parameter block
 
-		// Build the NetServerEnum parameter block
+        final byte[] params = new byte[128];
+        DataPacker.putIntelShort(PacketType.RAPServerEnum2, params, 0);
+        int pos = 0;
 
-		byte[] params = new byte[128];
-		DataPacker.putIntelShort(PacketType.RAPServerEnum2, params, 0);
+        if (m_sess.getDialectString().equalsIgnoreCase("NT LM 0.12")
+                || (m_sess.getOperatingSystem() != null && m_sess.getOperatingSystem().startsWith("Windows NT 4"))) {
+            pos = DataPacker.putString("WrLehDz", params, 2, true);
+        } else {
+            // pos = DataPacker.putString ( "WrLehDz", params, 2, true);
+            pos = DataPacker.putString("WrLehD0", params, 2, true);
+        }
 
-		int pos = 0;
+        pos = DataPacker.putString("B16", params, pos, true);
 
-		pos = DataPacker.putString("WrLehDz", params, 2, true);
-		pos = DataPacker.putString("B16BBDz", params, pos, true);
+        DataPacker.putIntelShort(ServerInfo.InfoLevel0, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize - SMBPacket.TRANS_HEADERLEN, params, pos);
+        pos += 2;
+        DataPacker.putIntelInt(flags, params, pos);
+        pos += 4;
 
-		DataPacker.putIntelShort(ServerInfo.InfoLevel1, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize - SMBPacket.TRANS_HEADERLEN, params, pos);
-		pos += 2;
-		DataPacker.putIntelInt(flags, params, pos);
-		pos += 4;
+        // Set the domain enumeration flag
 
-		// Set the domain enumeration flag
+        boolean domainEnum = false;
 
-		boolean domainEnum = false;
+        if ((flags & ServerType.DomainEnum) != 0) {
+            domainEnum = true;
+        }
 
-		if ( (flags & ServerType.DomainEnum) != 0)
-			domainEnum = true;
+        // Check for the domain enum flag, if set then specify a null domain
+        // name string.
 
-		// Check for the domain enum flag, if set then specify a null domain
-		// name string.
+        if (m_sess.getDomain() == null || domainEnum == true) {
+            pos = DataPacker.putString("", params, pos, true);
+        } else {
+            pos = DataPacker.putString(m_sess.getDomain(), params, pos, true);
+        }
 
-		if ( m_sess.getDomain() == null || domainEnum == true)
-			pos = DataPacker.putString("", params, pos, true);
-		else
-			pos = DataPacker.putString(m_sess.getDomain(), params, pos, true);
+        // Initialize the transaction packet
 
-		// Initialize the transaction packet
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        // Set various transaction parameters
 
-		// Set various transaction parameters
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Set the user id and tree id
 
-		// Set the user id and tree id
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Exchanged the SMB packet
 
-		// Exchanged the SMB packet
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Check if we received a valid response
 
-		// Check if we received a valid response
+        if (pkt.isValidResponse() == false) {
+            throw new java.io.IOException("Transaction failed");
+        }
 
-		if ( pkt.isValidResponse() == false)
-			throw new java.io.IOException("Transaction failed");
+        // Unpack the parameter block
 
-		// Unpack the parameter block
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        int nsrv = prms[2]; // number of server infos in this packet
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int nsrv = (int) prms[2]; // number of server infos in this packet
-		int totsrv = (int) prms[3]; // total server infos
+        // Create a vector to return the server names
 
-		// Create a server list to return the server information
+        final Vector srvList = new Vector();
 
-		ServerList srvList = new ServerList();
+        // Unpack the server information structures
 
-		// Unpack the server information structures
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        while (nsrv-- > 0) {
 
-		while (nsrv-- > 0) {
+            // Unpack the server information structure
 
-			// Unpack the server information structure
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "B16", objs, conv);
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "B16BBDz", objs, conv);
+            // Get the server name string, and add it to the list
 
-			// Copy the values to a full server information object
+            final String name = (String) objs.elementAt(0);
+            srvList.addElement(name);
+        }
 
-			RAPServerInfo srvinfo = new RAPServerInfo(ServerInfo.InfoLevel1, objs, domainEnum);
+        // Return the server name list
 
-			// Add the server info to the list
+        return new StringList(srvList);
+    }
 
-			srvList.addServerInfo(srvinfo);
-		}
+    /**
+     * Return a list of services installed on the remote node, using the older RAP call.
+     *
+     * @return List of service name strings.
+     * @exception SMBException
+     *                SMB error occurred.
+     * @exception java.io.IOException
+     *                I/O exception.
+     */
+    private final StringList getRAPServiceList() throws SMBException, java.io.IOException {
 
-		// Return the server information list
+        // Create an SMB transaction packet for the service enum request
 
-		return srvList;
-	}
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-	/**
-	 * Return the list of available servers on the network, using the older RAP call.
-	 *
-	 * @param flags Server enumerate flags.
-	 * @return List of available servers, as a Vector of Strings, else null if there are no servers
-	 *         available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB exception occurs
-	 */
-	private final StringList getRAPServerNames(int flags)
-		throws java.io.IOException, SMBException {
+        // Build the NetUserGetInfo parameter block
 
-		// Create an SMB transaction packet for the server enum request
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetServiceEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B16WDWB64", params, pos, true);
+        DataPacker.putIntelShort(ServiceInfo2, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Initialize the transaction packet
 
-		// Build the NetServerEnum parameter block
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		byte[] params = new byte[128];
-		DataPacker.putIntelShort(PacketType.RAPServerEnum2, params, 0);
-		int pos = 0;
+        // Set various transaction parameters
 
-		if ( m_sess.getDialectString().equalsIgnoreCase("NT LM 0.12")
-				|| (m_sess.getOperatingSystem() != null && m_sess.getOperatingSystem().startsWith("Windows NT 4")))
-			pos = DataPacker.putString("WrLehDz", params, 2, true);
-		else
-			// pos = DataPacker.putString ( "WrLehDz", params, 2, true);
-			pos = DataPacker.putString("WrLehD0", params, 2, true);
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		pos = DataPacker.putString("B16", params, pos, true);
+        // Set the user id and tree id
 
-		DataPacker.putIntelShort(ServerInfo.InfoLevel0, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize - SMBPacket.TRANS_HEADERLEN, params, pos);
-		pos += 2;
-		DataPacker.putIntelInt(flags, params, pos);
-		pos += 4;
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Set the domain enumeration flag
+        // Exchanged the SMB packet
 
-		boolean domainEnum = false;
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		if ( (flags & ServerType.DomainEnum) != 0)
-			domainEnum = true;
+        // Check if we received a valid response
 
-		// Check for the domain enum flag, if set then specify a null domain
-		// name string.
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		if ( m_sess.getDomain() == null || domainEnum == true)
-			pos = DataPacker.putString("", params, pos, true);
-		else
-			pos = DataPacker.putString(m_sess.getDomain(), params, pos, true);
+        // Unpack the parameter block
 
-		// Initialize the transaction packet
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Set various transaction parameters
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Unpack the user information structure
 
-		// Set the user id and tree id
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Unpack the service information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		// Exchanged the SMB packet
+        final Vector srvList = new Vector();
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        int cnt = prms[2];
 
-		// Check if we received a valid response
+        while (cnt-- > 0) {
 
-		if ( pkt.isValidResponse() == false)
-			throw new java.io.IOException("Transaction failed");
+            // Unpack the service information structure
 
-		// Unpack the parameter block
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "B16WDWB64", objs, conv);
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+            // Copy the values to a full service information object
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+            final RAPServiceInfo srvInfo = new RAPServiceInfo(ServiceInfo2, objs);
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int nsrv = (int) prms[2]; // number of server infos in this packet
-		int totsrv = (int) prms[3]; // total server infos
+            // Add the service info to the list
 
-		// Create a vector to return the server names
+            srvList.addElement(srvInfo);
+        }
 
-		Vector srvList = new Vector();
+        // Return the service information
 
-		// Unpack the server information structures
+        return new StringList(srvList);
+    }
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+    /**
+     * Return a list of open sessions on the remote server, using the older RAP call.
+     *
+     * @return SessionInfoList
+     * @exception SMBException
+     *                If an SMB exception occurs
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     */
+    private final SessionInfoList getRAPSessionList() throws SMBException, java.io.IOException {
 
-		while (nsrv-- > 0) {
+        // Create an SMB transaction packet for the session enum request
 
-			// Unpack the server information structure
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "B16", objs, conv);
+        // Build the NetSessionEnum parameter block
 
-			// Get the server name string, and add it to the list
+        final byte[] params = new byte[128];
+        DataPacker.putIntelShort(PacketType.RAPSessionEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("zzWWWDDD", params, pos, true);
 
-			String name = (String) objs.elementAt(0);
-			srvList.addElement(name);
-		}
+        DataPacker.putIntelShort(SessionInfo.InfoLevel1, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Return the server name list
+        // Initialize the transaction packet
 
-		return new StringList(srvList);
-	}
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-	/**
-	 * Return a list of services installed on the remote node, using the older RAP call.
-	 *
-	 * @return List of service name strings.
-	 * @exception SMBException SMB error occurred.
-	 * @exception java.io.IOException I/O exception.
-	 */
-	private final StringList getRAPServiceList()
-		throws SMBException, java.io.IOException {
+        // Set various transaction parameters
 
-		// Create an SMB transaction packet for the service enum request
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Set the user id and tree id
 
-		// Build the NetUserGetInfo parameter block
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetServiceEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B16WDWB64", params, pos, true);
-		DataPacker.putIntelShort(ServiceInfo2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        // Exchanged the SMB packet
 
-		// Initialize the transaction packet
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        // Check if we received a valid response
 
-		// Set various transaction parameters
+        if (pkt.isValidResponse() == false) {
+            throw new java.io.IOException("Transaction failed");
+        }
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        // Unpack the parameter block
 
-		// Set the user id and tree id
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Exchanged the SMB packet
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        int nsess = prms[2]; // number of session infos in this packet
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Create a vector to return the session info objects
 
-		// Check if we received a valid response
+        final SessionInfoList sessList = new SessionInfoList();
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Unpack the session information structures
 
-		// Unpack the parameter block
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        while (nsess-- > 0) {
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+            // Unpack the session information structure
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+            final Vector objs = new Vector();
+            pos = DataDecoder.DecodeData(buf, pos, "zzWWWDDD", objs, conv);
 
-		// Unpack the user information structure
+            // Copy the values to a full session information object
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+            final RAPSessionInfo sessInfo = new RAPSessionInfo(SessionInfo.InfoLevel1, objs);
 
-		// Unpack the service information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+            // Add the session info to the list
 
-		Vector srvList = new Vector();
+            sessList.addSession(sessInfo);
+        }
 
-		int cnt = (int) prms[2];
+        // Return the session information list
 
-		while (cnt-- > 0) {
+        return sessList;
+    }
 
-			// Unpack the service information structure
+    /**
+     * Return the full share information for the specified share, using the older RAP call.
+     *
+     * @param shr
+     *            Remote share name to return information for.
+     * @return ShareInfo containing the full share details
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final ShareInfo getRAPShareInfo(final String shr) throws java.io.IOException, SMBException {
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "B16WDWB64", objs, conv);
+        // Create an SMB transaction packet for the get share info request
 
-			// Copy the values to a full service information object
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-			RAPServiceInfo srvInfo = new RAPServiceInfo(ServiceInfo2, objs);
+        // Build the NetShareGetInfo parameter block
 
-			// Add the service info to the list
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.RAPShareGetInfo, params, 0);
+        int pos = DataPacker.putString("zWrLh", params, 2, true);
+        pos = DataPacker.putString("B13BWzWWWzB9B", params, pos, true);
+        pos = DataPacker.putString(shr, params, pos, true);
+        DataPacker.putIntelShort(ShareInfo.InfoLevel2, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-			srvList.addElement(srvInfo);
-		}
+        // Initialize the transaction packet
 
-		// Return the service information
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		return new StringList(srvList);
-	}
+        // Set various transaction parameters
 
-	/**
-	 * Return a list of open sessions on the remote server, using the older RAP call.
-	 *
-	 * @return SessionInfoList
-	 * @exception SMBException If an SMB exception occurs
-	 * @exception java.io.IOException If an I/O error occurs
-	 */
-	private final SessionInfoList getRAPSessionList()
-		throws SMBException, java.io.IOException {
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		// Create an SMB transaction packet for the session enum request
+        // Set the user id and tree id
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		// Build the NetSessionEnum parameter block
+        // Exchanged the SMB packet
 
-		byte[] params = new byte[128];
-		DataPacker.putIntelShort(PacketType.RAPSessionEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("zzWWWDDD", params, pos, true);
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		DataPacker.putIntelShort(SessionInfo.InfoLevel1, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        // Check if we received a valid response
 
-		// Initialize the transaction packet
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        // Unpack the parameter block
 
-		// Set various transaction parameters
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Set the user id and tree id
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Unpack the share information structure
 
-		// Exchanged the SMB packet
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Unpack the share information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		// Check if we received a valid response
+        final Vector objs = new Vector();
+        DataDecoder.DecodeData(buf, pos, "B13.WzWWWzB9.", objs, conv);
 
-		if ( pkt.isValidResponse() == false)
-			throw new java.io.IOException("Transaction failed");
+        // Create the share information object
 
-		// Unpack the parameter block
+        return new RAPShareInfo(ShareInfo.InfoLevel2, objs);
+    }
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+    /**
+     * Return the list of available shares on the remote server, using the older RAP call.
+     *
+     * @return List of available shares, as a ShareList, else null if there are no shares available.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     */
+    private final ShareInfoList getRAPShareList() throws java.io.IOException, SMBException {
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Create an SMB transaction packet for the share enum request
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int nsess = (int) prms[2]; // number of session infos in this packet
-		int totsess = (int) prms[3]; // total session infos
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Create a vector to return the session info objects
+        // Build the NetShareEnum parameter block
 
-		SessionInfoList sessList = new SessionInfoList();
+        final byte[] params = new byte[64];
+        DataPacker.putIntelShort(PacketType.RAPShareEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B13BWz", params, pos, true);
+        DataPacker.putIntelShort(ShareInfo.InfoLevel1, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Unpack the session information structures
+        // Initialize the transaction packet
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		while (nsess-- > 0) {
+        // Set various transaction parameters
 
-			// Unpack the session information structure
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-			Vector objs = new Vector();
-			pos = DataDecoder.DecodeData(buf, pos, "zzWWWDDD", objs, conv);
+        // Set the user id and tree id
 
-			// Copy the values to a full session information object
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-			RAPSessionInfo sessInfo = new RAPSessionInfo(SessionInfo.InfoLevel1, objs);
+        // Exchanged the SMB packet
 
-			// Add the session info to the list
+        pkt.ExchangeSMB(m_sess, pkt);
 
-			sessList.addSession(sessInfo);
-		}
+        // Check if we received a valid response
 
-		// Return the session information list
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		return sessList;
-	}
+        // Unpack the parameter block
 
-	/**
-	 * Return the full share information for the specified share, using the older RAP call.
-	 *
-	 * @param shr Remote share name to return information for.
-	 * @return ShareInfo containing the full share details
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final ShareInfo getRAPShareInfo(String shr)
-		throws java.io.IOException, SMBException {
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		// Create an SMB transaction packet for the get share info request
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        int nshr = prms[2]; // number of share infos in this packet
 
-		// Build the NetShareGetInfo parameter block
+        // Check if the status indicates more data, if so then ping the server so
+        // that the remaining data is discarded (?)
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.RAPShareGetInfo, params, 0);
-		int pos = DataPacker.putString("zWrLh", params, 2, true);
-		pos = DataPacker.putString("B13BWzWWWzB9B", params, pos, true);
-		pos = DataPacker.putString(shr, params, pos, true);
-		DataPacker.putIntelShort(ShareInfo.InfoLevel2, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        if (prms[0] == SMBStatus.Win32MoreData) {
+            m_sess.pingServer(1);
+        }
 
-		// Initialize the transaction packet
+        // Unpack the share information structures
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
+        final Vector objs = new Vector();
+        final ShareInfoList shrList = new ShareInfoList();
 
-		// Set various transaction parameters
+        while (nshr-- > 0) {
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+            // Unpack a share information structure, padding bytes are indicated by
+            // '.'s and will not return objects
 
-		// Set the user id and tree id
+            pos = DataDecoder.DecodeData(buf, pos, "B13.Wz", objs, conv);
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+            // Create the share information object and add to the list
 
-		// Exchanged the SMB packet
+            final ShareInfo shrinfo = new RAPShareInfo(ShareInfo.InfoLevel1, objs);
+            shrList.addShare(shrinfo);
 
-		pkt.ExchangeSMB(m_sess, pkt);
+            // Clear the current share data
 
-		// Check if we received a valid response
+            objs.removeAllElements();
+        }
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Return the share list
 
-		// Unpack the parameter block
+        return shrList;
+    }
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+    /**
+     * Get a list of groups for the specified user, using the RAP call.
+     *
+     * @param userName
+     *            java.lang.String USer name to return group list for.
+     * @return List of group names.
+     * @exception SMBException
+     *                If an SMB error occurs.
+     * @exception java.io.IOException
+     *                If an I/O error occurs.
+     */
+    public final StringList getRAPUserGroups(final String userName) throws SMBException, java.io.IOException {
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        // Create an SMB transaction packet for the get group users info request
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		// Unpack the share information structure
+        // Build the NetUserGetGroups parameter block
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetUserGetGroups, params, 0);
+        int pos = DataPacker.putString("zWrLeh", params, 2, true);
+        pos = DataPacker.putString("B21", params, pos, true);
+        pos = DataPacker.putString(userName, params, pos, true);
+        DataPacker.putIntelShort(GroupInfo0, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		// Unpack the share information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        // Initialize the transaction packet
 
-		Vector objs = new Vector();
-		DataDecoder.DecodeData(buf, pos, "B13.WzWWWzB9.", objs, conv);
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		// Create the share information object
+        // Set various transaction parameters
 
-		return new RAPShareInfo(ShareInfo.InfoLevel2, objs);
-	}
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-	/**
-	 * Return the list of available shares on the remote server, using the older RAP call.
-	 *
-	 * @return List of available shares, as a ShareList, else null if there are no shares available.
-	 * @exception java.io.IOException If an I/O error occurs
-	 */
-	private final ShareInfoList getRAPShareList()
-		throws java.io.IOException, SMBException {
+        // Set the user id and tree id
 
-		// Create an SMB transaction packet for the share enum request
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        // Exchanged the SMB packet
 
-		// Build the NetShareEnum parameter block
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		byte[] params = new byte[64];
-		DataPacker.putIntelShort(PacketType.RAPShareEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B13BWz", params, pos, true);
-		DataPacker.putIntelShort(ShareInfo.InfoLevel1, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        // Check if we received a valid response
 
-		// Initialize the transaction packet
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        // Unpack the parameter block
 
-		// Set various transaction parameters
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		// Set the user id and tree id
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        // Unpack the user information structure
 
-		// Exchanged the SMB packet
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        // Unpack the user information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		// Check if we received a valid response
+        final Vector usrList = new Vector();
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        int cnt = prms[3];
 
-		// Unpack the parameter block
+        while (cnt-- > 0) {
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+            // Decode a user name string from the return buffer
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+            pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
+        }
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-		int nshr = (int) prms[2]; // number of share infos in this packet
-		int totshr = (int) prms[3]; // total share infos
+        // Return the user information
 
-		// Check if the status indicates more data, if so then ping the server so
-		// that the remaining data is discarded (?)
+        return new StringList(usrList);
+    }
 
-		if ( prms[0] == SMBStatus.Win32MoreData)
-			m_sess.pingServer(1);
+    /**
+     * Return the user information for the specified user, using the older RAP call.
+     *
+     * @param usr
+     *            User name of the user to return information for.
+     * @return UserInfo containing the user details
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final UserInfo getRAPUserInfo(final String usr) throws java.io.IOException, SMBException {
 
-		// Unpack the share information structures
+        // Create an SMB transaction packet for the get user info request
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
-		Vector objs = new Vector();
-		ShareInfoList shrList = new ShareInfoList();
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		while (nshr-- > 0) {
+        // Build the NetUserGetInfo parameter block
 
-			// Unpack a share information structure, padding bytes are indicated by
-			// '.'s and will not return objects
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.RAPUserGetInfo, params, 0);
+        int pos = DataPacker.putString("zWrLh", params, 2, true);
+        pos = DataPacker.putString("B21BzzzWDDzzDDWWzWzDWB21W", params, pos, true);
+        pos = DataPacker.putString(usr, params, pos, true);
+        DataPacker.putIntelShort(UserInfo11, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-			pos = DataDecoder.DecodeData(buf, pos, "B13.Wz", objs, conv);
+        // Initialize the transaction packet
 
-			// Create the share information object and add to the list
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-			ShareInfo shrinfo = new RAPShareInfo(ShareInfo.InfoLevel1, objs);
-			shrList.addShare(shrinfo);
+        // Set various transaction parameters
 
-			// Clear the current share data
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-			objs.removeAllElements();
-		}
+        // Set the user id and tree id
 
-		// Return the share list
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		return shrList;
-	}
+        // Exchanged the SMB packet
 
-	/**
-	 * Get a list of groups for the specified user, using the RAP call.
-	 *
-	 * @param userName java.lang.String USer name to return group list for.
-	 * @return List of group names.
-	 * @exception SMBException If an SMB error occurs.
-	 * @exception java.io.IOException If an I/O error occurs.
-	 */
-	public final StringList getRAPUserGroups(String userName)
-		throws SMBException, java.io.IOException {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Create an SMB transaction packet for the get group users info request
+        // Check if we received a valid response
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Build the NetUserGetGroups parameter block
+        // Unpack the parameter block
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetUserGetGroups, params, 0);
-		int pos = DataPacker.putString("zWrLeh", params, 2, true);
-		pos = DataPacker.putString("B21", params, pos, true);
-		pos = DataPacker.putString(userName, params, pos, true);
-		DataPacker.putIntelShort(GroupInfo0, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Initialize the transaction packet
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		// Set various transaction parameters
+        // Unpack the user information structure
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Set the user id and tree id
+        // Unpack the user information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        final Vector objs = new Vector();
+        DataDecoder.DecodeData(buf, pos, "B21.zzzWDDz.4TTWWzWzDWB21W", objs, conv);
 
-		// Exchanged the SMB packet
+        // Copy the values to a user information object
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        return new RAPUserInfo(UserInfo11, objs);
+    }
 
-		// Check if we received a valid response
+    /**
+     * Return the list of users on the remote server, using the older RAP call.
+     *
+     * @return Vector of user name strings.
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final StringList getRAPUserList() throws java.io.IOException, SMBException {
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Create an SMB transaction packet for the get user info request
 
-		// Unpack the parameter block
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
+        // Build the NetUserGetInfo parameter block
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.NetUserEnum, params, 0);
+        int pos = DataPacker.putString("WrLeh", params, 2, true);
+        pos = DataPacker.putString("B21", params, pos, true);
+        DataPacker.putIntelShort(UserInfo0, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
+        // Initialize the transaction packet
 
-		// Unpack the user information structure
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        // Set various transaction parameters
 
-		// Unpack the user information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		Vector usrList = new Vector();
+        // Set the user id and tree id
 
-		int cnt = (int) prms[3];
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		while (cnt-- > 0) {
+        // Exchanged the SMB packet
 
-			// Decode a user name string from the return buffer
+        pkt.ExchangeSMB(m_sess, pkt);
 
-			pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
-		}
+        // Check if we received a valid response
 
-		// Return the user information
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		return new StringList(usrList);
-	}
+        // Unpack the parameter block
 
-	/**
-	 * Return the user information for the specified user, using the older RAP call.
-	 *
-	 * @param usr User name of the user to return information for.
-	 * @return UserInfo containing the user details
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final UserInfo getRAPUserInfo(String usr)
-		throws java.io.IOException, SMBException {
+        final short[] prms = new short[4];
+        pkt.getParameterBlock(prms);
 
-		// Create an SMB transaction packet for the get user info request
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		// Build the NetUserGetInfo parameter block
+        // Unpack the user information structure
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.RAPUserGetInfo, params, 0);
-		int pos = DataPacker.putString("zWrLh", params, 2, true);
-		pos = DataPacker.putString("B21BzzzWDDzzDDWWzWzDWB21W", params, pos, true);
-		pos = DataPacker.putString(usr, params, pos, true);
-		DataPacker.putIntelShort(UserInfo11, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Initialize the transaction packet
+        // Unpack the user information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final Vector usrList = new Vector();
 
-		// Set various transaction parameters
+        int cnt = prms[3];
 
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        while (cnt-- > 0) {
 
-		// Set the user id and tree id
+            // Decode a user name string from the return buffer
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+            pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
+        }
 
-		// Exchanged the SMB packet
+        // Return the user information
 
-		pkt.ExchangeSMB(m_sess, pkt);
+        return new StringList(usrList);
+    }
 
-		// Check if we received a valid response
+    /**
+     * Return the server type/information for the server we are connected to, using the older RAP call.
+     *
+     * @return WorkStationInfo containing the information
+     * @exception java.io.IOException
+     *                If an I/O error occurs
+     * @exception SMBException
+     *                If an SMB error occurs
+     */
+    private final WorkstationInfo getRAPWorkstationInfo() throws java.io.IOException, SMBException {
 
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        // Create an SMB transaction packet for the get server info request
 
-		// Unpack the parameter block
+        final ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
+        pkt.setTransactionName("\\PIPE\\LANMAN");
 
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
+        // Build the NetServerGetInfo parameter block
 
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
+        final byte[] params = new byte[256];
+        DataPacker.putIntelShort(PacketType.RAPWkstaGetInfo, params, 0);
+        int pos = DataPacker.putString("WrLh", params, 2, true);
+        pos = DataPacker.putString("zzzBBzz", params, pos, true);
+        DataPacker.putIntelShort(WorkStation10, params, pos);
+        pos += 2;
+        DataPacker.putIntelShort(m_defBufSize, params, pos);
+        pos += 2;
 
-		int conv = prms[1] - pkt.getDataOffset(); // offset converter
+        // Initialize the transaction packet
 
-		// Unpack the user information structure
+        pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
 
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
+        // Set various transaction parameters
 
-		// Unpack the user information structure, padding bytes are indicated by
-		// '.'s and will not return objects
+        pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
+        pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
+        // maximum data bytes to return
 
-		Vector objs = new Vector();
-		DataDecoder.DecodeData(buf, pos, "B21.zzzWDDz.4TTWWzWzDWB21W", objs, conv);
+        // Set the user id and tree id
 
-		// Copy the values to a user information object
+        pkt.setUserId(m_sess.getUserId());
+        pkt.setTreeId(m_sess.getTreeId());
 
-		return new RAPUserInfo(UserInfo11, objs);
-	}
+        // Exchanged the SMB packet
 
-	/**
-	 * Return the list of users on the remote server, using the older RAP call.
-	 *
-	 * @return Vector of user name strings.
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final StringList getRAPUserList()
-		throws java.io.IOException, SMBException {
+        pkt.ExchangeSMB(m_sess, pkt);
 
-		// Create an SMB transaction packet for the get user info request
+        // Check if we received a valid response
 
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
+        if (pkt.isValidResponse() == false) {
+            throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
+        }
 
-		// Build the NetUserGetInfo parameter block
+        // Unpack the parameter block
 
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.NetUserEnum, params, 0);
-		int pos = DataPacker.putString("WrLeh", params, 2, true);
-		pos = DataPacker.putString("B21", params, pos, true);
-		DataPacker.putIntelShort(UserInfo0, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
+        final short[] prms = new short[3];
+        pkt.getParameterBlock(prms);
 
-		// Initialize the transaction packet
+        if (prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData) {
+            throw new SMBException(SMBStatus.NetErr, prms[0]);
+        }
 
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
+        final int conv = prms[1] - pkt.getDataOffset(); // offset converter
 
-		// Set various transaction parameters
+        // Unpack the share information structure
 
-		pkt.setParameter(2, 8); // maximum parameter bytes to return, 4 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
+        final byte[] buf = pkt.getBuffer();
+        pos = pkt.getDataOffset();
 
-		// Set the user id and tree id
+        // Unpack the server information structure, padding bytes are indicated by
+        // '.'s and will not return objects
 
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
+        final Vector objs = new Vector();
+        DataDecoder.DecodeData(buf, pos, "zzzBBzz", objs, conv);
 
-		// Exchanged the SMB packet
+        // Create the workstation information object to return
 
-		pkt.ExchangeSMB(m_sess, pkt);
-
-		// Check if we received a valid response
-
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
-
-		// Unpack the parameter block
-
-		short[] prms = new short[4];
-		pkt.getParameterBlock(prms);
-
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
-
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-
-		// Unpack the user information structure
-
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
-
-		// Unpack the user information structure, padding bytes are indicated by
-		// '.'s and will not return objects
-
-		Vector usrList = new Vector();
-
-		int cnt = (int) prms[3];
-
-		while (cnt-- > 0) {
-
-			// Decode a user name string from the return buffer
-
-			pos = DataDecoder.DecodeData(buf, pos, "B21", usrList, conv);
-		}
-
-		// Return the user information
-
-		return new StringList(usrList);
-	}
-
-	/**
-	 * Return the server type/information for the server we are connected to, using the older RAP
-	 * call.
-	 *
-	 * @return WorkStationInfo containing the information
-	 * @exception java.io.IOException If an I/O error occurs
-	 * @exception SMBException If an SMB error occurs
-	 */
-	private final WorkstationInfo getRAPWorkstationInfo()
-		throws java.io.IOException, SMBException {
-
-		// Create an SMB transaction packet for the get server info request
-
-		ClientTransPacket pkt = new ClientTransPacket(m_defBufSize);
-		pkt.setTransactionName("\\PIPE\\LANMAN");
-
-		// Build the NetServerGetInfo parameter block
-
-		byte[] params = new byte[256];
-		DataPacker.putIntelShort(PacketType.RAPWkstaGetInfo, params, 0);
-		int pos = DataPacker.putString("WrLh", params, 2, true);
-		pos = DataPacker.putString("zzzBBzz", params, pos, true);
-		DataPacker.putIntelShort(WorkStation10, params, pos);
-		pos += 2;
-		DataPacker.putIntelShort(m_defBufSize, params, pos);
-		pos += 2;
-
-		// Initialize the transaction packet
-
-		pkt.InitializeTransact(m_sess, 14, params, pos, null, 0);
-
-		// Set various transaction parameters
-
-		pkt.setParameter(2, 6); // maximum parameter bytes to return, 3 shorts
-		pkt.setParameter(3, m_defBufSize - SMBPacket.TRANS_HEADERLEN);
-		// maximum data bytes to return
-
-		// Set the user id and tree id
-
-		pkt.setUserId(m_sess.getUserId());
-		pkt.setTreeId(m_sess.getTreeId());
-
-		// Exchanged the SMB packet
-
-		pkt.ExchangeSMB(m_sess, pkt);
-
-		// Check if we received a valid response
-
-		if ( pkt.isValidResponse() == false)
-			throw new SMBException(pkt.getErrorClass(), pkt.getErrorCode());
-
-		// Unpack the parameter block
-
-		short[] prms = new short[3];
-		pkt.getParameterBlock(prms);
-
-		if ( prms[0] != 0 && prms[0] != SMBStatus.Win32MoreData)
-			throw new SMBException(SMBStatus.NetErr, prms[0]);
-
-		int conv = (int) prms[1] - pkt.getDataOffset(); // offset converter
-
-		// Unpack the share information structure
-
-		byte[] buf = pkt.getBuffer();
-		pos = pkt.getDataOffset();
-
-		// Unpack the server information structure, padding bytes are indicated by
-		// '.'s and will not return objects
-
-		Vector objs = new Vector();
-		DataDecoder.DecodeData(buf, pos, "zzzBBzz", objs, conv);
-
-		// Create the workstation information object to return
-
-		return new RAPWorkstationInfo(WorkStation10, objs);
-	}
+        return new RAPWorkstationInfo(WorkStation10, objs);
+    }
 }
