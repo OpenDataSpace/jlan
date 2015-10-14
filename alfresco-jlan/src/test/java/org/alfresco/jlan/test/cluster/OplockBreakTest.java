@@ -34,6 +34,8 @@ import org.alfresco.jlan.server.filesys.FileAttribute;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Oplock Break Test Class
@@ -41,7 +43,7 @@ import org.alfresco.jlan.smb.WinNT;
  * @author gkspencer
  */
 public class OplockBreakTest extends Test {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(OplockBreakTest.class);
 	/**
 	 * Oplock Break Callback Class
 	 */
@@ -134,7 +136,7 @@ public class OplockBreakTest extends Test {
 
 				if ( sess.FileExists( testFileName)) {
 					if ( isVerbose())
-						Debug.println( "File " + testFileName + " exists");
+						LOGGER.debug( "File " + testFileName + " exists");
 					initOK = true;
 				}
 				else {
@@ -142,7 +144,7 @@ public class OplockBreakTest extends Test {
 					// Create a new file
 
 					if ( isVerbose())
-						Debug.println( "Creating file " + testFileName + " via " + sess.getServer());
+					    LOGGER.debug( "Creating file " + testFileName + " via " + sess.getServer());
 					SMBFile testFile = sess.CreateFile( testFileName);
 					if ( testFile != null)
 						testFile.Close();
@@ -154,7 +156,7 @@ public class OplockBreakTest extends Test {
 				}
 			}
 			catch ( Exception ex) {
-				Debug.println( ex);
+			    LOGGER.warn( ex.getMessage(), ex);
 			}
 		}
 		else
@@ -263,7 +265,7 @@ public class OplockBreakTest extends Test {
 
 		}
 		catch ( Exception ex) {
-			Debug.println(ex);
+			LOGGER.error(ex.getMessage(), ex);
 
 			result = new ExceptionTestResult( ex);
 		}

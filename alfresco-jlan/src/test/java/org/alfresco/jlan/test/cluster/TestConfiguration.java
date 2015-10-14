@@ -48,697 +48,704 @@ import org.xml.sax.InputSource;
  */
 public class TestConfiguration {
 
-	// Constants
-	//
-	// Node type for an Element
-
-	private static final int ELEMENT_TYPE = 1;
-
-	// Maximum number of threads per server
-
-	public static final int MaximumThreadsPerServer		=	25;
-
-	// Test classes
-
-	private static final String[][] _testClasses = {{ "createFile", 		"org.alfresco.jlan.test.cluster.CreateFileTest"},
-									   				{ "createFolder", 		"org.alfresco.jlan.test.cluster.CreateFolderTest"},
-									   				{ "oplockGrant", 		"org.alfresco.jlan.test.cluster.OplockGrantTest"},
-									   				{ "oplockBreak", 		"org.alfresco.jlan.test.cluster.OplockBreakTest"},
-									   				{ "deleteFile", 		"org.alfresco.jlan.test.cluster.DeleteFileTest"},
-									   				{ "deleteFolder", 		"org.alfresco.jlan.test.cluster.DeleteFolderTest"},
-									   				{ "openFile", 			"org.alfresco.jlan.test.cluster.OpenFileTest"},
-									   				{ "openFileSharedRead", "org.alfresco.jlan.test.cluster.OpenFileShareReadTest"},
-									   				{ "byteRangeLocking", 	"org.alfresco.jlan.test.cluster.ByteRangeLockingTest"},
-									   				{ "renameFile", 		"org.alfresco.jlan.test.cluster.RenameFileTest"},
-									   				{ "renameFolder", 		"org.alfresco.jlan.test.cluster.RenameFolderTest"},
-									   				{ "writeFileSequential","org.alfresco.jlan.test.cluster.WriteSequentialTest"},
-									   				{ "writeFileRandom", 	"org.alfresco.jlan.test.cluster.WriteRandomTest"},
-									   				{ "folderSearch", 		"org.alfresco.jlan.test.cluster.FolderSearchTest"},
-									   				{ "changeNotify", 		"org.alfresco.jlan.test.cluster.ChangeNotifyTest"},
-									   				{ "NTCreateFile",		"org.alfresco.jlan.test.cluster.NTCreateFileTest"},
-									   				{ "perfFilesPerFolder", "org.alfresco.jlan.test.cluster.PerfFilesPerFolderTest"},
-									   				{ "perfFolderTree",		"org.alfresco.jlan.test.cluster.PerfFolderTreeTest"},
-									   				{ "perfDataTransfer",	"org.alfresco.jlan.test.cluster.PerfDataTransferTest"},
-									   				{ "oplockLeak",			"org.alfresco.jlan.test.cluster.OplockLeakTest"},
-									   				{ "oplockLevelII",		"org.alfresco.jlan.test.cluster.OplockBreakLevelIITest"},
-									   				{ "attributesOnlyOplock","org.alfresco.jlan.test.cluster.AttributesOnlyOplockGrantTest"}
-	};
-
-	// List of remote servers
-
-	private List<TestServer> m_serverList;
-
-	// List of tests
-
-	private List<Test> m_testList;
-
-	// Test run options
-	//
-	// Run tests sequentially or interleaved
-
-	private boolean m_runInterleaved;
-
-	// Number of test threads to create per server
-
-	private int m_threadsPerServer	= 1;
-
-	// Debug configuration
-
-	private DebugConfigSection m_debugConfig;
-
-	/**
-	 * Default constructor
-	 */
-	public TestConfiguration() {
-	}
-
-	/**
-	 * Return the server list
-	 *
-	 * @return List<TestServer>
-	 */
-	public List<TestServer> getServerList() {
-		return m_serverList;
-	}
-
-	/**
-	 * Return the test list
-	 *
-	 * @return List<Test>
-	 */
-	public List<Test> getTestList() {
-		return m_testList;
-	}
-
-	/**
-	 * Check if the tests should be run interleaved or sequentially
-	 *
-	 * @return boolean
-	 */
-	public final boolean runInterleaved() {
-		return m_runInterleaved;
-	}
+    // Constants
+    //
+    // Node type for an Element
+    private static final int ELEMENT_TYPE = 1;
+
+    // Maximum number of threads per server
+    public static final int MaximumThreadsPerServer = 25;
+
+    // Test classes
+    private static final String[][] _testClasses = {{"createFile", "org.alfresco.jlan.test.cluster.CreateFileTest"},
+            {"createFolder", "org.alfresco.jlan.test.cluster.CreateFolderTest"}, {"oplockGrant", "org.alfresco.jlan.test.cluster.OplockGrantTest"},
+            {"oplockBreak", "org.alfresco.jlan.test.cluster.OplockBreakTest"}, {"deleteFile", "org.alfresco.jlan.test.cluster.DeleteFileTest"},
+            {"deleteFolder", "org.alfresco.jlan.test.cluster.DeleteFolderTest"}, {"openFile", "org.alfresco.jlan.test.cluster.OpenFileTest"},
+            {"openFileSharedRead", "org.alfresco.jlan.test.cluster.OpenFileShareReadTest"},
+            {"byteRangeLocking", "org.alfresco.jlan.test.cluster.ByteRangeLockingTest"}, {"renameFile", "org.alfresco.jlan.test.cluster.RenameFileTest"},
+            {"renameFolder", "org.alfresco.jlan.test.cluster.RenameFolderTest"}, {"writeFileSequential", "org.alfresco.jlan.test.cluster.WriteSequentialTest"},
+            {"writeFileRandom", "org.alfresco.jlan.test.cluster.WriteRandomTest"}, {"folderSearch", "org.alfresco.jlan.test.cluster.FolderSearchTest"},
+            {"changeNotify", "org.alfresco.jlan.test.cluster.ChangeNotifyTest"}, {"NTCreateFile", "org.alfresco.jlan.test.cluster.NTCreateFileTest"},
+            {"perfFilesPerFolder", "org.alfresco.jlan.test.cluster.PerfFilesPerFolderTest"},
+            {"perfFolderTree", "org.alfresco.jlan.test.cluster.PerfFolderTreeTest"},
+            {"perfDataTransfer", "org.alfresco.jlan.test.cluster.PerfDataTransferTest"}, {"oplockLeak", "org.alfresco.jlan.test.cluster.OplockLeakTest"},
+            {"oplockLevelII", "org.alfresco.jlan.test.cluster.OplockBreakLevelIITest"},
+            {"attributesOnlyOplock", "org.alfresco.jlan.test.cluster.AttributesOnlyOplockGrantTest"}};
+
+    // List of remote servers
+    private List<TestServer> m_serverList;
+
+    // List of tests
+    private List<Test> m_testList;
+
+    // Test run options
+    //
+    // Run tests sequentially or interleaved
+    private boolean m_runInterleaved;
+
+    // Number of test threads to create per server
+    private int m_threadsPerServer = 1;
+
+    // Debug configuration
+    private DebugConfigSection m_debugConfig;
+
+    /**
+     * Default constructor
+     */
+    public TestConfiguration() {
+    }
+
+    /**
+     * Return the server list
+     *
+     * @return List<TestServer>
+     */
+    public List<TestServer> getServerList() {
+        return m_serverList;
+    }
+
+    /**
+     * Return the test list
+     *
+     * @return List<Test>
+     */
+    public List<Test> getTestList() {
+        return m_testList;
+    }
+
+    /**
+     * Check if the tests should be run interleaved or sequentially
+     *
+     * @return boolean
+     */
+    public final boolean runInterleaved() {
+        return m_runInterleaved;
+    }
+
+    /**
+     * Check how many test threads are to be created per server
+     *
+     * @return int
+     */
+    public final int getThreadsPerServer() {
+        return m_threadsPerServer;
+    }
+
+    /**
+     * Load the configuration from the specified file.
+     *
+     * @param fname
+     *            java.lang.String
+     * @exception IOException
+     * @exception InvalidConfigurationException
+     */
+    public final void loadConfiguration(final String fname) throws IOException, InvalidConfigurationException {
+
+        // Open the configuration file
+
+        final InputStream inFile = new FileInputStream(fname);
+        final Reader inRead = new InputStreamReader(inFile);
+
+        // Call the main parsing method
+
+        loadConfiguration(inRead);
+    }
 
-	/**
-	 * Check how many test threads are to be created per server
-	 *
-	 * @return int
-	 */
-	public final int getThreadsPerServer() {
-		return m_threadsPerServer;
-	}
+    /**
+     * Load the configuration from the specified input stream
+     *
+     * @param in
+     *            Reader
+     * @exception IOException
+     * @exception InvalidConfigurationException
+     */
+    public final void loadConfiguration(final Reader in) throws IOException, InvalidConfigurationException {
 
-	/**
-	 * Load the configuration from the specified file.
-	 *
-	 * @param fname java.lang.String
-	 * @exception IOException
-	 * @exception InvalidConfigurationException
-	 */
-	public final void loadConfiguration(String fname)
-		throws IOException, InvalidConfigurationException {
+        // Load and parse the XML configuration document
 
-		// Open the configuration file
+        try {
 
-		InputStream inFile = new FileInputStream(fname);
-		Reader inRead = new InputStreamReader(inFile);
+            // Load the configuration from the XML file
 
-		// Call the main parsing method
+            final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            final DocumentBuilder builder = factory.newDocumentBuilder();
 
-		loadConfiguration(inRead);
-	}
+            final InputSource xmlSource = new InputSource(in);
+            final Document doc = builder.parse(xmlSource);
 
-	/**
-	 * Load the configuration from the specified input stream
-	 *
-	 * @param in Reader
-	 * @exception IOException
-	 * @exception InvalidConfigurationException
-	 */
-	public final void loadConfiguration(Reader in)
-		throws IOException, InvalidConfigurationException {
+            // Parse the document
 
-		// Load and parse the XML configuration document
+            loadConfiguration(doc);
+        } catch (final Exception ex) {
 
-		try {
+            // Rethrow the exception as a configuration exception
 
-			// Load the configuration from the XML file
+            throw new InvalidConfigurationException("XML error", ex);
+        } finally {
 
-			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder builder = factory.newDocumentBuilder();
+            // Close the input file
 
-			InputSource xmlSource = new InputSource(in);
-			Document doc = builder.parse(xmlSource);
+            in.close();
+        }
+    }
 
-			// Parse the document
+    /**
+     * Load the configuration from the specified document
+     *
+     * @param doc
+     *            Document
+     * @exception IOException
+     * @exception InvalidConfigurationException
+     */
+    public void loadConfiguration(final Document doc) throws IOException, InvalidConfigurationException {
 
-			loadConfiguration(doc);
-		}
-		catch (Exception ex) {
+        // Parse the XML configuration document
 
-			// Rethrow the exception as a configuration exeception
+        try {
 
-			throw new InvalidConfigurationException("XML error", ex);
-		}
-		finally {
+            // Access the root of the XML document, get a list of the child nodes
 
-			// Close the input file
+            final Element root = doc.getDocumentElement();
+            final NodeList childNodes = root.getChildNodes();
 
-			in.close();
-		}
-	}
+            // Process the server list element
 
-	/**
-	 * Load the configuration from the specified document
-	 *
-	 * @param doc Document
-	 * @exception IOException
-	 * @exception InvalidConfigurationException
-	 */
-	public void loadConfiguration(Document doc)
-		throws IOException, InvalidConfigurationException {
+            procServerList(buildConfigElement(findChildNode("servers", childNodes)));
 
-		// Parse the XML configuration document
+            // Process the test list
 
-		try {
+            procTestList(buildConfigElement(findChildNode("tests", childNodes)));
 
-			// Access the root of the XML document, get a list of the child nodes
+            // Process the run parameters
 
-			Element root = doc.getDocumentElement();
-			NodeList childNodes = root.getChildNodes();
+            procRunParameters(buildConfigElement(findChildNode("run", childNodes)));
 
-			// Process the server list element
+            // Process the debug output element
 
-			procServerList( buildConfigElement( findChildNode("servers", childNodes)));
+            procDebugSetup(buildConfigElement(findChildNode("debug", childNodes)));
+        } catch (final Exception ex) {
 
-			// Process the test list
+            // Rethrow the exception as a configuration exception
 
-			procTestList( buildConfigElement( findChildNode("tests", childNodes)));
+            throw new InvalidConfigurationException("XML error", ex);
+        }
+    }
 
-			// Process the run parameters
+    /**
+     * Process the server list
+     *
+     * @param servers
+     *            ConfigElement
+     * @exception InvalidConfigurationException
+     */
+    protected final void procServerList(final ConfigElement servers) throws InvalidConfigurationException {
 
-			procRunParameters( buildConfigElement( findChildNode( "run", childNodes)));
+        // Check if the server list is valid
 
-			// Process the debug output element
+        if (servers == null) {
+            throw new InvalidConfigurationException("Server list must be specified");
+        }
 
-			procDebugSetup( buildConfigElement( findChildNode( "debug", childNodes)));
-		}
-		catch (Exception ex) {
+        // Allocate the server list
 
-			// Rethrow the exception as a configuration exeception
+        m_serverList = new ArrayList<TestServer>();
 
-			throw new InvalidConfigurationException("XML error", ex);
-		}
-	}
+        // Check if default server settings have been specified
 
-	/**
-	 * Process the server list
-	 *
-	 * @param servers ConfigElement
-	 * @exception InvalidConfigurationException
-	 */
-	protected final void procServerList( ConfigElement servers)
-		throws InvalidConfigurationException {
+        final ConfigElement defaultElem = servers.getChild("default");
+        TestServer defaultSrv = null;
 
-		// Check if the server list is valid
+        if (defaultElem != null) {
 
-		if ( servers == null)
-			throw new InvalidConfigurationException( "Server list must be specified");
+            // Check for default values for username, password, share
 
-		// Allocate the server list
+            final String defUser = defaultElem.getAttribute("username");
+            final String defPass = defaultElem.getAttribute("password");
+            final String defShare = defaultElem.getAttribute("share");
 
-		m_serverList = new ArrayList<TestServer>();
+            // Create the default server details
 
-		// Check if default server settings have been specified
+            defaultSrv = new TestServer("", defUser, defPass, defShare);
+        }
 
-		ConfigElement defaultElem = servers.getChild( "default");
-		TestServer defaultSrv = null;
+        // Process the server list
 
-		if ( defaultElem != null) {
+        final List<ConfigElement> srvElemList = servers.getChildren();
 
-			// Check for default values for username, password, share
+        for (int idx = 0; idx < srvElemList.size(); idx++) {
 
-			String defUser = defaultElem.getAttribute( "username");
-			String defPass = defaultElem.getAttribute( "password");
-			String defShare= defaultElem.getAttribute( "share");
+            // Get the current server details
 
-			// Create the default server details
+            final ConfigElement curElem = srvElemList.get(idx);
+            if (curElem.getName().equals("server")) {
 
-			defaultSrv = new TestServer( "", defUser, defPass, defShare);
-		}
+                // Create the server details
 
-		// Process the server list
+                final String srvName = curElem.getAttribute("name");
+                if (srvName == null || srvName.length() == 0) {
+                    throw new InvalidConfigurationException("Invalid server, name not specified");
+                }
 
-		List<ConfigElement> srvElemList = servers.getChildren();
+                String srvUser = curElem.getAttribute("username");
+                String srvPass = curElem.getAttribute("password");
+                String srvShare = curElem.getAttribute("share");
 
-		for ( int idx = 0; idx < srvElemList.size(); idx++) {
+                // Add default values
 
-			// Get the current server details
+                if (defaultSrv != null) {
+                    if (srvUser == null) {
+                        srvUser = defaultSrv.getUserName();
+                    }
+                    if (srvPass == null) {
+                        srvPass = defaultSrv.getPassword();
+                    }
+                    if (srvShare == null) {
+                        srvShare = defaultSrv.getShareName();
+                    }
+                }
 
-			ConfigElement curElem = srvElemList.get( idx);
-			if ( curElem.getName().equals( "server")) {
+                // Create the server details
 
-				// Create the server details
+                final TestServer testSrv = new TestServer(srvName, srvUser, srvPass, srvShare);
+                m_serverList.add(testSrv);
+            }
+        }
+    }
 
-				String srvName = curElem.getAttribute( "name");
-				if ( srvName == null || srvName.length() == 0)
-					throw new InvalidConfigurationException( "Invalid server, name not specified");
+    /**
+     * Process the test list
+     *
+     * @param tests
+     *            ConfigElement
+     * @exception InvalidConfigurationException
+     */
+    protected final void procTestList(final ConfigElement tests) throws InvalidConfigurationException {
 
-				String srvUser = curElem.getAttribute( "username");
-				String srvPass = curElem.getAttribute( "password");
-				String srvShare= curElem.getAttribute( "share");
+        // Check if the test list is valid
 
-				// Add default values
+        if (tests == null) {
+            throw new InvalidConfigurationException("Test list must be specified");
+        }
 
-				if ( defaultSrv != null) {
-					if ( srvUser == null)
-						srvUser = defaultSrv.getUserName();
-					if ( srvPass == null)
-						srvPass = defaultSrv.getPassword();
-					if ( srvShare == null)
-						srvShare = defaultSrv.getShareName();
-				}
+        // Allocate the test list
 
-				// Create the server details
+        m_testList = new ArrayList<Test>();
 
-				TestServer testSrv = new TestServer( srvName, srvUser, srvPass, srvShare);
-				m_serverList.add( testSrv);
-			}
-		}
-	}
+        // Check if default test settings have been specified
 
-	/**
-	 * Process the test list
-	 *
-	 * @param tests ConfigElement
-	 * @exception InvalidConfigurationException
-	 */
-	protected final void procTestList(ConfigElement tests)
-		throws InvalidConfigurationException {
+        final ConfigElement defaultElem = tests.getChild("default");
 
-		// Check if the test list is valid
+        String defPath = null;
+        int defIterations = -1;
+        boolean defVerbose = false;
+        boolean defCleanup = true;
 
-		if ( tests == null)
-			throw new InvalidConfigurationException( "Test list must be specified");
+        if (defaultElem != null) {
 
-		// Allocate the test list
+            // Check for default values for path, iterations, verbose logging and test cleanup
 
-		m_testList = new ArrayList<Test>();
+            defPath = defaultElem.getAttribute("path");
+            String defValue = defaultElem.getAttribute("iterations");
+            if (defValue != null) {
+                try {
+                    defIterations = Integer.parseInt(defValue);
+                } catch (final NumberFormatException ex) {
+                    throw new InvalidConfigurationException("Invalid iterations value");
+                }
+            }
 
-		// Check if default test settings have been specified
+            defValue = defaultElem.getAttribute("verbose");
+            if (defValue != null) {
+                defVerbose = Boolean.parseBoolean(defValue);
+            }
 
-		ConfigElement defaultElem = tests.getChild( "default");
+            defValue = defaultElem.getAttribute("cleanup");
+            if (defValue != null) {
+                defCleanup = Boolean.parseBoolean(defValue);
+            }
+        }
 
-		String defPath = null;
-		int defIterations = -1;
-		boolean defVerbose = false;
-		boolean defCleanup = true;
+        // Process the test list
 
-		if ( defaultElem != null) {
+        final List<ConfigElement> testElemList = tests.getChildren();
 
-			// Check for default values for path, iterations, verbose logging and test cleanup
+        for (int idx = 0; idx < testElemList.size(); idx++) {
 
-			defPath = defaultElem.getAttribute( "path");
-			String defValue = defaultElem.getAttribute( "iterations");
-			if ( defValue != null) {
-				try {
-					defIterations = Integer.parseInt( defValue);
-				}
-				catch ( NumberFormatException ex) {
-					throw new InvalidConfigurationException( "Invalid iterations value");
-				}
-			}
+            // Get the current test details
 
-			defValue = defaultElem.getAttribute( "verbose");
-			if ( defValue != null)
-				defVerbose = Boolean.parseBoolean( defValue);
+            final ConfigElement curElem = testElemList.get(idx);
+            if (curElem.getName().equals("default") == false) {
 
-			defValue = defaultElem.getAttribute( "cleanup");
-			if ( defValue != null)
-				defCleanup = Boolean.parseBoolean( defValue);
-		}
+                // Get the test name and parameters
 
-		// Process the test list
+                final String testName = curElem.getName();
+                final String testPath = curElem.hasAttribute("path") ? curElem.getAttribute("path") : defPath;
+                int testIter = 1;
+                boolean testVerbose = false;
+                boolean testCleanup = true;
 
-		List<ConfigElement> testElemList = tests.getChildren();
+                if (curElem.hasAttribute("iterations")) {
+                    final String iterStr = curElem.getAttribute("iterations");
+                    try {
+                        testIter = Integer.parseInt(iterStr);
+                    } catch (final NumberFormatException ex) {
+                        throw new InvalidConfigurationException("Invalid 'iterations' attribute " + iterStr);
+                    }
+                } else if (defIterations != -1) {
+                    testIter = defIterations;
+                }
 
-		for ( int idx = 0; idx < testElemList.size(); idx++) {
+                if (curElem.hasAttribute("verbose")) {
+                    final String boolStr = curElem.getAttribute("verbose");
+                    testVerbose = Boolean.parseBoolean(boolStr);
+                } else {
+                    testVerbose = defVerbose;
+                }
 
-			// Get the current test details
+                if (curElem.hasAttribute("cleanup")) {
+                    final String boolStr = curElem.getAttribute("cleanup");
+                    testCleanup = Boolean.parseBoolean(boolStr);
+                } else {
+                    testCleanup = defCleanup;
+                }
 
-			ConfigElement curElem = testElemList.get( idx);
-			if ( curElem.getName().equals( "default") == false) {
+                // Create the test class
 
-				// Get the test name and parameters
+                final Test testClass = getTestClass(testName, testPath, testIter, testVerbose);
+                if (testClass != null) {
 
-				String testName = curElem.getName();
-				String testPath = curElem.hasAttribute( "path") ? curElem.getAttribute( "path") : defPath;
-				int testIter = 1;
-				boolean testVerbose = false;
-				boolean testCleanup = true;
+                    // Set the test cleanup flag
 
-				if ( curElem.hasAttribute( "iterations")) {
-					String iterStr = curElem.getAttribute( "iterations");
-					try {
-						testIter = Integer.parseInt( iterStr);
-					}
-					catch ( NumberFormatException ex) {
-						throw new InvalidConfigurationException( "Invalid 'iterations' attribute " + iterStr);
-					}
-				}
-				else if ( defIterations != -1)
-					testIter = defIterations;
+                    testClass.setTestCleanup(testCleanup);
 
-				if ( curElem.hasAttribute( "verbose")) {
-					String boolStr = curElem.getAttribute( "verbose");
-					testVerbose = Boolean.parseBoolean( boolStr);
-				}
-				else
-					testVerbose = defVerbose;
+                    // Run the per test configuration
 
-				if ( curElem.hasAttribute( "cleanup")) {
-					String boolStr = curElem.getAttribute( "cleanup");
-					testCleanup = Boolean.parseBoolean( boolStr);
-				}
-				else
-					testCleanup = defCleanup;
+                    testClass.configTest(curElem);
 
-				// Create the test class
+                    // Add to the list of tests
 
-				Test testClass = getTestClass( testName, testPath, testIter, testVerbose);
-				if ( testClass != null) {
+                    m_testList.add(testClass);
+                } else {
+                    throw new InvalidConfigurationException("Invalid test name '" + curElem.getName() + "'");
+                }
+            }
+        }
 
-					// Set the test cleanup flag
+        // Check that there are tests configured
 
-					testClass.setTestCleanup( testCleanup);
+        if (m_testList.size() == 0) {
+            throw new InvalidConfigurationException("No tests configured");
+        }
+    }
 
-					// Run the per test configuration
+    /**
+     * Process the run parameters
+     *
+     * @param runParams
+     *            ConfigElement
+     * @exception InvalidConfigurationException
+     */
+    protected final void procRunParameters(final ConfigElement runParams) throws InvalidConfigurationException {
 
-					testClass.configTest( curElem);
+        // Check if custom run parameters have been specified
 
-					// Add to the list of tests
+        if (runParams == null) {
+            return;
+        }
 
-					m_testList.add( testClass);
-				}
-				else
-					throw new InvalidConfigurationException( "Invalid test name '" + curElem.getName() + "'");
-			}
-		}
+        // Check if tests should be run interleaved, or sequentially
 
-		// Check that there are tests configured
+        if (runParams.getChild("interleaved") != null) {
+            m_runInterleaved = true;
+        }
 
-		if ( m_testList.size() == 0)
-			throw new InvalidConfigurationException( "No tests configured");
-	}
+        // Check if multiple threads per server should be used
 
-	/**
-	 * Process the run parameters
-	 *
-	 * @param runParams ConfigElement
-	 * @exception InvalidConfigurationException
-	 */
-	protected final void procRunParameters( ConfigElement runParams)
-		throws InvalidConfigurationException {
+        final ConfigElement elem = runParams.getChild("perServer");
+        if (elem != null) {
 
-		// Check if custom run parameters have been specified
+            // Parse the thread per server count
 
-		if ( runParams == null)
-			return;
+            final String srvThreads = elem.getAttribute("threads");
+            if (srvThreads != null) {
 
-		// Check if tests should be run interleaved, or sequentially
+                // Parse the threads per server, and validate
 
-		if ( runParams.getChild( "interleaved") != null)
-			m_runInterleaved = true;
+                try {
+                    m_threadsPerServer = Integer.parseInt(srvThreads);
 
-		// Check if multiple threads per server should be used
+                    // Range check the threads per server value
 
-		ConfigElement elem = runParams.getChild( "perServer");
-		if ( elem != null) {
+                    if (m_threadsPerServer < 1 || m_threadsPerServer > MaximumThreadsPerServer) {
+                        throw new InvalidConfigurationException(
+                                "Invalid threads per server value, " + srvThreads + ", valid range 1-" + MaximumThreadsPerServer);
+                    }
+                } catch (final NumberFormatException ex) {
+                    throw new InvalidConfigurationException("Invalid threads per server value, " + srvThreads);
+                }
+            }
+        }
+    }
 
-			// Parse the thread per server count
+    /**
+     * Process the debug setup
+     *
+     * @param debug
+     *            ConfigElement
+     * @exception InvalidConfigurationException
+     */
+    protected final void procDebugSetup(final ConfigElement debug) throws InvalidConfigurationException {
 
-			String srvThreads = elem.getAttribute( "threads");
-			if ( srvThreads != null) {
+        // Check if the debug section has been specified
 
-				// Parse the threads per server, and validate
+        if (debug == null) {
+            return;
+        }
 
-				try {
-					m_threadsPerServer = Integer.parseInt( srvThreads);
+        // Create the debug configuration section
 
-					// Range check the threads per server value
+        m_debugConfig = new DebugConfigSection(null);
 
-					if ( m_threadsPerServer < 1 || m_threadsPerServer > MaximumThreadsPerServer)
-						throw new InvalidConfigurationException( "Invalid threads per server value, " + srvThreads + ", valid range 1-" + MaximumThreadsPerServer);
-				}
-				catch ( NumberFormatException ex) {
-					throw new InvalidConfigurationException( "Invalid threads per server value, " + srvThreads);
-				}
-			}
-		}
-	}
+        // Get the debug output class and parameters
 
-	/**
-	 * Process the debug setup
-	 *
-	 * @param debug ConfigElement
-	 * @exception InvalidConfigurationException
-	 */
-	protected final void procDebugSetup( ConfigElement debug)
-		throws InvalidConfigurationException {
+        final ConfigElement elem = debug.getChild("output");
+        if (elem == null) {
+            throw new InvalidConfigurationException("Output class must be specified to enable debug output");
+        }
 
-		// Check if the debug section has been specified
+        // Get the debug output class
 
-		if ( debug == null)
-			return;
+        final ConfigElement debugClass = elem.getChild("class");
+        if (debugClass == null) {
+            throw new InvalidConfigurationException("Class must be specified for debug output");
+        }
 
-		// Create the debug configuration section
+        // Get the parameters for the debug class
 
-		m_debugConfig = new DebugConfigSection( null);
+        m_debugConfig.setDebug(debugClass.getValue(), elem);
+    }
 
-		// Get the debug output class and parameters
+    /**
+     * Find the test class
+     *
+     * @param name
+     *            String
+     * @param path
+     *            String
+     * @param iter
+     *            int
+     * @param verbose
+     *            boolean
+     * @return Test
+     */
+    private Test getTestClass(final String name, final String path, final int iter, final boolean verbose) {
 
-		ConfigElement elem = debug.getChild( "output");
-		if ( elem == null)
-			throw new InvalidConfigurationException("Output class must be specified to enable debug output");
+        // Validate the test name and return the test class
 
-		// Get the debug output class
+        Test test = null;
 
-		ConfigElement debugClass = elem.getChild( "class");
-		if ( debugClass == null)
-			throw new InvalidConfigurationException("Class must be specified for debug output");
+        try {
 
-		// Get the parameters for the debug class
+            // Validate the test name, find the associated test class
 
-		m_debugConfig.setDebug( debugClass.getValue(), elem);
-	}
+            String testClass = null;
+            int idx = 0;
 
-	/**
-	 * Find the test class
-	 *
-	 * @param name String
-	 * @param path String
-	 * @param iter int
-	 * @param verbose boolean
-	 * @return Test
-	 */
-	private Test getTestClass( String name, String path, int iter, boolean verbose) {
+            while (idx < _testClasses.length && testClass == null) {
+                if (_testClasses[idx][0].equalsIgnoreCase(name)) {
+                    testClass = _testClasses[idx][1];
+                } else {
+                    idx++;
+                }
+            }
 
-		// Validate the test name and return the test class
+            if (testClass == null) {
+                return null;
+            }
 
-		Test test = null;
+            // Load the test class, and validate
 
-		try {
+            final Object testClassObj = Class.forName(testClass).newInstance();
+            if (testClassObj != null && testClassObj instanceof Test) {
+                test = (Test) testClassObj;
 
-			// Validate the test name, find the associated test class
+                // Set the basic test settings
 
-			String testClass = null;
-			int idx = 0;
+                test.setPath(path);
+                test.setIterations(iter);
+                test.setVerbose(verbose);
+            }
+        } catch (final Exception ex) {
+            ex.printStackTrace();
+        }
 
-			while ( idx < _testClasses.length && testClass == null) {
-				if ( _testClasses[idx][0].equalsIgnoreCase( name))
-					testClass = _testClasses[idx][1];
-				else
-					idx++;
-			}
+        // Return the test, or null if not found
 
-			if ( testClass == null)
-				return null;
+        return test;
+    }
 
-			// Load the test class, and validate
+    /**
+     * Find the specified child node in the node list
+     *
+     * @param name
+     *            String
+     * @param list
+     *            NodeList
+     * @return Element
+     */
+    protected final Element findChildNode(final String name, final NodeList list) {
 
-			Object testClassObj = Class.forName( testClass).newInstance();
-			if ( testClassObj != null && testClassObj instanceof Test) {
-				test = (Test) testClassObj;
+        // Check if the list is valid
 
-				// Set the basic test settings
+        if (list == null) {
+            return null;
+        }
 
-				test.setPath( path);
-				test.setIterations( iter);
-				test.setVerbose( verbose);
-			}
-		}
-		catch ( Exception ex) {
-			ex.printStackTrace();
-		}
+        // Search for the required element
 
-		// Return the test, or null if not found
+        for (int i = 0; i < list.getLength(); i++) {
 
-		return test;
-	}
+            // Get the current child node
 
-	/**
-	 * Find the specified child node in the node list
-	 *
-	 * @param name String
-	 * @param list NodeList
-	 * @return Element
-	 */
-	protected final Element findChildNode(String name, NodeList list) {
+            final Node child = list.item(i);
+            if (child.getNodeName().equals(name) && child.getNodeType() == ELEMENT_TYPE) {
+                return (Element) child;
+            }
+        }
 
-		// Check if the list is valid
+        // Element not found
 
-		if ( list == null)
-			return null;
+        return null;
+    }
 
-		// Search for the required element
+    /**
+     * Get the value text for the specified element
+     *
+     * @param elem
+     *            Element
+     * @return String
+     */
+    protected final String getText(final Element elem) {
 
-		for (int i = 0; i < list.getLength(); i++) {
+        // Check if the element has children
 
-			// Get the current child node
+        final NodeList children = elem.getChildNodes();
+        String text = "";
 
-			Node child = list.item(i);
-			if ( child.getNodeName().equals(name) && child.getNodeType() == ELEMENT_TYPE)
-				return (Element) child;
-		}
+        if (children != null && children.getLength() > 0 && children.item(0).getNodeType() != ELEMENT_TYPE) {
+            text = children.item(0).getNodeValue();
+        }
 
-		// Element not found
+        // Return the element text value
 
-		return null;
-	}
+        return text;
+    }
 
-	/**
-	 * Get the value text for the specified element
-	 *
-	 * @param elem Element
-	 * @return String
-	 */
-	protected final String getText(Element elem) {
+    /**
+     * Build a configuration element list from an elements child nodes
+     *
+     * @param root
+     *            Element
+     * @return GenericConfigElement
+     */
+    protected final GenericConfigElement buildConfigElement(final Element root) {
+        return buildConfigElement(root, null);
+    }
 
-		// Check if the element has children
+    /**
+     * Build a configuration element list from an elements child nodes
+     *
+     * @param root
+     *            Element
+     * @param cfgElem
+     *            GenericConfigElement
+     * @return GenericConfigElement
+     */
+    protected final GenericConfigElement buildConfigElement(final Element root, final GenericConfigElement cfgElem) {
 
-		NodeList children = elem.getChildNodes();
-		String text = "";
+        // Create the top level element, if not specified
 
-		if ( children != null && children.getLength() > 0 && children.item(0).getNodeType() != ELEMENT_TYPE)
-			text = children.item(0).getNodeValue();
+        GenericConfigElement rootElem = cfgElem;
 
-		// Return the element text value
+        if (rootElem == null) {
 
-		return text;
-	}
+            // Create the root element
 
-	/**
-	 * Build a configuration element list from an elements child nodes
-	 *
-	 * @param root Element
-	 * @return GenericConfigElement
-	 */
-	protected final GenericConfigElement buildConfigElement(Element root) {
-		return buildConfigElement(root, null);
-	}
+            rootElem = new GenericConfigElement(root.getNodeName());
 
-	/**
-	 * Build a configuration element list from an elements child nodes
-	 *
-	 * @param root Element
-	 * @param cfgElem GenericConfigElement
-	 * @return GenericConfigElement
-	 */
-	protected final GenericConfigElement buildConfigElement(Element root, GenericConfigElement cfgElem) {
+            // Add any attributes
 
-		// Create the top level element, if not specified
+            final NamedNodeMap attribs = root.getAttributes();
+            if (attribs != null) {
+                for (int i = 0; i < attribs.getLength(); i++) {
+                    final Node attribNode = attribs.item(i);
+                    rootElem.addAttribute(attribNode.getNodeName(), attribNode.getNodeValue());
+                }
+            }
+        }
 
-		GenericConfigElement rootElem = cfgElem;
+        // Get the child node list
 
-		if ( rootElem == null) {
+        final NodeList nodes = root.getChildNodes();
+        if (nodes == null) {
+            return rootElem;
+        }
 
-			// Create the root element
+        // Process the child node list
 
-			rootElem = new GenericConfigElement(root.getNodeName());
+        GenericConfigElement childElem = null;
 
-			// Add any attributes
+        for (int i = 0; i < nodes.getLength(); i++) {
 
-			NamedNodeMap attribs = root.getAttributes();
-			if ( attribs != null) {
-				for (int i = 0; i < attribs.getLength(); i++) {
-					Node attribNode = attribs.item(i);
-					rootElem.addAttribute(attribNode.getNodeName(), attribNode.getNodeValue());
-				}
-			}
-		}
+            // Get the current node
 
-		// Get the child node list
+            final Node node = nodes.item(i);
 
-		NodeList nodes = root.getChildNodes();
-		if ( nodes == null)
-			return rootElem;
+            if (node.getNodeType() == ELEMENT_TYPE) {
 
-		// Process the child node list
+                // Access the Element
 
-		GenericConfigElement childElem = null;
+                final Element elem = (Element) node;
 
-		for (int i = 0; i < nodes.getLength(); i++) {
+                // Check if the element has any child nodes
 
-			// Get the current node
+                final NodeList children = elem.getChildNodes();
 
-			Node node = nodes.item(i);
+                if (children != null && children.getLength() > 1) {
 
-			if ( node.getNodeType() == ELEMENT_TYPE) {
+                    // Add the child nodes as child configuration elements
 
-				// Access the Element
+                    childElem = buildConfigElement(elem, null);
+                } else {
 
-				Element elem = (Element) node;
+                    // Create a normal name/value
 
-				// Check if the element has any child nodes
+                    if (children.getLength() > 0) {
+                        childElem = new GenericConfigElement(elem.getNodeName());
+                        childElem.setValue(children.item(0).getNodeValue());
+                    } else {
+                        childElem = new GenericConfigElement(elem.getNodeName());
+                    }
 
-				NodeList children = elem.getChildNodes();
+                    // Add any attributes
 
-				if ( children != null && children.getLength() > 1) {
+                    final NamedNodeMap attribs = elem.getAttributes();
+                    if (attribs != null) {
+                        for (int j = 0; j < attribs.getLength(); j++) {
+                            final Node attribNode = attribs.item(j);
+                            childElem.addAttribute(attribNode.getNodeName(), attribNode.getNodeValue());
+                        }
+                    }
+                }
 
-					// Add the child nodes as child configuration elements
+                // Add the child configuration element
 
-					childElem = buildConfigElement(elem, null);
-				}
-				else {
+                rootElem.addChild(childElem);
+            }
+        }
 
-					// Create a normal name/value
+        // Return the configuration element
 
-					if ( children.getLength() > 0) {
-						childElem = new GenericConfigElement(elem.getNodeName());
-						childElem.setValue(children.item(0).getNodeValue());
-					}
-					else
-						childElem = new GenericConfigElement(elem.getNodeName());
-
-					// Add any attributes
-
-					NamedNodeMap attribs = elem.getAttributes();
-					if ( attribs != null) {
-						for (int j = 0; j < attribs.getLength(); j++) {
-							Node attribNode = attribs.item(j);
-							childElem.addAttribute(attribNode.getNodeName(), attribNode.getNodeValue());
-						}
-					}
-				}
-
-				// Add the child configuration element
-
-				rootElem.addChild(childElem);
-			}
-		}
-
-		// Return the configuration element
-
-		return rootElem;
-	}
+        return rootElem;
+    }
 }

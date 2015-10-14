@@ -25,15 +25,15 @@ import org.alfresco.jlan.client.CIFSDiskSession;
 import org.alfresco.jlan.client.CIFSFile;
 import org.alfresco.jlan.client.DiskSession;
 import org.alfresco.jlan.client.info.FileInfo;
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
-import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.util.MemorySize;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Byte Range Locking Test Class
@@ -41,258 +41,253 @@ import org.alfresco.jlan.util.MemorySize;
  * @author gkspencer
  */
 public class ByteRangeLockingTest extends Test {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ByteRangeLockingTest.class);
+
+    // Constants
+
+    private static final long TestFileSize = MemorySize.KILOBYTE;
+
+    /**
+     * Default constructor
+     */
+    public ByteRangeLockingTest() {
+        super("ByteRangeLocking");
+    }
+
+    /**
+     * Initialize the test setup
+     *
+     * @param threadId
+     *            int
+     * @param curIter
+     *            int
+     * @param sess
+     *            DiskSession
+     * @return boolean
+     */
+    @Override
+    public boolean runInit(final int threadId, final int curIter, final DiskSession sess) {
+        // Create the test file, if this is the first test thread
+        boolean initOK = false;
+        if (threadId == 1) {
+            try {
+                // Check if the test file exists
+                final String testFileName = getPerTestFileName(threadId, curIter);
 
-	// Constants
+                // Create a new file
+                LOGGER.debug("Creating file {} via {}", testFileName, sess.getServer());
 
-	private static final long TestFileSize	= MemorySize.KILOBYTE;
+                final CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
+                final CIFSFile testFile = cifsSess.NTCreate(testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal, SharingMode.READWRITEDELETE,
+                        FileAction.NTOverwriteIf, 0, 0);
 
-	/**
-	 * Default constructor
-	 */
-	public ByteRangeLockingTest() {
-		super( "ByteRangeLocking");
-	}
+                if (testFile != null) {
+                    // Extend the file to 1K
+                    cifsSess.NTSetEndOfFile(testFile.getFileId(), TestFileSize);
 
-	/**
-	 * Initialize the test setup
-	 *
-	 * @param threadId int
-	 * @param curIter int
-	 * @param sess DiskSession
-	 * @return boolean
-	 */
-	public boolean runInit( int threadId, int curIter, DiskSession sess) {
+                    // Close the test file
+                    testFile.Close();
 
-		// Create the test file, if this is the first test thread
+                    // Check that the file is the required length
+                    final FileInfo fInfo = cifsSess.getFileInformation(testFileName);
+                    if (fInfo.getSize() < TestFileSize) {
+                        LOGGER.error("Test file " + testFileName + " not required size, actual=" + fInfo.getSize());
+                    } else {
+                        initOK = true;
+                    }
+                }
+            } catch (final Exception ex) {
+                LOGGER.warn(ex.getMessage(), ex);
+            }
+        } else {
+            initOK = true;
+        }
 
-		boolean initOK = false;
+        // Return the initialization status
 
-		if ( threadId == 1) {
+        return initOK;
+    }
 
-			try {
+    /**
+     * Run the byte range locking test
+     *
+     * @param threadId
+     *            int
+     * @param iteration
+     *            int
+     * @param sess
+     *            DiskSession
+     * @param log
+     *            StringWriter
+     * @return TestResult
+     */
+    @Override
+    public TestResult runTest(final int threadId, final int iteration, final DiskSession sess, final StringWriter log) {
 
-				// Check if the test file exists
+        TestResult result = null;
 
-				String testFileName = getPerTestFileName( threadId, curIter);
+        try {
 
-				// Create a new file
+            // Create a test file name for this iteration
 
-				if ( isVerbose())
-					Debug.println( "Creating file " + testFileName + " via " + sess.getServer());
+            final String testFileName = getPerTestFileName(threadId, iteration);
 
-				CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
-				CIFSFile testFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal,
-   						SharingMode.READWRITEDELETE, FileAction.NTOverwriteIf, 0, 0);
+            // DEBUG
 
-				if ( testFile != null) {
+            testLog(log, "ByteRangeLocking Test");
 
-					// Extend the file to 1K
+            // Open the test file
 
-					cifsSess.NTSetEndOfFile( testFile.getFileId(), TestFileSize);
+            testLog(log, "Opening file " + testFileName + " via " + sess.getServer());
 
-					// Close the test file
+            final CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
+            CIFSFile lockFile = null;
 
-					testFile.Close();
+            try {
 
-					// Check that the file is the required length
+                // Use the thread id as the process id for the CIFS requests, locks use the process id
+                // to track the lock owner
 
-					FileInfo fInfo = cifsSess.getFileInformation( testFileName);
-					if ( fInfo.getSize() < TestFileSize)
-						Debug.println( "Test file " + testFileName + " not required size, actual=" + fInfo.getSize());
-					else
-						initOK = true;
-				}
-			}
-			catch ( Exception ex) {
-				Debug.println( ex);
-			}
-		}
-		else
-			initOK = true;
+                cifsSess.setProcessId(threadId);
 
-		// Return the initialization status
+                // Open existing file
 
-		return initOK;
-	}
+                lockFile = cifsSess.NTCreate(testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal, SharingMode.READWRITE, FileAction.NTOpen, 0, 0);
 
-	/**
-	 * Run the byte range locking test
-	 *
-	 * @param threadId int
-	 * @param iteration int
-	 * @param sess DiskSession
-	 * @param log StringWriter
-	 * @return TestResult
-	 */
-	public TestResult runTest( int threadId, int iteration, DiskSession sess, StringWriter log) {
+                // Lock/unlock a range of bytes
 
-		TestResult result = null;
+                long lockPos = 0L;
+                final long lockLen = 100L;
 
-		try {
+                for (int idx = 0; idx < 10; idx++) {
 
-			// Create a test file name for this iteration
+                    // Lock position and length
 
-			String testFileName = getPerTestFileName( threadId, iteration);
+                    boolean isLocked = false;
 
-			// DEBUG
+                    try {
 
-			testLog( log, "ByteRangeLocking Test");
+                        // Lock a range of bytes, hold the lock for a short while then unlock
 
-			// Open the test file
+                        lockFile.Lock(lockPos, lockLen);
+                        isLocked = true;
 
-			testLog( log, "Opening file " + testFileName + " via " + sess.getServer());
+                        // DEBUG
 
-			CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
-			CIFSFile lockFile = null;
+                        testLog(log, "Locked pos=" + lockPos + ", len=" + lockLen);
+                    } catch (final SMBException ex) {
 
-			try {
+                        // Check for a lock conflict error code
 
-				// Use the thread id as the process id for the CIFS requests, locks use the process id
-				// to track the lock owner
+                        if ((ex.getErrorClass() == SMBStatus.NTErr && ex.getErrorCode() == SMBStatus.NTLockConflict)
+                                || (ex.getErrorClass() == SMBStatus.ErrDos && ex.getErrorCode() == SMBStatus.DOSLockConflict)) {
 
-				cifsSess.setProcessId( threadId);
+                            // DEBUG
 
-				// Open existing file
+                            testLog(log, "Lock failed with lock conflict error (expected), " + testFileName);
+                            result = new BooleanTestResult(true, "Lock conflict error");
+                        } else {
 
-				lockFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal,
-					       						SharingMode.READWRITE, FileAction.NTOpen, 0, 0);
+                            // DEBUG
 
-				// Lock/unlock a range of bytes
+                            testLog(log, "Failed to lock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
 
-				long lockPos = 0L;
-				long lockLen = 100L;
+                            result = new ExceptionTestResult(ex);
+                        }
+                    } catch (final Exception ex) {
 
-				for ( int idx = 0; idx < 10; idx++) {
+                        // DEBUG
 
-					// Lock position and length
+                        testLog(log, "Failed to lock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
 
-					boolean isLocked = false;
+                        result = new ExceptionTestResult(ex);
+                    }
 
-					try {
+                    // If we got the lock then release it
 
-						// Lock a range of bytes, hold the lock for a short while then unlock
+                    if (isLocked == true) {
 
-						lockFile.Lock( lockPos, lockLen);
-						isLocked = true;
+                        try {
+                            // Release the lock
 
-						// DEBUG
+                            lockFile.Unlock(lockPos, lockLen);
 
-						testLog( log, "Locked pos=" + lockPos + ", len=" + lockLen);
-					}
-					catch ( SMBException ex) {
+                            // DEBUG
 
-						// Check for a lock conflict error code
+                            testLog(log, "Unlocked pos=" + lockPos + ", len=" + lockLen);
+                        } catch (final Exception ex) {
 
-						if (( ex.getErrorClass() == SMBStatus.NTErr && ex.getErrorCode() == SMBStatus.NTLockConflict) ||
-								(ex.getErrorClass() == SMBStatus.ErrDos && ex.getErrorCode() == SMBStatus.DOSLockConflict)) {
+                            // DEBUG
 
-							// DEBUG
+                            testLog(log, "Failed to unlock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
 
-							testLog ( log, "Lock failed with lock conflict error (expected), " + testFileName);
-							result = new BooleanTestResult( true, "Lock conflict error");
-						}
-						else {
+                            result = new ExceptionTestResult(ex);
+                        }
+                    } else {
 
-							// DEBUG
+                        // Sleep for a short while
 
-							testLog( log, "Failed to lock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
+                        testSleep(3);
+                    }
 
-							result = new ExceptionTestResult( ex);
-						}
-					}
-					catch ( Exception ex) {
+                    // Update the lock position
 
-						// DEBUG
+                    lockPos += lockLen;
+                }
 
-						testLog( log, "Failed to lock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
+                // Close the lock file
 
-						result = new ExceptionTestResult( ex);
-					}
+                if (lockFile != null) {
+                    lockFile.Close();
+                }
 
-					// If we got the lock then release it
+                // Set the test result if not already set
 
-					if ( isLocked == true) {
+                if (result == null) {
+                    result = new BooleanTestResult(true);
+                }
+            } catch (final Exception ex) {
 
-						try {
-							// Release the lock
+                // DEBUG
 
-							lockFile.Unlock( lockPos, lockLen);
+                testLog(log, "Failed to open test file " + testFileName + ", ex=" + ex);
 
-							// DEBUG
+                result = new ExceptionTestResult(ex);
+            }
 
-							testLog( log, "Unlocked pos=" + lockPos + ", len=" + lockLen);
-						}
-						catch ( Exception ex) {
+            // Finished
 
-							// DEBUG
+            testLog(log, "Test completed");
 
-							testLog( log, "Failed to unlock file " + testFileName + ", pos=" + lockPos + ", len=" + lockLen + ", ex=" + ex);
+        } catch (final Exception ex) {
+            LOGGER.warn(ex.getMessage(), ex);
+            result = new ExceptionTestResult(ex);
+        }
 
-							result = new ExceptionTestResult( ex);
-						}
-					}
-					else {
+        // Return the test result
+        return result;
+    }
 
-						// Sleep for a short while
+    /**
+     * Cleanup the test
+     *
+     * @param threadId
+     *            int
+     * @param iter
+     *            int
+     * @param sess
+     *            DiskSession
+     * @param log
+     *            StringWriter
+     * @exception Exception
+     */
+    @Override
+    public void cleanupTest(final int threadId, final int iter, final DiskSession sess, final StringWriter log) throws Exception {
 
-						testSleep( 3);
-					}
+        // Delete the test file
 
-					// Update the lock position
-
-					lockPos += lockLen;
-				}
-
-				// Close the lock file
-
-				if ( lockFile != null)
-					lockFile.Close();
-
-				// Set the test result if not already set
-
-				if ( result == null)
-					result = new BooleanTestResult( true);
-			}
-			catch ( Exception ex) {
-
-				// DEBUG
-
-				testLog( log, "Failed to open test file " + testFileName + ", ex=" + ex);
-
-				result = new ExceptionTestResult( ex);
-			}
-
-			// Finished
-
-			testLog( log, "Test completed");
-
-		}
-		catch ( Exception ex) {
-			Debug.println(ex);
-
-			result = new ExceptionTestResult( ex);
-		}
-
-		// Return the test result
-
-		return result;
-	}
-
-	/**
-	 * Cleanup the test
-	 *
-	 * @param threadId int
-	 * @param iter int
-	 * @param sess DiskSession
-	 * @param log StringWriter
-	 * @exception Exception
-	 */
-	public void cleanupTest( int threadId, int iter, DiskSession sess, StringWriter log)
-		throws Exception {
-
-		// Delete the test file
-
-		if ( threadId == 1)
-			sess.DeleteFile( getPerTestFileName( threadId, iter));
-	}
+        if (threadId == 1) {
+            sess.DeleteFile(getPerTestFileName(threadId, iter));
+        }
+    }
 }

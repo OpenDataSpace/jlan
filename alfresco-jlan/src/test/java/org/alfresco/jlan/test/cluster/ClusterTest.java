@@ -32,8 +32,9 @@ import java.util.concurrent.TimeUnit;
 import org.alfresco.jlan.client.DiskSession;
 import org.alfresco.jlan.client.SessionFactory;
 import org.alfresco.jlan.client.SessionSettings;
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.smb.PCShare;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Cluster Test Application
@@ -41,553 +42,529 @@ import org.alfresco.jlan.smb.PCShare;
  * @author gkspencer
  */
 public class ClusterTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ClusterTest.class);
+    // Constants
+    //
+    // Barrier wait time
+    private static long BarrierWaitTimeout = 60L; // seconds
+
+    // Test configuration
+    private final TestConfiguration m_config;
 
-	// Constants
-	//
-	//  Barrier wait time
+    // Test threads and synchronization object
+    private TestThread[] m_testThreads;
+    private CyclicBarrier m_startBarrier;
+    private CyclicBarrier m_stopBarrier;
 
-	private static long BarrierWaitTimeout	= 60L;	// seconds
+    // Test thread sets bit when test completed
+    private BitSet m_testDone;
 
-	// Test configuration
+    // Test results
+    private TestResult[] m_results;
 
-	private TestConfiguration m_config;
+    // Test result to indicate a test thread did not complete
+    private final TestResult m_didNotFinishResult = new BooleanTestResult(false, "Test thread did not complete");
 
-	// Test threads and synchronization object
+    /**
+     * Test Thread Inner Class
+     */
+    class TestThread extends Thread {
+        // Thread name and id
+        private final String m_name;
+        private final int m_id;
 
-	private TestThread[] m_testThreads;
-	private CyclicBarrier m_startBarrier;
-	private CyclicBarrier m_stopBarrier;
+        // Test iteration
+        private final int m_iter;
 
-	// Test thread sets bit when test completed
+        // Server details
+        private final TestServer m_server;
 
-	private BitSet m_testDone;
+        // Test to run
+        private final Test m_test;
 
-	// Test results
+        // Thread is waiting on sync object
+        private boolean m_wait;
 
-	private TestResult[] m_results;
+        // Thread has completed test iterations
+        private boolean m_complete;
 
-	// Test result to indicate a test thread did not complete
+        /**
+         * Class constructor
+         *
+         * @param server
+         *            TestServer
+         * @param test
+         *            Test
+         * @param id
+         *            int
+         * @param iter
+         *            int
+         */
+        public TestThread(final TestServer server, final Test test, final int id, final int iter) {
+            m_server = server;
+            m_test = test;
 
-	private TestResult m_didNotFinishResult = new BooleanTestResult( false, "Test thread did not complete");
+            // Set the thread name
+            m_name = m_test.getName() + "_" + id;
+            m_id = id;
 
-	/**
-	 * Test Thread Inner Class
-	 */
-	class TestThread extends Thread {
+            m_iter = iter;
+        }
 
-		// Thread name and id
+        /**
+         * Run the test
+         */
+        @Override
+        public void run() {
+            // Set the thread name
+            Thread.currentThread().setName(m_name);
+            if (m_test.isVerbose()) {
+                LOGGER.debug("{} running, using server {}", m_name, m_server.getName());
+            }
 
-		private String m_name;
-		private int m_id;
+            // Indicate test running
 
-		// Test iteration
+            m_complete = false;
 
-		private int m_iter;
+            // Connect to the remote server
 
-		// Server details
+            PCShare share = null;
+            DiskSession sess = null;
+            boolean initOK = false;
 
-		private TestServer m_server;
+            try {
 
-		// Test to run
+                // Connect to the remote server
 
-		private Test m_test;
+                share = new PCShare(m_server.getName(), m_server.getShareName(), m_server.getUserName(), m_server.getPassword());
 
-		// Thread is waiting on sync object
+                // Give each session a different virtual circuit id, this allows the test to be run against a Windows file
+                // server without the file server closing sessions down
 
-		private boolean m_wait;
+                final SessionSettings sessSettings = new SessionSettings();
+                sessSettings.setVirtualCircuit(m_id);
 
-		// Thread has completed test iterations
+                sess = SessionFactory.OpenDisk(share, sessSettings);
 
-		private boolean m_complete;
+                // Give each thread a unique process id
 
-		/**
-		 * Class constructor
-		 *
-		 * @param server TestServer
-		 * @param test Test
-		 * @param id int
-		 * @param iter int
-		 */
-		public TestThread( TestServer server, Test test, int id, int iter) {
-			m_server = server;
-			m_test   = test;
+                sess.setProcessId(m_id);
 
-			// Set the thread name
+                // Set the working directory
 
-			m_name = m_test.getName() + "_" + id;
-			m_id = id;
+                if (m_test.getPath() != null) {
 
-			m_iter = iter;
-		}
+                    // Primary thread sets up the test folder
 
-		/**
-		 * Run the test
-		 */
-		public void run() {
+                    if (isPrimaryThread()) {
 
-			// Set the thread name
+                        // Check if the remote path exists
 
-			Thread.currentThread().setName( m_name);
-			if ( m_test.isVerbose())
-				Debug.println( m_name + " running, using server " + m_server.getName());
+                        if (sess.FileExists(m_test.getPath()) == false) {
 
-			// Indicate test running
+                            // Create the test folder
 
-			m_complete = false;
+                            sess.CreateDirectory(m_test.getPath());
+                        }
+                    }
 
-			// Connect to the remote server
+                    // Set the working directory
 
-			PCShare share = null;
-			DiskSession sess = null;
-			boolean initOK = false;
+                    sess.setWorkingDirectory(m_test.getPath());
+                }
 
-			try {
+                // Wait for all threads
 
-				// Connect to the remote server
+                waitAtStartBarrier();
 
-				share = new PCShare( m_server.getName(), m_server.getShareName(), m_server.getUserName(), m_server.getPassword());
+                // Initialize the test
 
-				// Give each session a different virtual circuit id, this allows the test to be run against a Windows file
-				// server without the file server closing sessions down
+                initOK = m_test.initTest(m_id, m_iter, sess);
+                if (initOK == false) {
+                    LOGGER.warn("Failed to initialize test " + m_test.getName());
+                }
 
-				SessionSettings sessSettings = new SessionSettings();
-				sessSettings.setVirtualCircuit( m_id);
+                // Set the test result to 'not finished'
 
-				sess = SessionFactory.OpenDisk( share, sessSettings);
+                m_results[m_id - 1] = m_didNotFinishResult;
 
-				// Give each thread a unique process id
+                // Wait for all threads
 
-				sess.setProcessId( m_id);
+                waitAtStopBarrier();
+            } catch (final Exception ex) {
+                LOGGER.error("Error server=" + m_server, ex);
+            } finally {
 
-				// Set the working directory
+                // Check if initialization was successful
 
-				if ( m_test.getPath() != null) {
+                if (initOK == false) {
 
-					// Primary thread sets up the test folder
+                    // Close the session
 
-					if ( isPrimaryThread()) {
+                    if (sess != null) {
+                        try {
+                            sess.CloseSession();
+                            sess = null;
+                        } catch (final Exception ex) {
+                        }
+                    }
+                }
+            }
 
-						// Check if the remote path exists
+            // Run the test if connected successfully
 
-						if ( sess.FileExists( m_test.getPath()) == false) {
+            if (sess != null) {
 
-							// Create the test folder
+                // Loop through the test iterations
 
-							sess.CreateDirectory( m_test.getPath());
-						}
-					}
+                int iteration = 1;
 
-					// Set the working directory
+                while (iteration <= m_iter) {
 
-					sess.setWorkingDirectory( m_test.getPath());
-				}
+                    // Perform per run setup
 
-				// Wait for all threads
+                    if (m_test.runInit(m_id, iteration, sess) == false) {
+                        LOGGER.warn("Run initialization failed, id=" + m_id + ", iter=" + iteration);
+                    }
 
-				waitAtStartBarrier();
+                    // Create the per test thread output
 
-				// Initialize the test
+                    final StringWriter testLog = new StringWriter(512);
 
-				initOK = m_test.initTest( m_id, m_iter, sess);
-				if ( initOK == false)
-					Debug.println("Failed to initialize test " + m_test.getName());
+                    // Wait on synchronization object
 
-				// Set the test result to 'not finished'
+                    waitAtStartBarrier();
 
-				m_results[ m_id - 1] = m_didNotFinishResult;
+                    try {
+                        // Start of test setup
+                        if (m_id == 1) {
+                            LOGGER.info("------- Start iteration " + iteration + " for " + m_test.getName() + " --- " + new Date() + " -----");
+                        }
 
-				// Wait for all threads
+                        // Run the test
+                        final TestResult result = m_test.runTest(m_id, iteration, sess, testLog);
 
-				waitAtStopBarrier();
-			}
-			catch ( Exception ex) {
-				Debug.println("Error server=" + m_server);
-				Debug.println(ex);
-			}
-			finally {
+                        // Save the test results
+                        m_results[m_id - 1] = result;
+                    } catch (final Exception ex) {
+                        LOGGER.warn(ex.getMessage(), ex);
+                    }
 
-				// Check if initialization was successful
+                    // Wait for all threads to complete the test
+                    waitAtStopBarrier();
 
-				if ( initOK == false) {
+                    // Run test cleanup
+                    if (m_test.hasTestCleanup()) {
+                        // Wait for all threads to reach this point
+                        waitAtStartBarrier();
 
-					// Close the session
+                        try {
+                            m_test.cleanupTest(m_id, iteration, sess, testLog);
+                        } catch (final Exception ex) {
+                            LOGGER.warn(getName() + " Exception during cleanup", ex);
+                        }
 
-					if ( sess != null) {
-						try {
-							sess.CloseSession();
-							sess = null;
-						}
-						catch (Exception ex) {
-						}
-					}
-				}
-			}
+                        // Wait for all threads to finish cleanup
 
-			// Run the test if connected successfully
+                        waitAtStopBarrier();
+                    }
 
-			if ( sess != null) {
+                    // Dump the test log
 
-				// Loop through the test iterations
+                    if (testLog.getBuffer().length() > 0) {
+                        LOGGER.info(testLog.toString());
+                    }
 
-				int iteration = 1;
+                    // Check the test results
 
-				while ( iteration <= m_iter) {
+                    if (m_id == 1) {
 
-					// Perform per run setup
+                        final List<TestResult> resultsList = Arrays.asList(m_results);
+                        final TestResult finalResult = m_test.processTestResults(resultsList);
 
-					if ( m_test.runInit( m_id, iteration, sess) == false)
-						Debug.println( "Run initialization failed, id=" + m_id + ", iter=" + iteration);
+                        if (finalResult.isSuccess() == false) {
+                            LOGGER.info("Final test result: {}", finalResult);
+                            LOGGER.info("Test results:");
 
-					// Create the per test thread output
+                            for (final TestResult result : resultsList) {
+                                LOGGER.info("" + result);
+                            }
+                            LOGGER.info("");
+                        }
 
-					StringWriter testLog = new StringWriter ( 512);
+                        LOGGER.info("------- End iteration " + iteration + " for " + m_test.getName() + "   --- " + new Date() + " -----");
+                    }
 
-					// Wait on synchronization object
+                    // Update the iteration count
 
-					waitAtStartBarrier();
+                    iteration++;
+                }
 
-					try {
+                // Close the session
 
-						// Start of test setup
+                try {
+                    sess.CloseSession();
+                } catch (final Exception ex) {
+                    LOGGER.warn(ex.getMessage(), ex);
+                }
+            }
+            // Indicate that the test is complete
 
-						if ( m_id == 1)
-							Debug.println("------- Start iteration " + iteration + " for " + m_test.getName() + " --- " + new Date() + " -----");
+            m_complete = true;
+        }
 
-						// Run the test
+        /**
+         * Check if the test thread has completed
+         *
+         * @return boolean
+         */
+        public final boolean isComplete() {
+            return m_complete;
+        }
 
-						TestResult result = m_test.runTest( m_id, iteration, sess, testLog);
+        /**
+         * Check if the thread is waiting on the synchronization object
+         *
+         * @return boolean
+         */
+        public boolean isWaiting() {
+            return m_wait;
+        }
 
-						// Save the test results
+        /**
+         * Check if this is the primary thread
+         *
+         * @return boolean
+         */
+        public boolean isPrimaryThread() {
+            return m_id == 1 ? true : false;
+        }
 
-						m_results [ m_id - 1] = result;
-					}
-					catch (Exception ex) {
-						Debug.println(ex);
-					}
+        /**
+         * Wait for all test threads
+         */
+        protected void waitAtStartBarrier() {
 
-					// Wait for all threads to complete the test
+            try {
+                // Primary thread resets the stop barrier
 
-					waitAtStopBarrier();
+                if (m_id == 1) {
+                    m_stopBarrier.reset();
+                }
 
-					// Run test cleanup
+                m_wait = true;
+                m_startBarrier.await(BarrierWaitTimeout, TimeUnit.SECONDS);
+            } catch (final Exception ex) {
+                ex.printStackTrace();
+            }
 
-					if ( m_test.hasTestCleanup()) {
+            // Clear the wait flag
 
-						// Wait for all threads to reach this point
+            m_wait = false;
+        }
 
-						waitAtStartBarrier();
+        /**
+         * Wait for all test threads
+         */
+        protected void waitAtStopBarrier() {
 
-						try {
-							m_test.cleanupTest( m_id, iteration, sess, testLog);
-						}
-						catch (Exception ex) {
-							Debug.println( getName() + " Exception during cleanup");
-							Debug.println( ex);
-						}
+            try {
+                // Primary thread resets the start barrier
 
-						// Wait for all threads to finish cleanup
+                if (m_id == 1) {
+                    m_startBarrier.reset();
+                }
 
-						waitAtStopBarrier();
-					}
+                m_wait = true;
+                m_stopBarrier.await(BarrierWaitTimeout, TimeUnit.SECONDS);
+            } catch (final Exception ex) {
+                ex.printStackTrace();
+            }
 
-					// Dump the test log
+            // Clear the wait flag
 
-					if ( testLog.getBuffer().length() > 0)
-						Debug.println( testLog.toString());
+            m_wait = false;
+        }
+    };
 
-					// Check the test results
+    /**
+     * Class constructor
+     *
+     * @param args
+     *            String[]
+     */
+    public ClusterTest(final String[] args) throws Exception {
 
-					if ( m_id == 1) {
+        // Load the test configuration
 
-						List<TestResult> resultsList = Arrays.asList( m_results);
-						TestResult finalResult = m_test.processTestResults( resultsList);
+        m_config = new TestConfiguration();
+        m_config.loadConfiguration(args[0]);
+    }
 
-						if ( finalResult.isSuccess() == false) {
-							Debug.println("Final test result: " + finalResult);
-							Debug.println("Test results:");
+    /**
+     * Run the tests
+     */
+    public void runTests() {
 
-							for ( TestResult result : resultsList)
-								Debug.println( "" + result);
-							Debug.println("");
-						}
+        // Setup the JCE provider, required by the JLAN Client code
 
-						Debug.println("------- End iteration " + iteration + " for " + m_test.getName() + "   --- " + new Date() + " -----");
-					}
+        try {
+            final Provider provider = (Provider) Class.forName("cryptix.jce.provider.CryptixCrypto").newInstance();
+            Security.addProvider(provider);
+        } catch (final Exception ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
 
-					// Update the iteration count
+        // Global JLAN Client setup
 
-					iteration++;
-				}
+        SessionFactory.setSMBSigningEnabled(false);
 
-				// Close the session
+        // Startup information
 
-				try {
-					sess.CloseSession();
-				}
-				catch (Exception ex) {
-					Debug.println(ex);
-				}
-			}
-			// Indicate that the test is complete
+        LOGGER.info("----- Cluster Tests Running --- " + new Date() + " -----");
+        LOGGER.info("Run tests: " + (m_config.runInterleaved() ? "Interleaved" : "Sequentially"));
+        LOGGER.info("Threads per server: " + m_config.getThreadsPerServer());
+        LOGGER.info("");
 
-			m_complete = true;
-		}
+        LOGGER.info("Servers configured:");
+        final StringBuilder serverListBuilder = new StringBuilder();
+        for (final TestServer testSrv : m_config.getServerList()) {
+            serverListBuilder.append("  ").append(testSrv.getName());
+        }
+        LOGGER.info(serverListBuilder.toString());
+        LOGGER.info("");
+        LOGGER.info("");
 
-		/**
-		 * Check if the test thread has completed
-		 *
-		 * @return boolean
-		 */
-		public final boolean isComplete() {
-			return m_complete;
-		}
+        LOGGER.info("Tests configured:");
 
-		/**
-		 * Check if the thread is waiting on the synchronization object
-		 *
-		 * @return boolean
-		 */
-		public boolean isWaiting() {
-			return m_wait;
-		}
+        for (final Test test : m_config.getTestList()) {
+            LOGGER.info("  {}", test.toString());
+        }
 
-		/**
-		 * Check if this is the primary thread
-		 *
-		 * @return boolean
-		 */
-		public boolean isPrimaryThread() {
-			return m_id == 1 ? true : false;
-		}
+        LOGGER.info("");
 
-		/**
-		 * Wait for all test threads
-		 */
-		protected void waitAtStartBarrier() {
+        // Calculate the number of test threads
 
-			try {
-				// Primary thread resets the stop barrier
+        final int numTestThreads = m_config.getServerList().size() * m_config.getThreadsPerServer();
 
-				if ( m_id == 1)
-					m_stopBarrier.reset();
+        // Setup the thread synchronization object
 
-				m_wait = true;
-				m_startBarrier.await( BarrierWaitTimeout, TimeUnit.SECONDS);
-			}
-			catch ( Exception ex) {
-				ex.printStackTrace();
-			}
+        m_startBarrier = new CyclicBarrier(numTestThreads);
+        m_stopBarrier = new CyclicBarrier(numTestThreads);
 
-			// Clear the wait flag
+        // Create the test thread completion bit set
 
-			m_wait = false;
-		}
+        m_testDone = new BitSet(numTestThreads);
 
-		/**
-		 * Wait for all test threads
-		 */
-		protected void waitAtStopBarrier() {
+        // Create the per iteration test result list
 
-			try {
-				// Primary thread resets the start barrier
+        m_results = new TestResult[numTestThreads];
 
-				if ( m_id == 1)
-					m_startBarrier.reset();
+        // Loop through the tests
 
-				m_wait = true;
-				m_stopBarrier.await( BarrierWaitTimeout, TimeUnit.SECONDS);
-			}
-			catch ( Exception ex) {
-				ex.printStackTrace();
-			}
+        for (final Test curTest : m_config.getTestList()) {
 
-			// Clear the wait flag
+            // Start of test setup
 
-			m_wait = false;
-		}
-	};
+            LOGGER.info("----- Start test " + curTest.getName() + " --- " + new Date() + " -----");
 
-	/**
-	 * Class constructor
-	 *
-	 * @param args String[]
-	 */
-	public ClusterTest( String[] args)
-		throws Exception {
+            // Setup the test threads
 
-		// Load the test configuration
+            m_testThreads = new TestThread[numTestThreads];
 
-		m_config = new TestConfiguration();
-		m_config.loadConfiguration( args[0]);
-	}
+            int idx = 0;
 
-	/**
-	 * Run the tests
-	 */
-	public void runTests() {
+            for (final TestServer curSrv : m_config.getServerList()) {
 
-		// Setup the JCE provider, required by the JLAN Client code
+                // Create test thread(s) for the current test
 
-		try {
-			Provider provider = (Provider) Class.forName( "cryptix.jce.provider.CryptixCrypto").newInstance();
-			Security.addProvider(provider);
-		}
-		catch ( Exception ex) {
-			Debug.println(ex);
-		}
+                for (int perSrv = 0; perSrv < m_config.getThreadsPerServer(); perSrv++) {
 
-		// Global JLAN Client setup
+                    // Create a test thread
 
-		SessionFactory.setSMBSigningEnabled( false);
+                    final TestThread testThread = new TestThread(curSrv, curTest, idx + 1, curTest.getIterations());
+                    m_testThreads[idx] = testThread;
+                    idx++;
 
-		// Startup information
+                    // Start the thread
 
-		Debug.println("----- Cluster Tests Running --- " + new Date() + " -----");
-		Debug.println("Run tests: " + (m_config.runInterleaved() ? "Interleaved" : "Sequentially"));
-		Debug.println("Threads per server: " + m_config.getThreadsPerServer());
-		Debug.println("");
+                    testThread.setDaemon(true);
+                    testThread.start();
+                }
+            }
 
-		Debug.println("Servers configured:");
+            // Wait for tests to run
 
-		for ( TestServer testSrv : m_config.getServerList()) {
-			Debug.print("  ");
-			Debug.print(testSrv.getName());
-		}
-		Debug.println("");
-		Debug.println("");
+            int waitThread = m_testThreads.length;
 
-		Debug.println("Tests configured:");
+            while (waitThread > 0) {
 
-		for ( Test test : m_config.getTestList()) {
-			Debug.print("  ");
-			Debug.println( test.toString());
-		}
+                try {
+                    Thread.sleep(100L);
+                } catch (final Exception ex) {
+                }
 
-		Debug.println("");
+                // Check if the test threads have completed
 
-		// Calculate the number of test threads
+                waitThread = 0;
 
-		int numTestThreads = m_config.getServerList().size() * m_config.getThreadsPerServer();
+                for (final TestThread testThread : m_testThreads) {
+                    if (testThread.isComplete() == false) {
+                        waitThread++;
+                    }
+                }
+            }
 
-		// Setup the thread synchronization object
+            // Clear down the test threads
 
-		m_startBarrier = new CyclicBarrier( numTestThreads);
-		m_stopBarrier  = new CyclicBarrier( numTestThreads);
+            for (final TestThread curThread : m_testThreads) {
 
-		// Create the test thread completion bit set
+                // Stop the current thread, if still alive
 
-		m_testDone = new BitSet( numTestThreads);
+                if (curThread.isAlive()) {
+                    curThread.interrupt();
+                }
+            }
 
-		// Create the per iteration test result list
+            m_testThreads = null;
 
-		m_results = new TestResult[ numTestThreads];
+            // Run the garbage collector
 
-		// Loop through the tests
+            System.gc();
 
-		for ( Test curTest : m_config.getTestList()) {
+            // End of current test
 
-			// Start of test setup
+            LOGGER.info("----- End test " + curTest.getName() + " --- " + new Date() + " -----");
+        }
 
-			Debug.println("----- Start test " + curTest.getName() + " --- " + new Date() + " -----");
+        // End of all tests
 
-			// Setup the test threads
+        LOGGER.info("-- End all tests --- " + new Date() + " --");
+    }
 
-			m_testThreads = new TestThread[ numTestThreads];
+    /**
+     * Application startup
+     *
+     * @param args
+     *            String[]
+     */
+    public static void main(final String[] args) {
 
-			int idx = 0;
+        // Check there are enough command line parameters
 
-			for ( TestServer curSrv : m_config.getServerList()) {
+        if (args.length == 0) {
+            System.out.println("Usage: <testConfig XML file>");
+            System.exit(1);
+        }
 
-				// Create test thread(s) for the current test
+        try {
 
-				for ( int perSrv = 0; perSrv < m_config.getThreadsPerServer(); perSrv++) {
+            // Create the cluster tests
 
-					// Create a test thread
-
-					TestThread testThread = new TestThread( curSrv, curTest, idx+1, curTest.getIterations());
-					m_testThreads[idx] = testThread;
-					idx++;
-
-					// Start the thread
-
-					testThread.setDaemon( true);
-					testThread.start();
-				}
-			}
-
-			// Wait for tests to run
-
-			int waitThread = m_testThreads.length;
-
-			while ( waitThread > 0) {
-
-				try {
-					Thread.sleep( 100L);
-				}
-				catch ( Exception ex) {
-				}
-
-				// Check if the test threads have completed
-
-				waitThread = 0;
-
-				for ( TestThread testThread : m_testThreads) {
-					if ( testThread.isComplete() == false)
-						waitThread++;
-				}
-			}
-
-			// Clear down the test threads
-
-			for ( int i = 0; i < m_testThreads.length; i++) {
-
-				// Stop the current thread, if still alive
-
-				TestThread curThread = m_testThreads[i];
-
-				if ( curThread.isAlive())
-					curThread.interrupt();
-			}
-
-			m_testThreads = null;
-
-			// Run the garbage collector
-
-			System.gc();
-
-			// End of current test
-
-			Debug.println("----- End test " + curTest.getName() + " --- " + new Date() + " -----");
-		}
-
-		// End of all tests
-
-		Debug.println("-- End all tests --- " + new Date() + " --");
-	}
-
-	/**
-	 * Application startup
-	 *
-	 * @param args String[]
-	 */
-	public static void main(String[] args) {
-
-		// Check there are enough command line parameters
-
-		if ( args.length == 0) {
-			System.out.println("Usage: <testConfig XML file>");
-			System.exit( 1);
-		}
-
-		try {
-
-			// Create the cluster tests
-
-			ClusterTest clusterTest = new ClusterTest( args);
-			clusterTest.runTests();
-		}
-		catch ( Exception ex) {
-			Debug.println(ex);
-		}
-	}
+            final ClusterTest clusterTest = new ClusterTest(args);
+            clusterTest.runTests();
+        } catch (final Exception ex) {
+            LOGGER.error(ex.getMessage(), ex);
+        }
+    }
 }
