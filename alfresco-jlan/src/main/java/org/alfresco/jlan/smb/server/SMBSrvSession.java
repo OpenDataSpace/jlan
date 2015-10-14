@@ -636,8 +636,7 @@ public class SMBSrvSession extends SrvSession implements Runnable {
 		// Debug
 
 		if ( Debug.EnableInfo && hasDebug(DBG_STATE)) {
-			debugPrint("## Session closing. ");
-			debugPrintln(reason);
+			debugPrintln("## Session closing. " + reason);
 		}
 
 		// Set the session into a NetBIOS hangup state

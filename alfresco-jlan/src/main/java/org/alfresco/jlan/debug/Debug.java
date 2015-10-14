@@ -19,10 +19,164 @@
 
 package org.alfresco.jlan.debug;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.StringTokenizer;
+
 /**
  * Debug Output Class
  *
  * @author gkspencer
  */
 public final class Debug {
+
+    // Global constants used to control compiling of debug statements
+
+    public static final boolean EnableInfo = true;
+    public static final boolean EnableWarn = true;
+    public static final boolean EnableError = true;
+    public static final boolean EnableDbg = true;
+
+    // Line seperator used for exception stack traces
+
+    private static final String LineSeperator = System.getProperty("line.separator");
+
+    // Debug output levels
+    //
+    // Note: These should map to the standard Log4j levels
+
+    public static final int Fatal = 0;
+    public static final int Error = 1;
+    public static final int Warn = 2;
+    public static final int Info = 3;
+    public static final int Debug = 4;
+
+    // Global debug interface
+
+    private static DebugInterface m_debug = new ConsoleDebug();
+
+    /**
+     * Default constructor
+     */
+    private Debug() {
+    }
+
+    /**
+     * Get the debug interface
+     *
+     * @return dbg
+     */
+    public static final DebugInterface getDebugInterface() {
+        return m_debug;
+    }
+
+    /**
+     * Set the debug interface
+     *
+     * @param dbg
+     *            DebugInterface
+     */
+    public static final void setDebugInterface(final DebugInterface dbg) {
+        m_debug = dbg;
+    }
+
+    /**
+     * Output a debug string.
+     *
+     * @param str
+     *            java.lang.String
+     */
+    public static final void print(final String str) {
+        m_debug.debugPrint(str);
+    }
+
+    /**
+     * Output a debug string.
+     *
+     * @param str
+     *            String
+     * @param level
+     *            int
+     */
+    public static final void print(final String str, final int level) {
+        m_debug.debugPrint(str, level);
+    }
+
+    /**
+     * Output a debug string, and a newline.
+     *
+     * @param str
+     *            java.lang.String
+     */
+    public static final void println(final String str) {
+        m_debug.debugPrintln(str);
+    }
+
+    /**
+     * Output a debug string, and a newline.
+     *
+     * @param str
+     *            String
+     * @param level
+     *            int
+     */
+    public static final void println(final String str, final int level) {
+        m_debug.debugPrintln(str, level);
+    }
+
+    /**
+     * Output an exception trace to the debug device
+     *
+     * @param ex
+     *            Exception
+     */
+    public static final void println(final Exception ex) {
+        println(ex, Error);
+    }
+
+    /**
+     * Output an exception trace to the debug device
+     *
+     * @param ex
+     *            Exception
+     * @param level
+     *            int
+     */
+    public static final void println(final Exception ex, final int level) {
+        m_debug.debugPrintln(ex, level);
+    }
+
+    /**
+     * Output an exception trace to the debug device
+     *
+     * @param ex
+     *            Throwable
+     */
+    public static final void println(final Throwable ex) {
+        println(ex, Error);
+    }
+
+    /**
+     * Output an exception trace to the debug device
+     *
+     * @param ex
+     *            Throwable
+     * @param level
+     *            int
+     */
+    public static final void println(final Throwable ex, final int level) {
+
+        // Write the exception stack trace records to an in-memory stream
+
+        final StringWriter strWrt = new StringWriter();
+        ex.printStackTrace(new PrintWriter(strWrt, true));
+
+        // Split the resulting string into seperate records and output to the debug device
+
+        final StringTokenizer strTok = new StringTokenizer(strWrt.toString(), LineSeperator);
+
+        while (strTok.hasMoreTokens()) {
+            m_debug.debugPrintln(strTok.nextToken(), level);
+        }
+    }
 }

@@ -1213,7 +1213,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 				// DEBUG
 
 				if ( Debug.EnableInfo && m_sess.hasDebug(SMBSrvSession.DBG_TREE))
-					m_sess.debugPrint("Tree connect to " + shareName + ", access denied");
+					m_sess.debugPrintln("Tree connect to " + shareName + ", access denied");
 
 				// Invalid share connection request
 

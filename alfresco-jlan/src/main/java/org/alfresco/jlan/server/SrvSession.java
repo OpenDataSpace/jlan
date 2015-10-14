@@ -118,6 +118,28 @@ public abstract class SrvSession {
 		setProtocolName(proto);
 		setRemoteName(remoteName);
 	}
+	
+    /**
+     * Output a string and a newline to the debug device
+     *
+     * @param str
+     *            String
+     */
+    public final void debugPrintln(String str) {
+        Debug.print(m_dbgPrefix);
+        Debug.println(str);
+    }
+
+    /**
+     * Output an exception stack trace to the debug device
+     *
+     * @param ex
+     *            Exception
+     */
+    public final void debugPrintln(Exception ex) {
+        Debug.println(ex);
+    }
+
 
 	/**
 	 * Check if the session has an authentication context
