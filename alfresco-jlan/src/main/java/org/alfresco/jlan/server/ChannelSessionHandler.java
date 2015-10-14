@@ -25,116 +25,112 @@ import java.net.SocketException;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.smb.server.PacketHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Channel Session Handler Class
  *
- * <p>Base class for channel based session handler implementations.
+ * <p>
+ * Base class for channel based session handler implementations.
  *
  * @author gkspencer
  */
 public abstract class ChannelSessionHandler extends SessionHandlerBase {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChannelSessionHandler.class);
 
-	// Server socket channel for receiving incoming connections
+    // Server socket channel for receiving incoming connections
+    private ServerSocketChannel m_srvSockChannel;
 
-	private ServerSocketChannel m_srvSockChannel;
+    /**
+     * Class constructor
+     *
+     * @param name
+     *            String
+     * @param protocol
+     *            String
+     * @param server
+     *            NetworkServer
+     * @param addr
+     *            InetAddress
+     * @param port
+     *            int
+     */
+    public ChannelSessionHandler(final String name, final String protocol, final NetworkServer server, final InetAddress addr, final int port) {
+        super(name, protocol, server, addr, port);
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param name String
-	 * @param protocol String
-	 * @param server NetworkServer
-	 * @param addr InetAddress
-	 * @param port int
-	 */
-	public ChannelSessionHandler(String name, String protocol, NetworkServer server, InetAddress addr, int port) {
-		super(name, protocol, server, addr, port);
-	}
+    /**
+     * Return the server socket channel
+     *
+     * @return ServerSocketChannel
+     */
+    public final ServerSocketChannel getSocketChannel() {
+        return m_srvSockChannel;
+    }
 
-	/**
-	 * Return the server socket channel
-	 *
-	 * @return ServerSocketChannel
-	 */
-	public final ServerSocketChannel getSocketChannel() {
-		return m_srvSockChannel;
-	}
+    /**
+     * Initialize the session handler
+     *
+     * @param server
+     *            NetworkServer
+     */
+    @Override
+    public void initializeSessionHandler(final NetworkServer server) throws IOException {
+        // Create the server socket channel
+        m_srvSockChannel = ServerSocketChannel.open();
 
-	/**
-	 * Initialize the session handler
-	 *
-	 * @param server NetworkServer
-	 */
-	public void initializeSessionHandler(NetworkServer server)
-		throws IOException {
+        // Open the server socket
+        InetSocketAddress sockAddr = null;
 
-		// Create the server socket channel
+        if (hasBindAddress()) {
+            sockAddr = new InetSocketAddress(getBindAddress(), getPort());
+        } else {
+            sockAddr = new InetSocketAddress(getPort());
+        }
 
-		m_srvSockChannel = ServerSocketChannel.open();
+        // Bind the socket
+        m_srvSockChannel.socket().bind(sockAddr, getListenBacklog());
 
-		// Open the server socket
+        // Set the allocated port
+        if (getPort() == 0) {
+            setPort(m_srvSockChannel.socket().getLocalPort());
+        }
 
-		InetSocketAddress sockAddr = null;
+        if (hasDebug()) {
+            LOGGER.info("[{}] Binding {} session handler to address : {}", getProtocolName(), getHandlerName(),
+                    hasBindAddress() ? getBindAddress().getHostAddress() : "ALL");
+        }
+    }
 
-		if ( hasBindAddress())
-			sockAddr = new InetSocketAddress( getBindAddress(), getPort());
-		else
-			sockAddr = new InetSocketAddress( getPort());
+    /**
+     * Close the session handler
+     *
+     * @param server
+     *            NetworkServer
+     */
+    @Override
+    public void closeSessionHandler(final NetworkServer server) {
+        // Request the main listener thread shutdown
+        setShutdown(true);
+        try {
+            // Close the server socket to release any pending listen
+            if (m_srvSockChannel != null) {
+                m_srvSockChannel.close();
+            }
+        } catch (final SocketException ex) {
+        } catch (final Exception ex) {
+        }
+    }
 
-		// Bind the socket
-
-		m_srvSockChannel.socket().bind( sockAddr, getListenBacklog());
-
-		// Set the allocated port
-
-		if ( getPort() == 0)
-			setPort(m_srvSockChannel.socket().getLocalPort());
-
-		// DEBUG
-
-		if ( Debug.EnableInfo && hasDebug()) {
-			Debug.print("[" + getProtocolName() + "] Binding " + getHandlerName() + " session handler to address : ");
-			if ( hasBindAddress())
-				Debug.println(getBindAddress().getHostAddress());
-			else
-				Debug.println("ALL");
-		}
-	}
-
-	/**
-	 * Close the session handler
-	 *
-	 * @param server NetworkServer
-	 */
-	public void closeSessionHandler(NetworkServer server) {
-
-		// Request the main listener thread shutdown
-
-		setShutdown( true);
-
-		try {
-
-			// Close the server socket to release any pending listen
-
-			if ( m_srvSockChannel != null)
-				m_srvSockChannel.close();
-		}
-		catch (SocketException ex) {
-		}
-		catch (Exception ex) {
-		}
-	}
-
-	/**
-	 * Create a packet handler for the new client socket connection
-	 *
-	 * @param sockChannel SocketChannel
-	 * @return PacketHandler
-	 * @exception IOException
-	 */
-	public abstract PacketHandler createPacketHandler( SocketChannel sockChannel)
-		throws IOException;
+    /**
+     * Create a packet handler for the new client socket connection
+     *
+     * @param sockChannel
+     *            SocketChannel
+     * @return PacketHandler
+     * @exception IOException
+     */
+    public abstract PacketHandler createPacketHandler(SocketChannel sockChannel) throws IOException;
 }
