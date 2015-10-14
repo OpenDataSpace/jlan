@@ -71,6 +71,8 @@ import org.alfresco.jlan.smb.server.ntfs.StreamInfo;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfoList;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.WildCard;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 
 /**
@@ -80,6 +82,7 @@ import org.springframework.extensions.config.ConfigElement;
  */
 public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolumeInterface, NTFSStreamsInterface,
   FileLockingInterface, FileIdInterface, SymbolicLinkInterface, OpLockInterface, SecurityDescriptorInterface {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DBDiskDriver.class);
 
   //  Attributes attached to the file state
 

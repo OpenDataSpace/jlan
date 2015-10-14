@@ -33,6 +33,7 @@ import org.alfresco.jlan.server.filesys.FileSystem;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.FileStateCacheListener;
 import org.alfresco.jlan.server.filesys.cache.FileStateLockManager;
+import org.alfresco.jlan.server.filesys.db.derby.DerbyDBInterface;
 import org.alfresco.jlan.server.filesys.loader.DeleteFileRequest;
 import org.alfresco.jlan.server.filesys.loader.FileLoader;
 import org.alfresco.jlan.server.filesys.loader.FileRequestQueue;
@@ -41,6 +42,8 @@ import org.alfresco.jlan.server.locking.LockManager;
 import org.alfresco.jlan.server.locking.OpLockManager;
 import org.alfresco.jlan.server.thread.ThreadRequestPool;
 import org.alfresco.jlan.util.MemorySize;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
 
 /**
@@ -49,6 +52,7 @@ import org.springframework.extensions.config.ConfigElement;
  * @author gkspencer
  */
 public class DBDeviceContext extends DiskDeviceContext implements FileStateCacheListener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DBDeviceContext.class);
 
 	// Milliseconds per day
 
