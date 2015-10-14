@@ -25,43 +25,48 @@ import org.alfresco.jlan.ftp.FTPRequest;
 import org.alfresco.jlan.ftp.FTPSiteInterface;
 import org.alfresco.jlan.ftp.FTPSrvSession;
 import org.alfresco.jlan.server.config.ServerConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.extensions.config.ConfigElement;
-
 
 /**
  * Test FTP Site Interface Class
  *
- * <p>Implements the FTPSiteInterface to accept custom SITE commands.
+ * <p>
+ * Implements the FTPSiteInterface to accept custom SITE commands.
  *
  * @author gkspencer
  */
 public class TestFTPSiteInterface implements FTPSiteInterface {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestFTPSiteInterface.class);
 
-  /**
-   * Initialize the FTP site interface
-   *
-   * @param config ServerConfiguration
-   * @param params ConfigElement
-   */
-  public void initializeSiteInterface(ServerConfiguration config, ConfigElement params) {
-  }
+    /**
+     * Initialize the FTP site interface
+     *
+     * @param config
+     *            ServerConfiguration
+     * @param params
+     *            ConfigElement
+     */
+    @Override
+    public void initializeSiteInterface(final ServerConfiguration config, final ConfigElement params) {
+    }
 
-  /**
-   * Process the FTP SITE command
-   *
-   * @param sess FTPSrvSession
-   * @param req FTPRequest
-   */
-  public void processFTPSiteCommand(FTPSrvSession sess, FTPRequest req)
-    throws IOException {
+    /**
+     * Process the FTP SITE command
+     *
+     * @param sess
+     *            FTPSrvSession
+     * @param req
+     *            FTPRequest
+     */
+    @Override
+    public void processFTPSiteCommand(final FTPSrvSession sess, final FTPRequest req) throws IOException {
+        if (sess.hasDebug(FTPSrvSession.DBG_INFO)) {
+            LOGGER.info("SITE command {}", req.getArgument());
+        }
 
-    // DEBUG
-
-    if ( sess.hasDebug( FTPSrvSession.DBG_INFO))
-      sess.debugPrintln( "SITE command " + req.getArgument());
-
-    // Echo the user request
-
-    sess.sendFTPResponse( 200, "Site request : " + req.getArgument());
-  }
+        // Echo the user request
+        sess.sendFTPResponse(200, "Site request : " + req.getArgument());
+    }
 }

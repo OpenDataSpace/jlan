@@ -19,12 +19,12 @@
 
 package org.alfresco.jlan.sample;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.loader.FileProcessor;
 import org.alfresco.jlan.server.filesys.loader.FileSegment;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test File Processor Class
@@ -32,35 +32,42 @@ import org.alfresco.jlan.server.filesys.loader.FileSegment;
  * @author gkspencer
  */
 public class TestFileProcessor implements FileProcessor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestFileProcessor.class);
 
-	/**
-	 * Process a cached file just before it is to be stored.
-	 *
-	 * @param context DiskDeviceContext
-	 * @param state FileState
-	 * @param segment FileSegment
-	 */
-	public void processStoredFile(DiskDeviceContext context, FileState state, FileSegment segment) {
-		try {
-			Debug.println("## TestFileProcessor Storing file=" + state.getPath() + ", fid=" + state.getFileId() + ", cache=" + segment.getTemporaryFile());
-		}
-		catch (Exception ex) {
-		}
-	}
+    /**
+     * Process a cached file just before it is to be stored.
+     *
+     * @param context
+     *            DiskDeviceContext
+     * @param state
+     *            FileState
+     * @param segment
+     *            FileSegment
+     */
+    @Override
+    public void processStoredFile(final DiskDeviceContext context, final FileState state, final FileSegment segment) {
+        try {
+            LOGGER.info("## TestFileProcessor Storing file={}, fid={}, cache={}", state.getPath(), state.getFileId(), segment.getTemporaryFile());
+        } catch (final Exception ex) {
+        }
+    }
 
-	/**
-	 * Process a cached file just after being loaded.
-	 *
-	 * @param context DiskDeviceContext
-	 * @param state FileState
-	 * @param segment FileSegment
-	 */
-	public void processLoadedFile(DiskDeviceContext context, FileState state, FileSegment segment) {
-		try {
-			Debug.println("## TestFileProcessor Loaded file=" + state.getPath() + ", fid=" + state.getFileId() + ", cache=" + segment.getTemporaryFile());
-		}
-		catch (Exception ex) {
-		}
-	}
+    /**
+     * Process a cached file just after being loaded.
+     *
+     * @param context
+     *            DiskDeviceContext
+     * @param state
+     *            FileState
+     * @param segment
+     *            FileSegment
+     */
+    @Override
+    public void processLoadedFile(final DiskDeviceContext context, final FileState state, final FileSegment segment) {
+        try {
+            LOGGER.info("## TestFileProcessor Loaded file={}, fid={}, cache={}", state.getPath(), state.getFileId(), segment.getTemporaryFile());
+        } catch (final Exception ex) {
+        }
+    }
 
 }
