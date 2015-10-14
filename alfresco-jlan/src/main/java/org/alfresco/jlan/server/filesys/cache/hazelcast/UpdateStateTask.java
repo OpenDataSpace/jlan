@@ -23,6 +23,8 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
@@ -35,13 +37,12 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public class UpdateStateTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(UpdateStateTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // File status
-
     private int m_fileStatus;
 
     /**
@@ -82,46 +83,32 @@ public class UpdateStateTask extends RemoteStateTask<Boolean> {
      */
     @Override
     protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
-
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("UpdateStateTask: Update file status=" + FileStatus.asString(m_fileStatus) + ", state=" + fState);
+            LOGGER.debug("UpdateStateTask: Update file status={}, state={}", FileStatus.asString(m_fileStatus), fState);
         }
 
         // Check if the file status has changed
-
         boolean changedSts = false;
-
         if (fState.getFileStatus() != m_fileStatus) {
-
             // Update the file status
-
             fState.setFileStatusInternal(m_fileStatus, FileState.ReasonNone);
             changedSts = true;
 
             // If the status indicates the file/folder no longer exists then clear the file id, state attributes
-
             if (fState.getFileStatus() == FileStatus.NotExist) {
-
                 // Reset the file id
-
                 fState.setFileId(FileState.UnknownFileId);
 
                 // Clear out any state attributes
-
                 fState.removeAllAttributes();
             }
 
-            // DEBUG
-
             if (hasDebug()) {
-                Debug.println("UpdateStateTask: Status updated, state=" + fState);
+                LOGGER.debug("UpdateStateTask: Status updated, state={}", fState);
             }
         }
 
         // Return a status
-
         return Boolean.valueOf(changedSts);
     }
 }

@@ -19,11 +19,12 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.locking.FileLockList;
 import org.alfresco.jlan.locking.NotLockedException;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileLock;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
@@ -36,13 +37,12 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public class RemoveFileByteLockTask extends RemoteStateTask<ClusterFileState> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RemoveFileByteLockTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // Byte range lock details
-
     private ClusterFileLock m_lock;
 
     /**
@@ -83,32 +83,23 @@ public class RemoveFileByteLockTask extends RemoteStateTask<ClusterFileState> {
      */
     @Override
     protected ClusterFileState runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
-
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("RemoveFileByteLockTask: Remove lock=" + m_lock + " from " + fState);
+            LOGGER.debug("RemoveFileByteLockTask: Remove lock={} from {}", m_lock, fState);
         }
 
         // Find the matching lock, make sure the owner node matches
-
         final FileLockList lockList = fState.getLockList();
         final ClusterFileLock clLock = (ClusterFileLock) lockList.findLock(m_lock);
 
         if (clLock != null && clLock.getOwnerNode().equalsIgnoreCase(m_lock.getOwnerNode()) == true) {
-
             // Remove the lock
-
             lockList.removeLock(clLock);
         } else {
-
             // Return a not locked exception, node does not own the matching lock
-
             throw new NotLockedException();
         }
 
         // Return the updated file state
-
         return fState;
     }
 }

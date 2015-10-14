@@ -19,8 +19,9 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
@@ -33,9 +34,9 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public class RemoveOpLockTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RemoveOpLockTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     /**
@@ -72,19 +73,14 @@ public class RemoveOpLockTask extends RemoteStateTask<Boolean> {
      */
     @Override
     protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
-
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("RemoveOpLockTask: Remove oplock from " + fState);
+            LOGGER.debug("RemoveOpLockTask: Remove oplock from {}", fState);
         }
 
         // Remove the oplock
-
         fState.clearOpLock();
 
         // Return a success status
-
         return Boolean.TRUE;
     }
 }

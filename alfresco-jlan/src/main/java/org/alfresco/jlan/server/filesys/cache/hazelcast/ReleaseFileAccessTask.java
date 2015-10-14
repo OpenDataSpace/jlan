@@ -19,11 +19,12 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileAccessToken;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.SharingMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.ITopic;
@@ -37,17 +38,15 @@ import com.hazelcast.core.ITopic;
  * @author gkspencer
  */
 public class ReleaseFileAccessTask extends RemoteStateTask<Integer> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ReleaseFileAccessTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // Access token, allocated via a grant file access call
-
     private FileAccessToken m_token;
 
     // Cluster topic used to publish file server messages to
-
     private String m_clusterTopic;
 
     /**
@@ -91,68 +90,47 @@ public class ReleaseFileAccessTask extends RemoteStateTask<Integer> {
      */
     @Override
     protected Integer runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
-
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("ReleaseFileAccessTask: Release token=" + m_token + " path " + fState);
+            LOGGER.debug("ReleaseFileAccessTask: Release token={} path {}", m_token, fState);
         }
 
         // Get the current file open count
-
         int openCount = fState.getOpenCount();
 
         // Release the oplock
-
         if (m_token instanceof HazelCastAccessToken) {
-
             final HazelCastAccessToken hcToken = (HazelCastAccessToken) m_token;
-
             // Decrement the file open count, unless the token is from an attributes only file open
-
             if (hcToken.isAttributesOnly() == false) {
-
                 // Decrement the file open count
-
                 openCount = fState.decrementOpenCount();
-
                 if (openCount == 0) {
-
                     // Reset the sharing mode and clear the primary owner, no current file opens
-
                     fState.setSharedAccess(SharingMode.READWRITEDELETE);
                     fState.setPrimaryOwner(null);
                 }
             }
 
             // Check if the token indicates an oplock was granted during the file open
-
             if (fState.hasOpLock() && hcToken.getOpLockType() != OpLock.TypeNone) {
-
                 // Release the remote oplock
-
                 fState.clearOpLock();
 
                 // Inform cluster nodes that an oplock has been released
-
                 final ITopic<ClusterMessage> clusterTopic = getHazelcastInstance().getTopic(m_clusterTopic);
                 final OpLockMessage oplockMsg = new OpLockMessage(ClusterMessage.AllNodes, ClusterMessageType.OpLockBreakNotify, fState.getPath());
                 clusterTopic.publish(oplockMsg);
 
-                // DEBUG
-
                 if (hasDebug()) {
-                    Debug.println("Cleared remote oplock during token release");
+                    LOGGER.debug("Cleared remote oplock during token release");
                 }
             }
 
             // This is a copy of the access token, mark it as released
-
             hcToken.setReleased(true);
         }
 
         // Return the new file open count
-
         return new Integer(openCount);
     }
 }

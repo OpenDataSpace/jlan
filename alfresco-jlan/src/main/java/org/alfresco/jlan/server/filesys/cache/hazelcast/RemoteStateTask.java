@@ -22,8 +22,9 @@ package org.alfresco.jlan.server.filesys.cache.hazelcast;
 import java.io.Serializable;
 import java.util.concurrent.Callable;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastInstanceAware;
@@ -38,33 +39,28 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public abstract class RemoteStateTask<T> implements Callable<T>, HazelcastInstanceAware, Serializable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RemoteStateTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // Task option flags
-
     public static final int TaskDebug = 0x0001;
     public static final int TaskLockState = 0x0002;
     public static final int TaskNoUpdate = 0x0004;
     public static final int TaskTiming = 0x0008;
 
     // Clustered map name and key
-
     private String m_mapName;
     private String m_keyName;
 
     // Hazelcast instance
-
     private transient HazelcastInstance m_hcInstance;
 
     // Task options
-
     private short m_taskOptions;
 
     // Task name
-
     private transient String m_taskName;
 
     /**
@@ -212,9 +208,6 @@ public abstract class RemoteStateTask<T> implements Callable<T>, HazelcastInstan
      */
     @Override
     public T call() throws Exception {
-
-        // DEBUG
-
         long startTime = 0L;
         long lockTime = 0L;
         long unlockTime = 0L;
@@ -224,40 +217,28 @@ public abstract class RemoteStateTask<T> implements Callable<T>, HazelcastInstan
         }
 
         // Get the clustered cache
-
         final IMap<String, ClusterFileState> cache = getHazelcastInstance().getMap(getMapName());
         if (cache == null) {
             throw new Exception("Failed to find clustered map " + getMapName());
         }
 
         // Lock the file state if required, and load the current state
-
         if (hasOption(TaskLockState)) {
-
-            // DEBUG
-
             long lockStart = 0L;
             if (hasTimingDebug()) {
                 lockStart = System.currentTimeMillis();
             }
 
             // Lock the key
-
             cache.lock(getKey());
-
-            // DEBUG
-
             if (hasTimingDebug()) {
                 lockTime = System.currentTimeMillis() - lockStart;
             }
         }
 
         final ClusterFileState fState = cache.get(getKey());
-
         if (fState == null) {
-
             // Unlock the file state key and return an error
-
             if (hasOption(TaskLockState)) {
                 cache.unlock(getKey());
             }
@@ -266,61 +247,41 @@ public abstract class RemoteStateTask<T> implements Callable<T>, HazelcastInstan
         }
 
         // Run the task against the file state
-
         T retVal = null;
-
         try {
-
             // Run the remote task
-
             retVal = runRemoteTaskAgainstState(cache, fState);
 
             // Update the file state
-
             if (hasOption(TaskNoUpdate) == false) {
                 cache.put(getKey(), fState);
-
-                // DEBUG
-
                 if (hasDebug()) {
-                    Debug.println("Remote task " + getTaskName() + " updated state=" + fState);
+                    LOGGER.debug("Remote task {} updated state={}", getTaskName(), fState);
                 }
             }
         } finally {
-
             // Make sure the key is unlocked
-
             if (hasOption(TaskLockState)) {
-
-                // DEBUG
-
                 long lockEnd = 0L;
-
                 if (hasTimingDebug()) {
                     lockEnd = System.currentTimeMillis();
                 }
 
                 // Unlock the key
-
                 cache.unlock(getKey());
-
-                // DEBUG
 
                 if (hasTimingDebug()) {
                     unlockTime = System.currentTimeMillis() - lockEnd;
                 }
             }
 
-            // DEBUG
-
             if (hasTimingDebug()) {
-                Debug.println("Remote task " + getTaskName() + " executed in " + (System.currentTimeMillis() - startTime) + "ms (lock " + lockTime
-                        + "ms, unlock " + unlockTime + "ms)");
+                LOGGER.debug("Remote task {} executed in {}ms (lock {}ms, unlock {}ms)", getTaskName(), System.currentTimeMillis() - startTime, lockTime,
+                        unlockTime);
             }
         }
 
         // Return the task result
-
         return retVal;
     }
 

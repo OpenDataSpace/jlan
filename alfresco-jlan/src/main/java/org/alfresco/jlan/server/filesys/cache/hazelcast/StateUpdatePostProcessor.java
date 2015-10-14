@@ -19,10 +19,11 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileStateCache;
 import org.alfresco.jlan.server.filesys.cache.cluster.FileStatePostProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * File State Update Post Processor Class
@@ -33,9 +34,9 @@ import org.alfresco.jlan.server.filesys.cache.cluster.FileStatePostProcessor;
  * @author gkspencer
  */
 public class StateUpdatePostProcessor extends FileStatePostProcessor {
+    private static final Logger LOGGER = LoggerFactory.getLogger(StateUpdatePostProcessor.class);
 
     // Update mask
-
     private int m_updateMask;
 
     /**
@@ -88,20 +89,13 @@ public class StateUpdatePostProcessor extends FileStatePostProcessor {
      */
     @Override
     public void runProcessor() {
-
         try {
-
             // Send the state updated message to the cluster
-
             getStateCache().updateFileState(getState(), m_updateMask);
         } catch (final Exception ex) {
-
-            // DEBUG
-
             if (hasDebug()) {
-                Debug.println("State update post processor failed to update state=" + getState() + ", updates="
-                        + ClusterFileState.getUpdateMaskAsString(m_updateMask));
-                Debug.println(ex);
+                LOGGER.debug("State update post processor failed to update state=" + getState() + ", updates="
+                        + ClusterFileState.getUpdateMaskAsString(m_updateMask), ex);
             }
         }
     }

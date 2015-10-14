@@ -21,10 +21,11 @@ package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
 import java.io.Serializable;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileAccessToken;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
 import org.alfresco.jlan.smb.OpLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HazelCast Access Token Class
@@ -35,34 +36,27 @@ import org.alfresco.jlan.smb.OpLock;
  * @author gkspencer
  */
 public class HazelCastAccessToken implements Serializable, FileAccessToken {
-
+    private static final Logger LOGGER = LoggerFactory.getLogger(HazelCastAccessToken.class);
     // Serialization id
-
     private static final long serialVersionUID = 5L;
 
     // Cluster node that owns the token
-
     private String m_ownerName;
 
     // Process id that owns the file
-
     private int m_pid;
 
     // Granted oplock type, if requested, and flag to indicate if the oplock is not available
-
     private int m_oplock;
     private boolean m_oplockNotAvailable;
 
     // Associated network file path
-
     private String m_path;
 
     // Attributes only file access
-
     private boolean m_attribOnly;
 
     // Access token has been released
-
     private transient boolean m_released = false;
 
     /**
@@ -261,11 +255,9 @@ public class HazelCastAccessToken implements Serializable, FileAccessToken {
      */
     @Override
     public void finalize() {
-
         // Check if hte access token was released
-
         if (isReleased() == false) {
-            Debug.println("** Access token finalized, not released, " + toString() + " **");
+            LOGGER.warn("** Access token finalized, not released, {} **", this);
         }
     }
 }

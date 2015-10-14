@@ -19,10 +19,11 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.IMap;
 
@@ -34,17 +35,15 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public class RenameStateTask extends RemoteStateTask<Boolean> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RenameStateTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // New file state key/path
-
     private String m_newKey;
 
     // Flag to indicate path is to a folder
-
     private boolean m_folder;
 
     /**
@@ -89,38 +88,28 @@ public class RenameStateTask extends RemoteStateTask<Boolean> {
      */
     @Override
     protected Boolean runRemoteTaskAgainstState(final IMap<String, ClusterFileState> stateCache, final ClusterFileState fState) throws Exception {
-
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("RenameStateTask: Rename from " + getKey() + " to " + m_newKey);
+            LOGGER.debug("RenameStateTask: Rename from {} to {}", getKey(), m_newKey);
         }
 
         // Remove the existing file state from the cache, using the original name
-
         final ClusterFileState state = stateCache.remove(getKey());
 
         // Set the file status
-
         state.setFileStatusInternal(m_folder ? FileStatus.DirectoryExists : FileStatus.FileExists, FileState.ReasonNone);
 
         // Clear attributes from the renamed state
-
         state.removeAllAttributes();
 
         // Update the file state path and add it back to the cache using the new name
-
         state.setPathInternal(m_newKey);
         stateCache.put(state.getPath(), state);
 
-        // DEBUG
-
         if (hasDebug()) {
-            Debug.println("Rename to " + m_newKey + " successful, state=" + state);
+            LOGGER.debug("Rename to {} successful, state={}", m_newKey, state);
         }
 
         // Return the rename status
-
         return Boolean.TRUE;
     }
 }

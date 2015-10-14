@@ -19,7 +19,6 @@
 
 package org.alfresco.jlan.server.filesys.cache.hazelcast;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.RequestPostProcessor;
 import org.alfresco.jlan.server.filesys.ExistingOpLockException;
 import org.alfresco.jlan.server.filesys.FileStatus;
@@ -27,6 +26,8 @@ import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileStateCache;
 import org.alfresco.jlan.server.locking.OpLockDetails;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * HazelCast Cluster File State Class
@@ -34,6 +35,7 @@ import org.alfresco.jlan.server.locking.OpLockDetails;
  * @author gkspencer
  */
 public class HazelCastClusterFileState extends ClusterFileState {
+    private static final Logger LOGGER = LoggerFactory.getLogger(HazelCastClusterFileState.class);
 
     // Serialization id
 
@@ -414,25 +416,20 @@ public class HazelCastClusterFileState extends ClusterFileState {
      *            StateUpdateMessage
      */
     protected final void updateState(final StateUpdateMessage updateMsg) {
-
         // Update the file state from the update message
         //
         // Note: Only update the FileState class values using the super methods.
         // The HazelCastClusterFileState set/update methods must not be used.
 
         // File status
-
         if (updateMsg.hasUpdate(ClusterFileState.UpdateFileStatus)) {
             super.setFileStatus(updateMsg.getFileStatus());
-
             // TEST
-
             if (getFileStatus() == FileStatus.NotExist && getOpenCount() > 0) {
-                Debug.println("Setting status to NotExist when openCount>0, fid=" + getFileId() + ", name=" + getPath());
+                LOGGER.debug("Setting status to NotExist when openCount>0, fid={}, name={}", getFileId(), getPath());
             }
 
             // If the file/folder no longer exists then clear the file id and state attributes
-
             if (getFileStatus() == FileStatus.NotExist) {
                 setFileId(FileState.UnknownFileId);
                 removeAllAttributes();
@@ -440,7 +437,6 @@ public class HazelCastClusterFileState extends ClusterFileState {
         }
 
         // File size/allocation size
-
         if (updateMsg.hasUpdate(ClusterFileState.UpdateFileSize)) {
             super.setFileSize(updateMsg.getFileSize());
         }

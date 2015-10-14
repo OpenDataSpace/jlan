@@ -22,8 +22,9 @@ package org.alfresco.jlan.server.filesys.cache.hazelcast;
 import java.io.Serializable;
 import java.util.concurrent.Callable;
 
-import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastInstanceAware;
@@ -38,31 +39,26 @@ import com.hazelcast.core.IMap;
  * @author gkspencer
  */
 public abstract class RemoteCacheTask<T> implements Callable<T>, HazelcastInstanceAware, Serializable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(RemoteCacheTask.class);
 
     // Serialization id
-
     private static final long serialVersionUID = 1L;
 
     // Task option flags
-
     public static final int TaskDebug = 0x0001;
     public static final int TaskTiming = 0x0002;
 
     // Clustered map name
-
     private String m_mapName;
     private String m_keyName;
 
     // Hazelcast instance
-
     private transient HazelcastInstance m_hcInstance;
 
     // Task options
-
     private short m_taskOptions;
 
     // Task name
-
     private transient String m_taskName;
 
     /**
@@ -197,41 +193,29 @@ public abstract class RemoteCacheTask<T> implements Callable<T>, HazelcastInstan
      */
     @Override
     public T call() throws Exception {
-
-        // DEBUG
-
         long startTime = 0L;
         if (hasTimingDebug()) {
             startTime = System.currentTimeMillis();
         }
 
         // Get the clustered cache
-
         final IMap<String, ClusterFileState> cache = getHazelcastInstance().getMap(getMapName());
         if (cache == null) {
             throw new Exception("Failed to find clustered map " + getMapName());
         }
 
         // Run the task
-
         T retVal = null;
-
         try {
-
             // Run the remote task
-
             retVal = runRemoteTask(cache, getKey());
         } finally {
-
-            // DEBUG
-
             if (hasTimingDebug()) {
-                Debug.println("Remote task executed in " + (System.currentTimeMillis() - startTime) + "ms");
+                LOGGER.debug("Remote task executed in {}ms", System.currentTimeMillis() - startTime);
             }
         }
 
         // Return the task result
-
         return retVal;
     }
 
