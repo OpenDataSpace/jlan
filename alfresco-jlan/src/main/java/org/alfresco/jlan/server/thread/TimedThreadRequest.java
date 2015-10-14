@@ -21,56 +21,60 @@ package org.alfresco.jlan.server.thread;
 
 import java.util.Date;
 
-import org.alfresco.jlan.debug.Debug;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Timer Thread Request Class
  *
- * <p>Run a thread request at a particular time, with options to repeat.
+ * <p>
+ * Run a thread request at a particular time, with options to repeat.
  *
  * @author gkspencer
  */
 public abstract class TimedThreadRequest implements ThreadRequest, Comparable<TimedThreadRequest> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TimedThreadRequest.class);
 
     // Run at time that indicates the timed request is paused
-
     public final static long TimedRequestPaused = 0L;
 
     // Time to run the request at and repeat interval
     // A repeat interval of zero indicates a one off request.
-
     private long m_runAt;
     private long m_repeatSecs;
 
     // Description/name
-
-    private String m_description;
+    private final String m_description;
 
     // Thread request pool that this request is queued to
-
     private ThreadRequestPool m_threadPool;
 
     /**
      * Class constructor
      *
-     * @param desc String
-     * @param runAt long
+     * @param desc
+     *            String
+     * @param runAt
+     *            long
      */
-    public TimedThreadRequest( String desc, long runAt) {
-        setRunAtTime( runAt);
+    public TimedThreadRequest(final String desc, final long runAt) {
+        setRunAtTime(runAt);
         m_description = desc;
     }
 
     /**
      * Class constructor
      *
-     * @param desc String
-     * @param runAt long
-     * @param repeatSecs long
+     * @param desc
+     *            String
+     * @param runAt
+     *            long
+     * @param repeatSecs
+     *            long
      */
-    public TimedThreadRequest( String desc, long runAt, long repeatSecs) {
-        setRunAtTime( runAt);
-        setRepeatInterval( repeatSecs);
+    public TimedThreadRequest(final String desc, final long runAt, final long repeatSecs) {
+        setRunAtTime(runAt);
+        setRepeatInterval(repeatSecs);
         m_description = desc;
     }
 
@@ -111,10 +115,9 @@ public abstract class TimedThreadRequest implements ThreadRequest, Comparable<Ti
     }
 
     /**
-     * Return the repeat interval for the timed request, or zero if this is not a repeating
-     * request.
+     * Return the repeat interval for the timed request, or zero if this is not a repeating request.
      *
-     *  @return long
+     * @return long
      */
     public final long getRepeatInterval() {
         return m_repeatSecs;
@@ -139,38 +142,41 @@ public abstract class TimedThreadRequest implements ThreadRequest, Comparable<Ti
     }
 
     /**
-     * Set the time to run the interval. A positive value indicates an absolute time value, a negative
-     * value indicates the number of seconds from now.
+     * Set the time to run the interval. A positive value indicates an absolute time value, a negative value indicates the number of seconds from now.
      *
-     * @param runAt long
+     * @param runAt
+     *            long
      */
-    public final void setRunAtTime(long runAt) {
-        if ( runAt < 0L)
+    public final void setRunAtTime(final long runAt) {
+        if (runAt < 0L) {
             m_runAt = System.currentTimeMillis() + (-runAt * 1000L);
-        else
+        } else {
             m_runAt = runAt;
+        }
 
         // If the request is associated with a thread pool then requeue the request
-
-        if ( hasThreadRequestPool())
-            getThreadRequestPool().queueTimedRequest( this);
+        if (hasThreadRequestPool()) {
+            getThreadRequestPool().queueTimedRequest(this);
+        }
     }
 
     /**
      * Set the repeat interval, in seconds
      *
-     * @param repeatSecs long
+     * @param repeatSecs
+     *            long
      */
-    public final void setRepeatInterval(long repeatSecs) {
+    public final void setRepeatInterval(final long repeatSecs) {
         m_repeatSecs = repeatSecs;
     }
 
     /**
      * Thread request pool that the request is queued to
      *
-     * @param threadPool ThreadRequestPool
+     * @param threadPool
+     *            ThreadRequestPool
      */
-    protected final void setThreadRequestPool( ThreadRequestPool threadPool) {
+    protected final void setThreadRequestPool(final ThreadRequestPool threadPool) {
         m_threadPool = threadPool;
     }
 
@@ -178,53 +184,39 @@ public abstract class TimedThreadRequest implements ThreadRequest, Comparable<Ti
      * Restart a timed request that has been paused
      */
     public final void restartRequest() {
-        if ( isPaused())
-            setRunAtTime( System.currentTimeMillis() + (getRepeatInterval() * 1000L));
+        if (isPaused()) {
+            setRunAtTime(System.currentTimeMillis() + (getRepeatInterval() * 1000L));
+        }
     }
 
     /**
      * Run the request in a thread from the thread pool
      */
+    @Override
     public void runRequest() {
-
         try {
-
             // Run the timed request
-
-             runTimedRequest();
-        }
-        catch ( Throwable ex) {
-            Debug.println(ex, Debug.Error);
+            runTimedRequest();
+        } catch (final Throwable ex) {
+            LOGGER.error(ex.getMessage(), ex);
         }
 
         // Check if the timed request should be requeued
-
-        if ( isPaused() == false) {
-
+        if (isPaused() == false) {
             // Check if the timed request has a repeat interval, if so then requeue it
-
-            if ( hasRepeatInterval()) {
-
+            if (hasRepeatInterval()) {
                 // Update the next scheduled run time for the request
-
-                setRunAtTime( System.currentTimeMillis() + ( getRepeatInterval() * 1000L));
+                setRunAtTime(System.currentTimeMillis() + (getRepeatInterval() * 1000L));
 
                 // Requeue the request
-
-                m_threadPool.queueTimedRequest( this);
-            }
-            else {
-
+                m_threadPool.queueTimedRequest(this);
+            } else {
                 // Clear the associated thread pool, request no longer queued
-
                 m_threadPool = null;
             }
-        }
-        else {
-
+        } else {
             // Requeue the paused request
-
-            m_threadPool.queueTimedRequest( this);
+            m_threadPool.queueTimedRequest(this);
         }
     }
 
@@ -236,21 +228,27 @@ public abstract class TimedThreadRequest implements ThreadRequest, Comparable<Ti
     /**
      * Compare timed thread requests for ordering
      *
-     * @param timedReq TimedThreadRequest
+     * @param timedReq
+     *            TimedThreadRequest
      * @return int
      */
-    public int compareTo( TimedThreadRequest timedReq) {
-    	if ( isPaused() && timedReq.isPaused())
-    		return 0;
-    	if ( isPaused())
-    		return 1;
-    	if ( timedReq.isPaused())
-    		return -1;
-
-    	if ( getRunAtTime() < timedReq.getRunAtTime())
-            return -1;
-        else if ( getRunAtTime() == timedReq.getRunAtTime())
+    @Override
+    public int compareTo(final TimedThreadRequest timedReq) {
+        if (isPaused() && timedReq.isPaused()) {
             return 0;
+        }
+        if (isPaused()) {
+            return 1;
+        }
+        if (timedReq.isPaused()) {
+            return -1;
+        }
+
+        if (getRunAtTime() < timedReq.getRunAtTime()) {
+            return -1;
+        } else if (getRunAtTime() == timedReq.getRunAtTime()) {
+            return 0;
+        }
         return 1;
     }
 
@@ -259,21 +257,24 @@ public abstract class TimedThreadRequest implements ThreadRequest, Comparable<Ti
      *
      * @return String
      */
+    @Override
     public String toString() {
-        StringBuilder str = new StringBuilder();
+        final StringBuilder str = new StringBuilder();
 
         str.append("[");
-        str.append( getDescription());
+        str.append(getDescription());
         str.append(",RunAt=");
-        if ( getRunAtTime() == TimedRequestPaused)
+        if (getRunAtTime() == TimedRequestPaused) {
             str.append("Paused");
-        else
+        } else {
             str.append(new Date(getRunAtTime()));
+        }
         str.append(",Repeat=");
-        if ( getRepeatInterval() > 0L)
-            str.append( getRepeatInterval());
-        else
+        if (getRepeatInterval() > 0L) {
+            str.append(getRepeatInterval());
+        } else {
             str.append("None");
+        }
         str.append("]");
 
         return str.toString();
