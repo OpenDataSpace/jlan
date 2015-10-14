@@ -25,198 +25,170 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 
-import org.alfresco.jlan.debug.Debug;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Socket Session Handler Class
  *
  * <p>
- * Implementation of a session handler that uses a Java socket to listen for incoming session
- * requests.
+ * Implementation of a session handler that uses a Java socket to listen for incoming session requests.
  *
  * @author gkspencer
  */
 public abstract class SocketSessionHandler extends SessionHandlerBase implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SocketSessionHandler.class);
 
-	// Server socket to listen for incoming connections
+    // Server socket to listen for incoming connections
+    private ServerSocket m_srvSock;
 
-	private ServerSocket m_srvSock;
+    // Client socket read timeout
+    private int m_clientSockTmo;
 
-	// Client socket read timeout
+    /**
+     * Class constructor
+     *
+     * @param name
+     *            String
+     * @param protocol
+     *            String
+     * @param server
+     *            NetworkServer
+     * @param addr
+     *            InetAddress
+     * @param port
+     *            int
+     */
+    public SocketSessionHandler(final String name, final String protocol, final NetworkServer server, final InetAddress addr, final int port) {
+        super(name, protocol, server, addr, port);
+    }
 
-	private int m_clientSockTmo;
+    /**
+     * Return the server socket
+     *
+     * @return ServerSocket
+     */
+    public final ServerSocket getSocket() {
+        return m_srvSock;
+    }
 
-	/**
-	 * Class constructor
-	 *
-	 * @param name String
-	 * @param protocol String
-	 * @param server NetworkServer
-	 * @param addr InetAddress
-	 * @param port int
-	 */
-	public SocketSessionHandler(String name, String protocol, NetworkServer server, InetAddress addr, int port) {
-		super(name, protocol, server, addr, port);
-	}
+    /**
+     * Return the client socket timeout, in milliseconds
+     *
+     * @return int
+     */
+    public final int getSocketTimeout() {
+        return m_clientSockTmo;
+    }
 
-	/**
-	 * Return the server socket
-	 *
-	 * @return ServerSocket
-	 */
-	public final ServerSocket getSocket() {
-		return m_srvSock;
-	}
+    /**
+     * Set the client socket timeout, in milliseconds, zero for no timeout
+     *
+     * @param tmo
+     *            int
+     */
+    public final void setSocketTimeout(final int tmo) {
+        m_clientSockTmo = tmo;
+    }
 
-	/**
-	 * Return the client socket timeout, in milliseconds
-	 *
-	 * @return int
-	 */
-	public final int getSocketTimeout() {
-		return m_clientSockTmo;
-	}
+    /**
+     * Initialize the session handler
+     *
+     * @param server
+     *            NetworkServer
+     */
+    @Override
+    public void initializeSessionHandler(final NetworkServer server) throws IOException {
+        // Open the server socket
+        if (hasBindAddress()) {
+            m_srvSock = new ServerSocket(getPort(), getListenBacklog(), getBindAddress());
+        } else {
+            m_srvSock = new ServerSocket(getPort(), getListenBacklog());
+        }
 
-	/**
-	 * Set the client socket timeout, in milliseconds, zero for no timeout
-	 *
-	 * @param tmo int
-	 */
-	public final void setSocketTimeout(int tmo) {
-		m_clientSockTmo = tmo;
-	}
+        // Set the allocated port
+        if (getPort() == 0) {
+            setPort(m_srvSock.getLocalPort());
+        }
 
-	/**
-	 * Initialize the session handler
-	 *
-	 * @param server NetworkServer
-	 */
-	public void initializeSessionHandler(NetworkServer server)
-		throws IOException {
+        if (hasDebug()) {
+            LOGGER.info("[{}] Binding {} session handler to address : {}", getProtocolName(), getHandlerName(),
+                    hasBindAddress() ? getBindAddress().getHostAddress() : "ALL");
+        }
+    }
 
-		// Open the server socket
+    /**
+     * Close the session handler
+     *
+     * @param server
+     *            NetworkServer
+     */
+    @Override
+    public void closeSessionHandler(final NetworkServer server) {
+        // Request the main listener thread shutdown
+        setShutdown(true);
+        try {
+            // Close the server socket to release any pending listen
+            if (m_srvSock != null) {
+                m_srvSock.close();
+            }
+        } catch (final SocketException ex) {
+        } catch (final Exception ex) {
+        }
+    }
 
-		if ( hasBindAddress())
-			m_srvSock = new ServerSocket(getPort(), getListenBacklog(), getBindAddress());
-		else
-			m_srvSock = new ServerSocket(getPort(), getListenBacklog());
+    /**
+     * Socket listener thread
+     */
+    @Override
+    public void run() {
+        try {
+            // Clear the shutdown flag
+            clearShutdown();
 
-		// Set the allocated port
+            // Wait for incoming connection requests
+            while (hasShutdown() == false) {
+                if (hasDebug()) {
+                    LOGGER.info("[{}] Waiting for session request ...", getProtocolName());
+                }
 
-		if ( getPort() == 0)
-			setPort(m_srvSock.getLocalPort());
+                // Wait for a connection
+                final Socket sessSock = m_srvSock.accept();
+                if (hasDebug()) {
+                    LOGGER.info("[{}] Session request received from {}", getProtocolName(), sessSock.getInetAddress().getHostAddress());
+                }
+                try {
+                    // Process the new connection request
+                    acceptConnection(sessSock);
+                } catch (final Exception ex) {
+                    if (hasDebug()) {
+                        LOGGER.info("[" + getProtocolName() + "] Failed to create session, " + ex.toString());
+                    }
+                }
+            }
+        } catch (final SocketException ex) {
+            // Do not report an error if the server has shutdown, closing the server socket
+            // causes an exception to be thrown.
+            if (hasShutdown() == false) {
+                LOGGER.error("[" + getProtocolName() + "] Socket error : ", ex);
+            }
+        } catch (final Exception ex) {
+            // Do not report an error if the server has shutdown, closing the server socket
+            // causes an exception to be thrown.
+            if (hasShutdown() == false) {
+                LOGGER.error("[" + getProtocolName() + "] Server error : ", ex);
+            }
+        }
+        if (hasDebug()) {
+            LOGGER.info("[{}] {} session handler closed", getProtocolName(), getHandlerName());
+        }
+    }
 
-		// DEBUG
-
-		if ( Debug.EnableInfo && hasDebug()) {
-			Debug.print("[" + getProtocolName() + "] Binding " + getHandlerName() + " session handler to address : ");
-			if ( hasBindAddress())
-				Debug.println(getBindAddress().getHostAddress());
-			else
-				Debug.println("ALL");
-		}
-	}
-
-	/**
-	 * Close the session handler
-	 *
-	 * @param server NetworkServer
-	 */
-	public void closeSessionHandler(NetworkServer server) {
-
-		// Request the main listener thread shutdown
-
-		setShutdown( true);
-
-		try {
-
-			// Close the server socket to release any pending listen
-
-			if ( m_srvSock != null)
-				m_srvSock.close();
-		}
-		catch (SocketException ex) {
-		}
-		catch (Exception ex) {
-		}
-	}
-
-	/**
-	 * Socket listener thread
-	 */
-	public void run() {
-
-		try {
-
-			// Clear the shutdown flag
-
-			clearShutdown();
-
-			// Wait for incoming connection requests
-
-			while (hasShutdown() == false) {
-
-				// Debug
-
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[" + getProtocolName() + "] Waiting for session request ...");
-
-				// Wait for a connection
-
-				Socket sessSock = m_srvSock.accept();
-
-				// Debug
-
-				if ( Debug.EnableInfo && hasDebug())
-					Debug.println("[" + getProtocolName() + "] Session request received from "
-							+ sessSock.getInetAddress().getHostAddress());
-
-				try {
-
-					// Process the new connection request
-
-					acceptConnection(sessSock);
-				}
-				catch (Exception ex) {
-
-					// Debug
-
-					if ( Debug.EnableInfo && hasDebug())
-						Debug.println("[" + getProtocolName() + "] Failed to create session, " + ex.toString());
-				}
-			}
-		}
-		catch (SocketException ex) {
-
-			// Do not report an error if the server has shutdown, closing the server socket
-			// causes an exception to be thrown.
-
-			if ( hasShutdown() == false) {
-				Debug.println("[" + getProtocolName() + "] Socket error : " + ex.toString());
-				Debug.println(ex);
-			}
-		}
-		catch (Exception ex) {
-
-			// Do not report an error if the server has shutdown, closing the server socket
-			// causes an exception to be thrown.
-
-			if ( hasShutdown() == false) {
-				Debug.println("[" + getProtocolName() + "] Server error : " + ex.toString());
-				Debug.println(ex);
-			}
-		}
-
-		// Debug
-
-		if ( Debug.EnableInfo && hasDebug())
-			Debug.println("[" + getProtocolName() + "] " + getHandlerName() + " session handler closed");
-	}
-
-	/**
-	 * Accept a new connection on the specified socket
-	 *
-	 * @param sock Socket
-	 */
-	protected abstract void acceptConnection(Socket sock);
+    /**
+     * Accept a new connection on the specified socket
+     *
+     * @param sock
+     *            Socket
+     */
+    protected abstract void acceptConnection(Socket sock);
 }
