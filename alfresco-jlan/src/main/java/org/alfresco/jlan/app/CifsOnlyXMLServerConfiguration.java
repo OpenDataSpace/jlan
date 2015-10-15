@@ -75,7 +75,6 @@ import org.alfresco.jlan.smb.server.SMBSrvSession;
 import org.alfresco.jlan.smb.server.VirtualCircuitList;
 import org.alfresco.jlan.smb.util.DriveMapping;
 import org.alfresco.jlan.smb.util.DriveMappingList;
-import org.alfresco.jlan.test.server.CifsServer;
 import org.alfresco.jlan.util.IPAddress;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.Platform;
