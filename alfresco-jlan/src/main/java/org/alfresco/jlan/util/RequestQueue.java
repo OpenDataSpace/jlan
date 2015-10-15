@@ -33,13 +33,13 @@ public class RequestQueue {
 
     // List of file requests
 
-    private final LinkedList m_queue;
+    private final LinkedList<Object> m_queue;
 
     /**
      * Class constructor
      */
     public RequestQueue() {
-        m_queue = new LinkedList();
+        m_queue = new LinkedList<>();
     }
 
     /**
