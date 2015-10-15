@@ -156,7 +156,7 @@ public class CifsServer {
         server.addConfigSection(fileSystem);
         server.addConfigSection(cifs);
         server.addConfigSection(global);
-        Object serverIsRunning = new Object();
+        final Object serverIsRunning = new Object();
         SMBServer smbServer = new SMBServer(server);
         smbServer.addServerListener(new ServerListener() {
             @Override
