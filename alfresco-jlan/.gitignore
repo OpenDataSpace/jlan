@@ -1,4 +1,6 @@
-target
 *.swp
-.classpath
-.project
+.checkstyle
+.pmd
+.pmdruleset.xml
+edu.umd.cs.findbugs.core.prefs
+target
