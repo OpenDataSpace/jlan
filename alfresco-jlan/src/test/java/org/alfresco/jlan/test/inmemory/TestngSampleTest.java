@@ -18,13 +18,13 @@ public class TestngSampleTest {
         assertTrue(true);
     }
 
-    @Test
-    public void expectThrownException() {
-        TestThing testThing = new TestThing();
-        RuntimeException ex = expectThrows(RuntimeException.class, () -> testThing.call());
-        assertThat(testThing.counter, is(equalTo(1)));
-        assertThat(ex.getMessage(), is(equalTo("some Message")));
-    }
+//    @Test
+//    public void expectThrownException() {
+//        TestThing testThing = new TestThing();
+//        RuntimeException ex = expectThrows(RuntimeException.class, () -> testThing.call());
+//        assertThat(testThing.counter, is(equalTo(1)));
+//        assertThat(ex.getMessage(), is(equalTo("some Message")));
+//    }
 
     private class TestThing {
         public int counter = 0;
