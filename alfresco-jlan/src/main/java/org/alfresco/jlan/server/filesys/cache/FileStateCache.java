@@ -95,7 +95,7 @@ public abstract class FileStateCache {
 	 */
 	public FileStateCache() {
 
-		// Default to case sensitive cache for backwards compatability
+		// Default to case sensitive cache for backwards compatibility
 
 		m_caseSensitive = true;
 	}
