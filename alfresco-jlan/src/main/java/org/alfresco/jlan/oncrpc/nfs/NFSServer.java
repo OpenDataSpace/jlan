@@ -61,6 +61,7 @@ import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.FileType;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.NotifyChange;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -4827,7 +4828,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
       file = fileCache.findFile(fileId, sess);
 
-      if (file == null || (file.getGrantedAccess() == NetworkFile.READONLY && readOnly == false)) {
+      if (file == null || (file.getGrantedAccess() == GrantedFileAccess.READONLY && readOnly == false)) {
 
         //	Get the path for the file
 
@@ -4864,7 +4865,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
           Debug.println(ex);
         }
       }
-      else if ( file.getGrantedAccess() == NetworkFile.READONLY && readOnly == false) {
+      else if ( file.getGrantedAccess() == GrantedFileAccess.READONLY && readOnly == false) {
 
       }
     }

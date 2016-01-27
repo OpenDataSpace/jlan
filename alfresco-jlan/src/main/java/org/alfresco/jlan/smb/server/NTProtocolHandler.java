@@ -38,6 +38,7 @@ import org.alfresco.jlan.server.core.ShareType;
 import org.alfresco.jlan.server.core.SharedDevice;
 import org.alfresco.jlan.server.filesys.AccessDeniedException;
 import org.alfresco.jlan.server.filesys.AccessMode;
+import org.alfresco.jlan.server.filesys.AllowedFileAccess;
 import org.alfresco.jlan.server.filesys.DeferFailedException;
 import org.alfresco.jlan.server.filesys.DeferredPacketException;
 import org.alfresco.jlan.server.filesys.DirectoryNotEmptyException;
@@ -2568,7 +2569,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 		smbPkt.setParameter(4, modDate != null ? modDate.asSMBTime() : 0); // last write time
 		smbPkt.setParameter(5, modDate != null ? modDate.asSMBDate() : 0); // last write date
 		smbPkt.setParameterLong(6, netFile.getFileSizeInt()); // file size
-		smbPkt.setParameter(8, netFile.getGrantedAccess());
+		smbPkt.setParameter(8, netFile.getGrantedAccess().getValue());
 		smbPkt.setParameter(9, OpenAndX.FileTypeDisk);
 		smbPkt.setParameter(10, 0); // named pipe state
 		smbPkt.setParameter(11, respAction);
@@ -6257,7 +6258,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 			// Pack the permissions
 
-			if ( netFile.isDirectory() || netFile.getAllowedAccess() == NetworkFile.READWRITE)
+			if ( netFile.isDirectory() || netFile.getAllowedAccess() == AllowedFileAccess.READWRITE)
 				prms.packInt( AccessMode.NTFileGenericAll);
 			else
 				prms.packInt( AccessMode.NTFileGenericRead);

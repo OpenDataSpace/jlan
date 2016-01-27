@@ -26,6 +26,7 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.netbios.RFCNetBIOSProtocol;
 import org.alfresco.jlan.server.filesys.DiskOfflineException;
 import org.alfresco.jlan.server.filesys.FileInfo;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.PathNotFoundException;
 import org.alfresco.jlan.server.filesys.TooManyFilesException;
@@ -240,7 +241,7 @@ class IPCHandler {
 		// Create a network file for the special pipe
 
 		DCEPipeFile pipeFile = new DCEPipeFile(pipeType);
-		pipeFile.setGrantedAccess(NetworkFile.READWRITE);
+		pipeFile.setGrantedAccess(GrantedFileAccess.READWRITE);
 
 		// Add the file to the list of open files for this tree connection
 
@@ -592,7 +593,7 @@ class IPCHandler {
 		// Create a network file for the special pipe
 
 		DCEPipeFile pipeFile = new DCEPipeFile(pipeType);
-		pipeFile.setGrantedAccess(NetworkFile.READWRITE);
+		pipeFile.setGrantedAccess(GrantedFileAccess.READWRITE);
 
 		// Add the file to the list of open files for this tree connection
 

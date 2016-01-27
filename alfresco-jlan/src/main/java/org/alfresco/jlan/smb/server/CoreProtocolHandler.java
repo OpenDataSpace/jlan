@@ -1746,7 +1746,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 			smbPkt.setParameterLong(2, 0);
 
 		smbPkt.setParameterLong(4, netFile.getFileSizeInt()); // file size
-		smbPkt.setParameter(6, netFile.getGrantedAccess());
+		smbPkt.setParameter(6, netFile.getGrantedAccess().getValue());
 
 		smbPkt.setByteCount(0);
 

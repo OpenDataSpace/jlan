@@ -33,6 +33,7 @@ import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOfflineException;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.FileStateCache;
@@ -1727,7 +1728,7 @@ public abstract class ObjectIdFileLoader implements FileLoader, BackgroundFileLo
 
 			netFile = new CachedNetworkFile(fname, fid, stid, did, m_stateCache.getFileStateProxy(state), fileSeg, this);
 
-			netFile.setGrantedAccess(params.isReadOnlyAccess() ? NetworkFile.READONLY : NetworkFile.READWRITE);
+			netFile.setGrantedAccess(params.isReadOnlyAccess() ? GrantedFileAccess.READONLY : GrantedFileAccess.READWRITE);
 			netFile.setSequentialOnly(params.isSequentialAccessOnly());
 			netFile.setAttributes(params.getAttributes());
 			netFile.setFullName(params.getPath());

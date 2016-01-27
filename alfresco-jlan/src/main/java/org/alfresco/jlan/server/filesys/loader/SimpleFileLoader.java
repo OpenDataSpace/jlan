@@ -31,6 +31,7 @@ import org.alfresco.jlan.server.filesys.AccessDeniedException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.db.DBDeviceContext;
 import org.alfresco.jlan.server.filesys.db.LocalDataNetworkFile;
@@ -130,7 +131,7 @@ public class SimpleFileLoader implements FileLoader, NamedFileLoader {
 
 		file = new File(fullName);
     LocalDataNetworkFile netFile = new LocalDataNetworkFile(params.getPath(),fid,did,file);
-    netFile.setGrantedAccess(NetworkFile.READWRITE);
+    netFile.setGrantedAccess(GrantedFileAccess.READWRITE);
 
     //  Return the network file
 

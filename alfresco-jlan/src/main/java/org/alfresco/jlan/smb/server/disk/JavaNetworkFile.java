@@ -26,6 +26,7 @@ import java.io.RandomAccessFile;
 
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.DiskFullException;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.smb.SeekType;
 
@@ -297,7 +298,7 @@ public class JavaNetworkFile extends NetworkFile {
 
 		    //  Open the file
 
-				m_io = new RandomAccessFile( m_file, getGrantedAccess() == NetworkFile.READWRITE ? "rw" : "r");
+				m_io = new RandomAccessFile( m_file, getGrantedAccess() == GrantedFileAccess.READWRITE ? "rw" : "r");
 
 				//	Indicate that the file is open
 

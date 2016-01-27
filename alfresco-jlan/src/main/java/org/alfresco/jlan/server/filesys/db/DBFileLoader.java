@@ -37,6 +37,7 @@ import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.FileStateCache;
@@ -2597,7 +2598,7 @@ public class DBFileLoader implements FileLoader, BackgroundFileLoader, FileState
 			FileStateProxy stateProxy = m_stateCache.getFileStateProxy(state);
 			netFile = new CachedNetworkFile(fname, fid, stid, did, stateProxy, fileSeg, this);
 
-			netFile.setGrantedAccess(params.isReadOnlyAccess() ? NetworkFile.READONLY : NetworkFile.READWRITE);
+			netFile.setGrantedAccess(params.isReadOnlyAccess() ? GrantedFileAccess.READONLY : GrantedFileAccess.READWRITE);
 			netFile.setSequentialOnly(params.isSequentialAccessOnly());
 			netFile.setAttributes(params.getAttributes());
 			netFile.setFullName(params.getPath());

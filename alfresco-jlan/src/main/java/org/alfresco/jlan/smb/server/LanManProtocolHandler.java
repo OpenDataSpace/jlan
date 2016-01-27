@@ -1028,7 +1028,7 @@ class LanManProtocolHandler extends CoreProtocolHandler {
 
 		respPkt.setParameterLong(4, (int) modDate);
 		respPkt.setParameterLong(6, netFile.getFileSizeInt()); // file size
-		respPkt.setParameter(8, netFile.getGrantedAccess());
+		respPkt.setParameter(8, netFile.getGrantedAccess().getValue());
 		respPkt.setParameter(9, OpenAndX.FileTypeDisk);
 		respPkt.setParameter(10, 0); // named pipe state
 		respPkt.setParameter(11, respAction);

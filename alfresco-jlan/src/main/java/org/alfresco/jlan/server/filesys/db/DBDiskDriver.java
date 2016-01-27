@@ -47,6 +47,7 @@ import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.FileType;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.SearchContext;
 import org.alfresco.jlan.server.filesys.SecurityDescriptorInterface;
@@ -276,7 +277,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
     //  Check if the file was opened for write access, if so then update the file size and modify date/time
 
-    if ( file.getGrantedAccess() != NetworkFile.READONLY && file.isDirectory() == false &&
+    if ( file.getGrantedAccess() != GrantedFileAccess.READONLY && file.isDirectory() == false &&
          file.getWriteCount() > 0) {
 
       //  DEBUG
@@ -1247,11 +1248,11 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 	    // Set the granted file access
 
 	    if ( params.isReadOnlyAccess())
-	    	jdbcFile.setGrantedAccess( NetworkFile.READONLY);
+	    	jdbcFile.setGrantedAccess( GrantedFileAccess.READONLY);
 	    else if ( params.isWriteOnlyAccess())
-	    	jdbcFile.setGrantedAccess( NetworkFile.WRITEONLY);
+	    	jdbcFile.setGrantedAccess( GrantedFileAccess.WRITEONLY);
 	    else
-	    	jdbcFile.setGrantedAccess( NetworkFile.READWRITE);
+	    	jdbcFile.setGrantedAccess( GrantedFileAccess.READWRITE);
 
 	    //  Set the file owner
 
@@ -3162,7 +3163,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
     //  Check if the stream was opened for write access, if so then update the stream size
 
-    if ( stream.getGrantedAccess() != NetworkFile.READONLY && stream.isDirectory() == false &&
+    if ( stream.getGrantedAccess() != GrantedFileAccess.READONLY && stream.isDirectory() == false &&
          stream.getWriteCount() > 0) {
 
       //  DEBUG

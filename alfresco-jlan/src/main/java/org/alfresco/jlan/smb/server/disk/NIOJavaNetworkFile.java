@@ -30,6 +30,7 @@ import java.nio.channels.OverlappingFileLockException;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.locking.LockConflictException;
 import org.alfresco.jlan.server.filesys.AccessMode;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.smb.SeekType;
 
@@ -301,7 +302,7 @@ public class NIOJavaNetworkFile extends NetworkFile {
 
     //  Open the file
 
-		m_io = new RandomAccessFile(m_file, getGrantedAccess() == NetworkFile.READWRITE ? "rw" : "r");
+		m_io = new RandomAccessFile(m_file, getGrantedAccess() == GrantedFileAccess.READWRITE ? "rw" : "r");
 		m_channel = m_io.getChannel();
 
 		//	Indicate that the file is open
@@ -511,7 +512,7 @@ public class NIOJavaNetworkFile extends NetworkFile {
 
     //	If the file is open for write access get an exclusive lock, for read access get a shared lock
 
-    boolean sharedLock = getGrantedAccess() == NetworkFile.READONLY ? true : false;
+    boolean sharedLock = getGrantedAccess() == GrantedFileAccess.READONLY ? true : false;
 
     //	Acquire the lock
 

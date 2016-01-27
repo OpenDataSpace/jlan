@@ -39,6 +39,7 @@ import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.FileSystem;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.PathNotFoundException;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -261,7 +262,7 @@ public class JavaFileDiskDriver implements DiskInterface {
 
 		file = new File(fname);
     JavaNetworkFile netFile = new JavaNetworkFile(file, params.getPath());
-    netFile.setGrantedAccess(NetworkFile.READWRITE);
+    netFile.setGrantedAccess(GrantedFileAccess.READWRITE);
 		netFile.setFullName(params.getPath());
 
     //  Return the network file
@@ -793,9 +794,9 @@ public class JavaFileDiskDriver implements DiskInterface {
     NetworkFile netFile = new JavaNetworkFile(file, params.getPath());
 
     if ( params.isReadOnlyAccess())
-    	netFile.setGrantedAccess(NetworkFile.READONLY);
+    	netFile.setGrantedAccess(GrantedFileAccess.READONLY);
 		else
-    	netFile.setGrantedAccess(NetworkFile.READWRITE);
+    	netFile.setGrantedAccess(GrantedFileAccess.READWRITE);
 
     netFile.setFullName(params.getPath());
 

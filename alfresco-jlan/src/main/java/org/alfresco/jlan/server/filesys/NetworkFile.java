@@ -37,14 +37,6 @@ import org.alfresco.jlan.smb.SeekType;
  * @author gkspencer
  */
 public abstract class NetworkFile {
-
-	// Granted file access types
-
-	public static final int ATTRIBUTESONLY	= 0;
-	public static final int READONLY 		= 1;
-	public static final int WRITEONLY 		= 2;
-	public static final int READWRITE 		= 3;
-
 	// File status flags
 
 	public static final int IOPending     		= 0x0001;
@@ -95,11 +87,11 @@ public abstract class NetworkFile {
 
 	// Granted file access type
 
-	protected int m_grantedAccess;
+	protected GrantedFileAccess m_grantedAccess;
 
 	// Allowed file access (can be different to granted file access if read-only access was requested)
 
-	protected int m_allowedAccess = NetworkFile.READWRITE;
+	protected AllowedFileAccess m_allowedAccess = AllowedFileAccess.READWRITE;
 
 	// Flag to indicate that the file has been closed
 
@@ -245,34 +237,8 @@ public abstract class NetworkFile {
 	 *
 	 * @return int
 	 */
-	public final int getGrantedAccess() {
+	public final GrantedFileAccess getGrantedAccess() {
 		return m_grantedAccess;
-	}
-
-	/**
-	 * Return the granted access as a string
-	 *
-	 * @return String
-	 */
-	public final String getGrantedAccessAsString() {
-	    String accStr = "Unknown";
-
-	    switch ( m_grantedAccess) {
-	        case READONLY:
-	            accStr = "ReadOnly";
-	            break;
-	        case READWRITE:
-	            accStr = "ReadWrite";
-	            break;
-	        case WRITEONLY:
-	            accStr = "WriteOnly";
-	            break;
-	        case ATTRIBUTESONLY:
-	        	accStr = "AttributesOnly";
-	        	break;
-	    }
-
-	    return accStr;
 	}
 
 	/**
@@ -280,7 +246,7 @@ public abstract class NetworkFile {
 	 *
 	 * @return int
 	 */
-	public final int getAllowedAccess() {
+	public final AllowedFileAccess getAllowedAccess() {
 		return m_allowedAccess;
 	}
 
@@ -600,7 +566,7 @@ public abstract class NetworkFile {
 	 *
 	 * @param mode int
 	 */
-	public final void setGrantedAccess(int mode) {
+	public final void setGrantedAccess(GrantedFileAccess mode) {
 		m_grantedAccess = mode;
 	}
 
@@ -609,7 +575,7 @@ public abstract class NetworkFile {
 	 *
 	 * @param mode int
 	 */
-	public final void setAllowedAccess(int mode) {
+	public final void setAllowedAccess(AllowedFileAccess mode) {
 		m_allowedAccess = mode;
 	}
 

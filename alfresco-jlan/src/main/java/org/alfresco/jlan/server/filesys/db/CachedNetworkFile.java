@@ -26,6 +26,7 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessDeniedException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileOfflineException;
+import org.alfresco.jlan.server.filesys.GrantedFileAccess;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.FileStateProxy;
 import org.alfresco.jlan.server.filesys.loader.FileLoader;
@@ -417,7 +418,7 @@ public class CachedNetworkFile extends DBNetworkFile {
 
 		// Check if the file is writeable
 
-		if ( getGrantedAccess() == READONLY)
+		if ( getGrantedAccess() == GrantedFileAccess.READONLY)
 			throw new AccessDeniedException("File is read-only");
 
 		// Write the file using the file segment
@@ -473,7 +474,7 @@ public class CachedNetworkFile extends DBNetworkFile {
 
 		// Check if the file is writeable
 
-		if ( getGrantedAccess() == READONLY)
+		if ( getGrantedAccess() == GrantedFileAccess.READONLY)
 			throw new AccessDeniedException("File is read-only");
 
 		// Truncate the file
