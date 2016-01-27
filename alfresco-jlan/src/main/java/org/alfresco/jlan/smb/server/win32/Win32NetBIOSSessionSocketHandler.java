@@ -651,7 +651,7 @@ public class Win32NetBIOSSessionSocketHandler extends SessionHandlerBase impleme
 
 			// Check if the network is down
 
-			if ( ex.getErrorCode() == WinsockError.WsaENetDown) {
+			if ( ex.getErrorCode() == WinsockError.WsaENetDown.getCode()) {
 
 				// Check if the LANA we are listening on is no longer valid
 

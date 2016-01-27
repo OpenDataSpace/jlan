@@ -27,199 +27,81 @@ package org.alfresco.jlan.netbios.win32;
  *
  * @author gkspencer
  */
-public class WinsockError {
+public enum WinsockError {
+    WsaEIntr        (10004, "Interrupted function call"),
+    WsaEAcces       (10013, "Permission denied"),
+    WsaEFault       (10014, "Bad address"),
+    WsaEInval       (10022, "Invalid argument"),
+    WsaEMfile       (10024, "Too many open files"),
+    WsaEWouldBlock  (10035, "Resource temporarily unavailable"),
+    WsaEInProgress  (10036, "Operation now in progress"),
+    WsaEAlready     (10037, "Operation already in progress"),
+    WsaENotSock     (10038, "Socket operation on nonsocket"),
+    WsaEDestAddrReq (10039, "Destination address required"),
+    WsaEMsgSize     (10040, "Message too long"),
+    WsaEPrototype   (10041, "Protocol wrong type for socket"),
+    WsaENoProtoOpt  (10042, "Bad protocol option"),
+    WsaEProtoNoSupp (10043, "Protocol not supported"),
+    WsaESocktNoSupp (10044, "Socket type not supported"),
+    WsaEOpNotSupp   (10045, "Operation not supported"),
+    WsaEPFNoSupport (10046, "Protocol family not supported"),
+    WsaEAFNoSupport (10047, "Address family not supported by protocol family"),
+    WsaEAddrInUse   (10048,  "Address already in use"),
+    WsaEAddrNotAvail(10049, "Cannot assign requested address"),
+    WsaENetDown     (10050, "Network is down"),
+    WsaENetUnReach  (10051, "Network is unreachable"),
+    WsaENetReset    (10052, "Network dropped connection on reset"),
+    WsaEConnAborted (10053, "Software caused connection abort"),
+    WsaEConnReset   (10054, "Connection reset by peer"),
+    WsaENoBufs      (10055, "No buffer space available"),
+    WsaEIsConn      (10056, "Socket is already connected"),
+    WsaENotConn     (10057, "Socket is not connected"),
+    WsaEShutdown    (10058, "Cannot send after socket shutdown"),
+    WsaETimedout    (10060, "Connection timed out"),
+    WsaEConnRefused (10061, "Connection refused"),
+    WsaEHostDown    (10064, "Host is down"),
+    WsaEHostUnreach (10065, "No route to host"),
+    WsaEProcLim     (10067, "Too many processes"),
+    WsaSysNotReady  (10091, "Network subsystem is unavailable"),
+    WsaVerNotSupp   (10092, "Winsock.dll version out of range"),
+    WsaNotInit      (10093, "Successful WSAStartup not yet performed"),
+    WsaEDiscon      (10101, "Graceful shutdown in progress"),
+    WsaTypeNotFound (10109, "Class type not found"),
+    WsaHostNotFound (11001, "Host not found"),
+    WsaTryAgain     (11002, "Nonauthoritative host not found"),
+    WsaNoRecovery   (11003, "This is a nonrecoverable error"),
+    WsaNoData       (11004, "Valid name, no data record of requested type");
 
-  // Winsock error code constants
+    private int code;
+    private String message;
 
-  public static final int WsaEIntr        = 10004;
-  public static final int WsaEAcces       = 10013;
-  public static final int WsaEFault       = 10014;
-  public static final int WsaEInval       = 10022;
-  public static final int WsaEMfile       = 10024;
-  public static final int WsaEWouldBlock  = 10035;
-  public static final int WsaEInProgress  = 10036;
-  public static final int WsaEAlready     = 10037;
-  public static final int WsaENotSock     = 10038;
-  public static final int WsaEDestAddrReq = 10039;
-  public static final int WsaEMsgSize     = 10040;
-  public static final int WsaEPrototype   = 10041;
-  public static final int WsaENoProtoOpt  = 10042;
-  public static final int WsaEProtoNoSupp = 10043;
-  public static final int WsaESocktNoSupp = 10044;
-  public static final int WsaEOpNotSupp   = 10045;
-  public static final int WsaEPFNoSupport = 10046;
-  public static final int WsaEAFNoSupport = 10047;
-  public static final int WsaEAddrInUse   = 10048;
-  public static final int WsaEAddrNotAvail = 10049;
-  public static final int WsaENetDown     = 10050;
-  public static final int WsaENetUnReach  = 10051;
-  public static final int WsaENetReset    = 10052;
-  public static final int WsaEConnAborted = 10053;
-  public static final int WsaEConnReset   = 10054;
-  public static final int WsaENoBufs      = 10055;
-  public static final int WsaEIsConn      = 10056;
-  public static final int WsaENotConn     = 10057;
-  public static final int WsaEShutdown    = 10058;
-  public static final int WsaETimedout    = 10060;
-  public static final int WsaEConnRefused = 10061;
-  public static final int WsaEHostDown    = 10064;
-  public static final int WsaEHostUnreach = 10065;
-  public static final int WsaEProcLim     = 10067;
-  public static final int WsaSysNotReady  = 10091;
-  public static final int WsaVerNotSupp   = 10092;
-  public static final int WsaNotInit      = 10093;
-  public static final int WsaEDiscon      = 10101;
-  public static final int WsaTypeNotFound = 10109;
-  public static final int WsaHostNotFound = 11001;
-  public static final int WsaTryAgain     = 11002;
-  public static final int WsaNoRecovery   = 11003;
-  public static final int WsaNoData       = 11004;
-
-  /**
-   * Convert a Winsock error code to a text string
-   *
-   * @param sts int
-   * @return String
-   */
-  public static final String asString(int sts) {
-
-    String errText = null;
-
-    switch (sts) {
-      case WsaEIntr:
-        errText = "Interrupted function call";
-        break;
-      case WsaEAcces:
-        errText = "Permission denied";
-        break;
-      case WsaEFault:
-        errText = "Bad address";
-        break;
-      case WsaEInval:
-        errText = "Invalid argument";
-        break;
-      case WsaEMfile:
-        errText = "Too many open files";
-        break;
-      case WsaEWouldBlock:
-        errText = "Resource temporarily unavailable";
-        break;
-      case WsaEInProgress:
-        errText = "Operation now in progress";
-        break;
-      case WsaEAlready:
-        errText = "Operation already in progress";
-        break;
-      case WsaENotSock:
-        errText = "Socket operation on nonsocket";
-        break;
-      case WsaEDestAddrReq:
-        errText = "Destination address required";
-        break;
-      case WsaEMsgSize:
-        errText = "Message too long";
-        break;
-      case WsaEPrototype:
-        errText = "Protocol wrong type for socket";
-        break;
-      case WsaENoProtoOpt:
-        errText = "Bad protocol option";
-        break;
-      case WsaEProtoNoSupp:
-        errText = "Protocol not supported";
-        break;
-      case WsaESocktNoSupp:
-        errText = "Socket type not supported";
-        break;
-      case WsaEOpNotSupp:
-        errText = "Operation not supported";
-        break;
-      case WsaEPFNoSupport:
-        errText = "Protocol family not supported";
-        break;
-      case WsaEAFNoSupport:
-        errText = "Address family not supported by protocol family";
-        break;
-      case WsaEAddrInUse:
-        errText = "Address already in use";
-        break;
-      case WsaEAddrNotAvail:
-        errText = "Cannot assign requested address";
-        break;
-      case WsaENetDown:
-        errText = "Network is down";
-        break;
-      case WsaENetUnReach:
-        errText = "Network is unreachable";
-        break;
-      case WsaENetReset:
-        errText = "Network dropped connection on reset";
-        break;
-      case WsaEConnAborted:
-        errText = "Software caused connection abort";
-        break;
-      case WsaEConnReset:
-        errText = "Connection reset by peer";
-        break;
-      case WsaENoBufs:
-        errText = "No buffer space available";
-        break;
-      case WsaEIsConn:
-        errText = "Socket is already connected";
-        break;
-      case WsaENotConn:
-        errText = "Socket is not connected";
-        break;
-      case WsaEShutdown:
-        errText = "Cannot send after socket shutdown";
-        break;
-      case WsaETimedout:
-        errText = "Connection timed out";
-        break;
-      case WsaEConnRefused:
-        errText = "Connection refused";
-        break;
-      case WsaEHostDown:
-        errText = "Host is down";
-        break;
-      case WsaEHostUnreach:
-        errText = "No route to host";
-        break;
-      case WsaEProcLim:
-        errText = "Too many processes";
-        break;
-      case WsaSysNotReady:
-        errText = "Network subsystem is unavailable";
-        break;
-      case WsaVerNotSupp:
-        errText = "Winsock.dll version out of range";
-        break;
-      case WsaNotInit:
-        errText = "Successful WSAStartup not yet performed";
-        break;
-      case WsaEDiscon:
-        errText = "Graceful shutdown in progress";
-        break;
-      case WsaTypeNotFound:
-        errText = "Class type not found";
-        break;
-      case WsaHostNotFound:
-        errText = "Host not found";
-        break;
-      case WsaTryAgain:
-        errText = "Nonauthoritative host not found";
-        break;
-      case WsaNoRecovery:
-        errText = "This is a nonrecoverable error";
-        break;
-      case WsaNoData:
-        errText = "Valid name, no data record of requested type";
-        break;
-      default:
-        errText = "Unknown Winsock error 0x" + Integer.toHexString(sts);
-        break;
+    private WinsockError(final int code, final String message) {
+        this.code = code;
+        this.message = message;
     }
 
-    return errText;
-  }
+    @Override
+    public String toString() {
+        return message;
+    }
+    
+    public int getCode() {
+        return code;
+    }
+
+    /**
+     * Convert a Winsock error code to a text string
+     *
+     * @param sts
+     *            int
+     * @return String
+     */
+    public static final String asString(int sts) {
+        for (WinsockError err : WinsockError.values()) {
+            if (err.code == sts) {
+                return err.message;
+            }
+        }
+        return "Unknown Winsock error 0x" + Integer.toHexString(sts);
+    }
 }
