@@ -793,7 +793,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
       //  If the file is a symbolic link delete the symbolic link record
 
-      if ( dbInfo.isFileType() == FileType.SymbolicLink)
+      if ( dbInfo.getFileType() == FileType.SYMBOLIC_LINK)
         dbCtx.getDBInterface().deleteSymbolicLinkRecord( dbInfo.getDirectoryId(), fstate.getFileId());
 
       // Check if the file has any NTFS streams

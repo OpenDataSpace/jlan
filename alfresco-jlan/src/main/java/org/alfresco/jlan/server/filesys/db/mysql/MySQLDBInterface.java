@@ -1540,10 +1540,10 @@ public class MySQLDBInterface extends JdbcDBInterface implements DBQueueInterfac
 
 						if ( rs.getBoolean("Directory") == true) {
 							attr += FileAttribute.Directory;
-							finfo.setFileType(FileType.Directory);
+							finfo.setFileType(FileType.DIRECTORY);
 						}
 						else
-							finfo.setFileType(FileType.RegularFile);
+							finfo.setFileType(FileType.REGULAR_FILE);
 
 						if ( rs.getBoolean("Archived") == true)
 							attr += FileAttribute.Archive;
@@ -1560,7 +1560,7 @@ public class MySQLDBInterface extends JdbcDBInterface implements DBQueueInterfac
 						// Check if the file is a symbolic link
 
 						if ( rs.getBoolean("IsSymLink") == true)
-							finfo.setFileType(FileType.SymbolicLink);
+							finfo.setFileType(FileType.SYMBOLIC_LINK);
 						break;
 				}
 			}

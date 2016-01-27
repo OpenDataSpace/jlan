@@ -116,7 +116,7 @@ public class FileInfo {
 
 	// File type
 
-	private int m_fileType;
+	private FileType m_fileType;
 
 	// File flags
 
@@ -154,9 +154,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -176,9 +176,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -201,9 +201,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -223,9 +223,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -247,9 +247,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -272,9 +272,9 @@ public class FileInfo {
 		setAllocationSize(0);
 
 		if ( isDirectory())
-			setFileType(FileType.Directory);
+			setFileType(FileType.DIRECTORY);
 		else
-			setFileType(FileType.RegularFile);
+			setFileType(FileType.REGULAR_FILE);
 	}
 
 	/**
@@ -619,7 +619,7 @@ public class FileInfo {
 	 *
 	 * @return int
 	 */
-	public final int isFileType() {
+	public final FileType getFileType() {
 		return m_fileType;
 	}
 
@@ -675,9 +675,9 @@ public class FileInfo {
 		m_mode = finfo.getMode();
 
 		if ( finfo.isDirectory())
-            setFileType(FileType.Directory);
+            setFileType(FileType.DIRECTORY);
         else
-            setFileType(FileType.RegularFile);
+            setFileType(FileType.REGULAR_FILE);
 
 		m_flags = finfo.getFileFlags();
 	}
@@ -876,7 +876,7 @@ public class FileInfo {
 	 *
 	 * @param typ int
 	 */
-	public final void setFileType(int typ) {
+	public final void setFileType(final FileType typ) {
 		m_fileType = typ;
 	}
 

@@ -19,8 +19,6 @@
 
 package org.alfresco.jlan.server.filesys;
 
-import java.util.Vector;
-
 import org.alfresco.jlan.util.StringList;
 
 /**

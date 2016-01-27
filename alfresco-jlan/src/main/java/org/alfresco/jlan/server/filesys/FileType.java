@@ -20,50 +20,40 @@
 package org.alfresco.jlan.server.filesys;
 
 /**
- * File Type Class
+ * File Type Enumeration
  *
- * <p>File type constants.
+ * <p>
+ * File type constants.
  *
  * @author gkspencer
  */
-public class FileType {
+public enum FileType {
+    UNKNOWN(0, "Unknown"),
+    REGULAR_FILE(1, "File"),
+    DIRECTORY(2, "Directory"),
+    SYMBOLIC_LINK(3, "SymbolicLink"),
+    HARD_LINK(4, "HardLink"),
+    DEVICE(5, "Device");
 
-  // File types
+    private int value;
+    private String name;
 
-  public static final int RegularFile   = 1;
-  public static final int Directory     = 2;
-  public static final int SymbolicLink  = 3;
-  public static final int HardLink      = 4;
-  public static final int Device        = 5;
-
-  /**
-   * Return a file type as a string
-   *
-   * @param typ int
-   * @return String
-   */
-  public final static String asString(int typ) {
-
-    String typStr = "Unknown";
-
-    switch ( typ) {
-      case RegularFile:
-        typStr = "File";
-        break;
-      case Directory:
-        typStr = "Directory";
-        break;
-      case SymbolicLink:
-        typStr = "SymbolicLink";
-        break;
-      case HardLink:
-        typStr = "HardLink";
-        break;
-      case Device:
-        typStr = "Device";
-        break;
+    private FileType(final int value, final String name) {
+        this.value = value;
+        this.name = name;
     }
 
-    return typStr;
-  }
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    public FileType forValue(final int value) {
+        for (FileType t : FileType.values()) {
+            if (t.value == value) {
+                return t;
+            }
+        }
+        return UNKNOWN;
+    }
 }

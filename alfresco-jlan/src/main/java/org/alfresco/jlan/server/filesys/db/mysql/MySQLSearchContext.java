@@ -100,10 +100,10 @@ public class MySQLSearchContext extends DBSearchContext {
 
         if ( m_rs.getBoolean("Directory") == true) {
         	attr += FileAttribute.Directory;
-          info.setFileType( FileType.Directory);
+          info.setFileType( FileType.DIRECTORY);
         }
         else
-          info.setFileType( FileType.RegularFile);
+          info.setFileType( FileType.REGULAR_FILE);
 
 				if ( m_rs.getBoolean("Archived") == true)
 					attr += FileAttribute.Archive;
@@ -127,7 +127,7 @@ public class MySQLSearchContext extends DBSearchContext {
         //  Check if the file is a symbolic link
 
         if ( m_rs.getBoolean( "IsSymLink") == true)
-          info.setFileType( FileType.SymbolicLink);
+          info.setFileType( FileType.SYMBOLIC_LINK);
 
         //	Check if there is a complex wildcard filter
 

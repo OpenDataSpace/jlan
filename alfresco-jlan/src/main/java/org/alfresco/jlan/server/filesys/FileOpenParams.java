@@ -109,7 +109,7 @@ public class FileOpenParams {
 
     //  File type and symbolic name
 
-    private int m_fileType;
+    private FileType m_fileType;
     private String m_symName;
 
     // Process id
@@ -467,7 +467,7 @@ public class FileOpenParams {
    *
    * @return int
    */
-  public final int isFileType() {
+  public final FileType isFileType() {
     return m_fileType;
   }
 
@@ -477,7 +477,7 @@ public class FileOpenParams {
    * @return boolean
    */
   public final boolean isSymbolicLink() {
-    return isFileType() == FileType.SymbolicLink;
+    return isFileType() == FileType.SYMBOLIC_LINK;
   }
 
   /**
@@ -754,7 +754,7 @@ public class FileOpenParams {
    *
    * @param typ int
    */
-  public final void setFileType(int typ) {
+  public final void setFileType(FileType typ) {
     m_fileType = typ;
   }
 
@@ -765,7 +765,7 @@ public class FileOpenParams {
    */
   public final void setSymbolicLink(String name) {
     m_symName  = name;
-    m_fileType = FileType.SymbolicLink;
+    m_fileType = FileType.SYMBOLIC_LINK;
   }
 
 	/**

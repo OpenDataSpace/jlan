@@ -1467,7 +1467,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
       // Get the file information for the symbolic link
 
       FileInfo finfo = disk.getFileInformation(sess, conn, path);
-      if ( finfo != null && finfo.isFileType() == FileType.SymbolicLink) {
+      if ( finfo != null && finfo.getFileType() == FileType.SYMBOLIC_LINK) {
 
         // Get the symbolic link data
 
@@ -3684,7 +3684,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
                 // Reset the file type
 
-                finfo.setFileType( FileType.RegularFile);
+                finfo.setFileType( FileType.REGULAR_FILE);
 			}
 
 			//	Indicate that there are no more file entries in this response
@@ -4408,7 +4408,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
       //	Pack the file information
 
-      if ( finfo.isFileType() == FileType.SymbolicLink)
+      if ( finfo.getFileType() == FileType.SYMBOLIC_LINK)
         rpc.packInt(NFS.FileTypeLnk);
       else
         rpc.packInt(NFS.FileTypeReg);
