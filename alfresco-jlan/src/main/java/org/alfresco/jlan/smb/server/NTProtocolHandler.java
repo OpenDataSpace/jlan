@@ -58,6 +58,7 @@ import org.alfresco.jlan.server.filesys.FileOfflineException;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.FileStatusFlag;
 import org.alfresco.jlan.server.filesys.FileSystem;
 import org.alfresco.jlan.server.filesys.IOControlNotImplementedException;
 import org.alfresco.jlan.server.filesys.IOCtlInterface;
@@ -5930,7 +5931,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 						// Indicate the file was created
 
 						if ( netFile != null && m_sess.hasDebug( SMBSrvSession.DBG_BENCHMARK)) {
-							netFile.setStatusFlag( NetworkFile.Created, true);
+							netFile.setStatusFlag( FileStatusFlag.Created, true);
 							netFile.setCreationDate( System.currentTimeMillis());
 						}
 
@@ -5983,7 +5984,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 						// Indicate the directory was created
 
 						if ( netFile != null && m_sess.hasDebug( SMBSrvSession.DBG_BENCHMARK)) {
-							netFile.setStatusFlag( NetworkFile.Created, true);
+							netFile.setStatusFlag( FileStatusFlag.Created, true);
 							netFile.setCreationDate( System.currentTimeMillis());
 						}
 					}
@@ -6078,7 +6079,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 					// Treat the file as if it is a newly created file
 
 					if ( netFile != null && m_sess.hasDebug( SMBSrvSession.DBG_BENCHMARK)) {
-						netFile.setStatusFlag( NetworkFile.Created, true);
+						netFile.setStatusFlag( FileStatusFlag.Created, true);
 						netFile.setCreationDate( System.currentTimeMillis());
 					}
 

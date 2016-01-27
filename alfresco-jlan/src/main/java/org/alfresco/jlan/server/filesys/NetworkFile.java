@@ -20,6 +20,7 @@
 package org.alfresco.jlan.server.filesys;
 
 import java.io.IOException;
+import java.util.EnumSet;
 
 import org.alfresco.jlan.locking.FileLock;
 import org.alfresco.jlan.locking.FileLockList;
@@ -37,14 +38,6 @@ import org.alfresco.jlan.smb.SeekType;
  * @author gkspencer
  */
 public abstract class NetworkFile {
-	// File status flags
-
-	public static final int IOPending     		= 0x0001;
-	public static final int DeleteOnClose 		= 0x0002;
-	public static final int DelayedWriteError 	= 0x0004;
-	public static final int Created             = 0x0008;
-	public static final int DelayedClose        = 0x0010;
-
 	// File identifier and parent directory identifier
 
 	protected int m_fid;
@@ -112,7 +105,7 @@ public abstract class NetworkFile {
 
 	// File status flags
 
-	private int m_flags;
+	private FileStatusFlags flags = new FileStatusFlags();
 
 	private boolean m_force;
 
@@ -416,7 +409,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean hasDelayedWriteError() {
-		return (m_flags & DelayedWriteError) != 0 ? true : false;
+		return flags.getFlags().contains(FileStatusFlag.DelayedWriteError);
 	}
 
 	/**
@@ -425,7 +418,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean hasDeleteOnClose() {
-		return (m_flags & DeleteOnClose) != 0 ? true : false;
+		return flags.getFlags().contains(FileStatusFlag.DeleteOnClose);
 	}
 
 	/**
@@ -434,7 +427,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean hasIOPending() {
-		return (m_flags & IOPending) != 0 ? true : false;
+		return flags.getFlags().contains(FileStatusFlag.IOPending);
 	}
 
 	/**
@@ -443,7 +436,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean hasDelayedClose() {
-	    return (m_flags & DelayedClose) != 0 ? true : false;
+	    return flags.getFlags().contains(FileStatusFlag.DelayedClose);
 	}
 
 	/**
@@ -452,7 +445,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean wasCreated() {
-		return ( m_flags & Created) != 0 ? true : false;
+		return flags.getFlags().contains(FileStatusFlag.Created);
 	}
 
 	/**
@@ -513,7 +506,7 @@ public abstract class NetworkFile {
 	 * @param del boolean
 	 */
 	public final void setDeleteOnClose(boolean del) {
-		setStatusFlag(DeleteOnClose, del);
+		setStatusFlag(FileStatusFlag.DeleteOnClose, del);
 	}
 
 	/**
@@ -594,7 +587,7 @@ public abstract class NetworkFile {
 	 * @param pending boolean
 	 */
 	public final void setIOPending(boolean pending) {
-		setStatusFlag(IOPending, pending);
+		setStatusFlag(FileStatusFlag.IOPending, pending);
 	}
 
 	/**
@@ -648,7 +641,7 @@ public abstract class NetworkFile {
 	 * @param err boolean
 	 */
 	public final void setDelayedWriteError(boolean err) {
-		setStatusFlag(DelayedWriteError, err);
+		setStatusFlag(FileStatusFlag.DelayedWriteError, err);
 	}
 
 	/**
@@ -657,7 +650,7 @@ public abstract class NetworkFile {
 	 * @param delayClose boolean
 	 */
 	public final void setDelayedClose(boolean delayClose) {
-	    setStatusFlag( DelayedClose, delayClose);
+	    setStatusFlag(FileStatusFlag.DelayedClose, delayClose);
 	}
 
 	/**
@@ -675,12 +668,14 @@ public abstract class NetworkFile {
 	 * @param flag int
 	 * @param sts boolean
 	 */
-	public final synchronized void setStatusFlag(int flag, boolean sts) {
-		boolean state = (m_flags & flag) != 0;
-		if ( sts == true && state == false)
-			m_flags += flag;
-		else if ( sts == false && state == true)
-			m_flags -= flag;
+	public final synchronized void setStatusFlag(final FileStatusFlag flag, boolean sts) {
+        final EnumSet<FileStatusFlag> temp = flags.getFlags();
+        if(sts) {
+            temp.add(flag);
+	    } else {
+	        temp.remove(flag);
+	    }
+        flags.setFlags(temp);
 	}
 
 	/**
