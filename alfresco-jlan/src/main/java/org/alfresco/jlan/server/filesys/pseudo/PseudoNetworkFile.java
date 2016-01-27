@@ -233,7 +233,7 @@ public class PseudoNetworkFile extends NetworkFile implements NetworkFileStateIn
    * @return long
    * @exception IOException
    */
-  public long seekFile(long pos, int typ)
+  public long seekFile(long pos, SeekType typ)
     throws IOException {
 
     // Open the file, if not already open
@@ -247,20 +247,20 @@ public class PseudoNetworkFile extends NetworkFile implements NetworkFileStateIn
 
       // From start of file
 
-      case SeekType.StartOfFile:
+      case StartOfFile:
         if (currentPosition() != pos)
           m_io.seek(pos);
         break;
 
       // From current position
 
-      case SeekType.CurrentPos:
+      case CurrentPos:
         m_io.seek(currentPosition() + pos);
         break;
 
       // From end of file
 
-      case SeekType.EndOfFile: {
+      case EndOfFile: {
         long newPos = m_io.length() + pos;
         m_io.seek(newPos);
       }

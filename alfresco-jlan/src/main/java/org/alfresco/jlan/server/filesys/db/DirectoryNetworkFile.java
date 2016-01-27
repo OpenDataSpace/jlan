@@ -23,6 +23,7 @@ import java.io.IOException;
 
 import org.alfresco.jlan.server.filesys.FileAttribute;
 import org.alfresco.jlan.server.filesys.cache.FileStateProxy;
+import org.alfresco.jlan.smb.SeekType;
 
 /**
  * Directory Network File Class
@@ -115,7 +116,7 @@ public class DirectoryNetworkFile extends DBNetworkFile {
    * @return long
    * @exception IOException
 	 */
-	public long seekFile(long pos, int typ)
+	public long seekFile(long pos, SeekType typ)
 		throws IOException {
 		return 0L;
 	}

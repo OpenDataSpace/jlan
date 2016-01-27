@@ -26,11 +26,24 @@ package org.alfresco.jlan.smb;
  *
  * @author gkspencer
  */
-public class SeekType {
+public enum SeekType {
+    // Seek file types
+    StartOfFile (0), CurrentPos (1), EndOfFile (2);
+    int value;
+    private SeekType(int value) {
+        this.value = value;
+    }
 
-  //	Seek file types
+    public int getValue() {
+        return this.value;
+    }
 
-  public static final int StartOfFile = 0;
-  public static final int CurrentPos 	= 1;
-  public static final int EndOfFile 	= 2;
+    public static SeekType forValue(int value) {
+        for (SeekType t : SeekType.values()) {
+            if (t.value == value) {
+                return t;
+            }
+        }
+        return null;
+    }
 }

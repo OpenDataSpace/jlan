@@ -353,7 +353,7 @@ public class NIOJavaNetworkFile extends NetworkFile {
    * @return long
    * @exception IOException
    */
-  public long seekFile(long pos, int typ) throws IOException {
+  public long seekFile(long pos, SeekType typ) throws IOException {
 
     //  Open the file, if not already open
 
@@ -366,20 +366,20 @@ public class NIOJavaNetworkFile extends NetworkFile {
 
       //  From start of file
 
-      case SeekType.StartOfFile :
+      case StartOfFile :
         if (currentPosition() != pos)
           m_channel.position(pos);
         break;
 
         //  From current position
 
-      case SeekType.CurrentPos :
+      case CurrentPos :
         m_channel.position(currentPosition() + pos);
         break;
 
         //  From end of file
 
-      case SeekType.EndOfFile :
+      case EndOfFile :
         {
           long newPos = m_channel.size() + pos;
           m_channel.position(newPos);

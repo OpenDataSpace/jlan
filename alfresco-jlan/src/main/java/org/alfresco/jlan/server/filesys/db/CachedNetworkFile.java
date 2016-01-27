@@ -33,6 +33,7 @@ import org.alfresco.jlan.server.filesys.loader.FileRequest;
 import org.alfresco.jlan.server.filesys.loader.FileSegment;
 import org.alfresco.jlan.server.filesys.loader.FileSegmentInfo;
 import org.alfresco.jlan.server.filesys.loader.SingleFileRequest;
+import org.alfresco.jlan.smb.SeekType;
 
 /**
  * Cached Data Network File Class
@@ -456,7 +457,7 @@ public class CachedNetworkFile extends DBNetworkFile {
 	 * @return long
 	 * @exception IOException
 	 */
-	public long seekFile(long pos, int typ)
+	public long seekFile(long pos, SeekType typ)
 		throws IOException {
 		return 0;
 	}

@@ -62,6 +62,7 @@ import org.alfresco.jlan.server.locking.FileLockingInterface;
 import org.alfresco.jlan.server.locking.LockManager;
 import org.alfresco.jlan.server.locking.OpLockInterface;
 import org.alfresco.jlan.server.locking.OpLockManager;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
 import org.alfresco.jlan.smb.nt.SecurityDescriptor;
@@ -1474,7 +1475,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
    * @return  New file position
    * @exception IOException
    */
-  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, int typ)
+  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, SeekType typ)
     throws IOException {
 
     //  Debug

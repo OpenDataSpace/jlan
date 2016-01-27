@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.alfresco.jlan.locking.FileLock;
 import org.alfresco.jlan.locking.FileLockList;
 import org.alfresco.jlan.server.locking.OpLockDetails;
+import org.alfresco.jlan.smb.SeekType;
 
 /**
  * <p>
@@ -933,11 +934,11 @@ public abstract class NetworkFile {
 	 * Seek to the specified file position.
 	 *
 	 * @param pos long
-	 * @param typ int
+	 * @param typ SeekType
 	 * @return int
 	 * @exception IOException
 	 */
-	public abstract long seekFile(long pos, int typ)
+	public abstract long seekFile(long pos, SeekType typ)
 		throws IOException;
 
 	/**

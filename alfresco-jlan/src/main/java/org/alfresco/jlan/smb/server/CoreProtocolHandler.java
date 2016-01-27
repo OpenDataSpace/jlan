@@ -56,6 +56,7 @@ import org.alfresco.jlan.smb.PCShare;
 import org.alfresco.jlan.smb.PacketType;
 import org.alfresco.jlan.smb.SMBDate;
 import org.alfresco.jlan.smb.SMBStatus;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.util.DataPacker;
 import org.alfresco.jlan.util.WildCard;
 
@@ -2713,7 +2714,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 		// Get the file id from the request
 
 		int fid      = smbPkt.getParameter(0);
-		int seekMode = smbPkt.getParameter(1);
+		SeekType seekMode = SeekType.forValue(smbPkt.getParameter(1));
 		long seekPos = (long) smbPkt.getParameterLong(2);
 
 		NetworkFile netFile = conn.findFile(fid);

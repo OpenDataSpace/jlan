@@ -22,6 +22,7 @@ package org.alfresco.jlan.smb.dcerpc.server;
 import java.io.IOException;
 
 import org.alfresco.jlan.server.filesys.NetworkFile;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.smb.dcerpc.DCEBuffer;
 import org.alfresco.jlan.smb.dcerpc.DCEPipeType;
 
@@ -242,7 +243,7 @@ public class DCEPipeFile extends NetworkFile {
 	 * @return long
 	 * @exception IOException
 	 */
-	public long seekFile(long pos, int typ) throws IOException {
+	public long seekFile(long pos, SeekType typ) throws IOException {
 		return 0;
 	}
 

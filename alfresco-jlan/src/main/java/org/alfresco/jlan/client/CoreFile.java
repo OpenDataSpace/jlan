@@ -26,6 +26,7 @@ import org.alfresco.jlan.smb.DataType;
 import org.alfresco.jlan.smb.PacketType;
 import org.alfresco.jlan.smb.SMBDate;
 import org.alfresco.jlan.smb.SMBException;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.util.DataPacker;
 
 /**
@@ -440,7 +441,7 @@ public class CoreFile extends SMBFile {
 	 * @exception IOException
 	 * @exception SMBException If an SMB level error occurs
 	 */
-	public long Seek(long pos, int typ)
+	public long Seek(long pos, SeekType typ)
 		throws IOException, SMBException {
 
 		// Check if the file has been closed
@@ -458,7 +459,7 @@ public class CoreFile extends SMBFile {
 		m_txpkt.setParameterCount(4);
 		m_txpkt.setParameter(0, m_FID);
 
-		m_txpkt.setParameter(1, typ);
+		m_txpkt.setParameter(1, typ.getValue());
 		m_txpkt.setParameterLong(2, (int) pos & 0xFFFFFFFF);
 
 		m_txpkt.setByteCount(0);

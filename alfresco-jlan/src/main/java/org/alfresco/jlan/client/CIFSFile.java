@@ -563,7 +563,7 @@ public final class CIFSFile extends SMBFile {
 	 * @exception IOException
 	 * @exception SMBException If an SMB level error occurs
 	 */
-	public long Seek(long pos, int typ)
+	public long Seek(long pos, SeekType typ)
 		throws IOException, SMBException {
 
 		// Check if the file has been closed
@@ -581,20 +581,20 @@ public final class CIFSFile extends SMBFile {
 
 			// Seek relative to the start of file
 
-			case SeekType.StartOfFile:
+			case StartOfFile:
 				m_txpos = m_rxpos = pos;
 				break;
 
 			// Seek realtive to the current file position
 
-			case SeekType.CurrentPos:
+			case CurrentPos:
 				m_txpos = m_rxpos + pos;
 				m_rxpos = m_txpos;
 				break;
 
 			// Seek relative to end of file
 
-			case SeekType.EndOfFile:
+			case EndOfFile:
 				m_txpos = m_rxpos = getFileSize() + pos;
 				break;
 		}

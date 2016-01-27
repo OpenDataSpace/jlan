@@ -190,7 +190,7 @@ public class MemoryNetworkFile extends NetworkFile implements NetworkFileStateIn
    * @return long
    * @exception IOException
    */
-  public long seekFile(long pos, int typ)
+  public long seekFile(long pos, SeekType typ)
     throws IOException {
 
     // Seek to the required file position
@@ -198,20 +198,20 @@ public class MemoryNetworkFile extends NetworkFile implements NetworkFileStateIn
     switch (typ) {
       // From start of file
 
-      case SeekType.StartOfFile:
+      case StartOfFile:
         if (currentPosition() != pos)
           m_filePos = pos;
         break;
 
       // From current position
 
-      case SeekType.CurrentPos:
+      case CurrentPos:
         m_filePos += pos;
         break;
 
       // From end of file
 
-      case SeekType.EndOfFile:
+      case EndOfFile:
         m_filePos += pos;
         if (m_filePos < 0)
           m_filePos = 0L;

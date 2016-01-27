@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.alfresco.jlan.server.filesys.AccessDeniedException;
 import org.alfresco.jlan.server.filesys.FileAttribute;
 import org.alfresco.jlan.server.filesys.NetworkFile;
+import org.alfresco.jlan.smb.SeekType;
 
 
 /**
@@ -134,7 +135,7 @@ public class PseudoFolderNetworkFile extends NetworkFile {
    * @return long
    * @exception IOException
    */
-  public long seekFile(long pos, int typ)
+  public long seekFile(long pos, SeekType typ)
     throws IOException {
 
     throw new AccessDeniedException("Attempt to read/write folder file");

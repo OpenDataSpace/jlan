@@ -26,6 +26,7 @@ import org.alfresco.jlan.client.info.FileInfo;
 import org.alfresco.jlan.smb.SMBDate;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
+import org.alfresco.jlan.smb.SeekType;
 
 /**
  *  SMB file class.
@@ -386,7 +387,7 @@ public abstract class SMBFile implements Closeable {
 	 * @exception IOException
 	 * @exception SMBException If an SMB level error occurs
 	 */
-	public abstract long Seek(long pos, int typ)
+	public abstract long Seek(long pos, SeekType typ)
 		throws IOException, SMBException;
 
 	/**

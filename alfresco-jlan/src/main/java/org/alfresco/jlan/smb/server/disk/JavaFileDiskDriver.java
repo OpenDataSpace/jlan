@@ -43,6 +43,7 @@ import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.PathNotFoundException;
 import org.alfresco.jlan.server.filesys.SearchContext;
 import org.alfresco.jlan.server.filesys.TreeConnection;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.smb.server.SMBSrvSession;
 import org.springframework.extensions.config.ConfigElement;
 
@@ -891,7 +892,7 @@ public class JavaFileDiskDriver implements DiskInterface {
    * @return  New file position
    * @exception IOException
    */
-  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, int typ)
+  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, SeekType typ)
     throws java.io.IOException {
 
     //  Check that the network file is our type

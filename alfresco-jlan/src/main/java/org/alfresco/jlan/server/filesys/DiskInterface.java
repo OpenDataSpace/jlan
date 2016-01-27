@@ -22,6 +22,7 @@ package org.alfresco.jlan.server.filesys;
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.server.core.DeviceContext;
 import org.alfresco.jlan.server.core.DeviceInterface;
+import org.alfresco.jlan.smb.SeekType;
 
 /**
  * The disk interface is implemented by classes that provide an interface for a disk type shared
@@ -182,7 +183,7 @@ public interface DiskInterface extends DeviceInterface {
    * @param typ      	Seek type.
    * @return         	New file position, relative to the start of file.
    */
-  long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, int typ)
+  long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, SeekType typ)
   	throws java.io.IOException;
 
   /**

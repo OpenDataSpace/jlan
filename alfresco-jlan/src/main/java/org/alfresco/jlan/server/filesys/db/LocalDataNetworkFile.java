@@ -182,7 +182,7 @@ public class LocalDataNetworkFile extends DBNetworkFile {
    * @return long
    * @exception IOException
 	 */
-	public long seekFile(long pos, int typ)
+	public long seekFile(long pos, SeekType typ)
 		throws IOException {
 
     //  Open the file, if not already open
@@ -198,20 +198,20 @@ public class LocalDataNetworkFile extends DBNetworkFile {
 
       //  From start of file
 
-      case SeekType.StartOfFile :
+      case StartOfFile :
         if (curPos != pos)
           m_io.seek(pos);
         break;
 
         //  From current position
 
-      case SeekType.CurrentPos :
+      case CurrentPos :
         m_io.seek(curPos + pos);
         break;
 
         //  From end of file
 
-      case SeekType.EndOfFile :
+      case EndOfFile :
         {
           long newPos = m_io.length() + pos;
           m_io.seek(newPos);

@@ -45,6 +45,7 @@ import org.alfresco.jlan.server.filesys.SearchContext;
 import org.alfresco.jlan.server.filesys.TreeConnection;
 import org.alfresco.jlan.server.locking.FileLockingInterface;
 import org.alfresco.jlan.server.locking.LockManager;
+import org.alfresco.jlan.smb.SeekType;
 import org.alfresco.jlan.smb.server.SMBSrvSession;
 import org.springframework.extensions.config.ConfigElement;
 
@@ -892,7 +893,7 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
    * @return  New file position
    * @exception IOException
    */
-  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, int typ)
+  public long seekFile(SrvSession sess, TreeConnection tree, NetworkFile file, long pos, SeekType typ)
     throws java.io.IOException {
 
     //  Check that the network file is our type
