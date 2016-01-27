@@ -869,7 +869,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
    * @param name  File name
    * @return int
    */
-  public int fileExists(SrvSession sess, TreeConnection tree, String name) {
+  public FileStatus fileExists(SrvSession sess, TreeConnection tree, String name) {
 
     //  Access the JDBC context
 
@@ -877,7 +877,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
     //  Check if the path contains an NTFS stream name
 
-    int fileSts = FileStatus.NotExist;
+    FileStatus fileSts = FileStatus.NotExist;
     FileState fstate = null;
 
     if ( FileName.containsStreamName(name)) {
@@ -900,7 +900,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
         //  Debug
 
         if ( Debug.EnableInfo && hasDebug())
-          Debug.println("DB fileExists() nameWithStream=" + name + ", fileSts=" + FileStatus.asString(fileSts));
+          Debug.println("DB fileExists() nameWithStream=" + name + ", fileSts=" + fileSts.toString());
     }
     else {
 
@@ -940,14 +940,14 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
         //  Debug
 
         if ( Debug.EnableInfo && hasDebug())
-          Debug.println("DB fileExists() name=" + name + ", fileSts=" + FileStatus.asString(fileSts));
+          Debug.println("DB fileExists() name=" + name + ", fileSts=" + fileSts.toString());
       }
       else {
 
         //  DEBUG
 
         if ( Debug.EnableInfo && hasDebug())
-          Debug.println("@@ Cache hit - fileExists() name=" + name + ", fileSts=" + FileStatus.asString(fileSts));
+          Debug.println("@@ Cache hit - fileExists() name=" + name + ", fileSts=" + fileSts.toString());
       }
     }
 

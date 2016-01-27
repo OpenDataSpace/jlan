@@ -53,7 +53,7 @@ public class GrantAccessParams implements Serializable {
 
 	// File status, if FileStatus.Unknown then do not set on file state
 
-	private int m_fileSts;
+	private FileStatus m_fileSts;
 
 	// File open parameter value required by the access check
 
@@ -80,7 +80,7 @@ public class GrantAccessParams implements Serializable {
 	 * @param openParams FileOpenParams
 	 * @param fileSts int
 	 */
-	public GrantAccessParams( ClusterNode clNode, FileOpenParams openParams, int fileSts) {
+	public GrantAccessParams( ClusterNode clNode, FileOpenParams openParams, FileStatus fileSts) {
 		m_ownerName = clNode.getName();
 
 		// New file status, or unknown to not set
@@ -118,7 +118,7 @@ public class GrantAccessParams implements Serializable {
 	 *
 	 * @return int
 	 */
-	public final int getFileStatus() {
+	public final FileStatus getFileStatus() {
 		return m_fileSts;
 	}
 
@@ -271,8 +271,8 @@ public class GrantAccessParams implements Serializable {
 		str.append( ",pid=");
 		str.append( getProcessId());
 		str.append( ",fileSts=");
-		if ( getFileStatus() != -1)
-			str.append( FileStatus.asString( getFileStatus()));
+		if ( getFileStatus() != FileStatus.Unknown)
+			str.append( getFileStatus().toString());
 		else
 			str.append( "Unknown");
 		str.append( ",openAction=");

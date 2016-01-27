@@ -41,7 +41,7 @@ public class UpdateStateTask extends RemoteStateTask<Boolean> {
 
 	// File status
 
-	private int m_fileStatus;
+	private FileStatus m_fileStatus;
 
 	/**
 	 * Default constructor
@@ -58,7 +58,7 @@ public class UpdateStateTask extends RemoteStateTask<Boolean> {
 	 * @param debug boolean
 	 * @param timingDebug boolean
 	 */
-	public UpdateStateTask( String mapName, String key, int fileSts, boolean debug, boolean timingDebug) {
+	public UpdateStateTask( String mapName, String key, FileStatus fileSts, boolean debug, boolean timingDebug) {
 		super( mapName, key, true, false, debug, timingDebug);
 
 		m_fileStatus = fileSts;
@@ -78,7 +78,7 @@ public class UpdateStateTask extends RemoteStateTask<Boolean> {
 		// DEBUG
 
 		if ( hasDebug())
-			Debug.println( "UpdateStateTask: Update file status=" + FileStatus.asString( m_fileStatus) + ", state=" + fState);
+			Debug.println( "UpdateStateTask: Update file status=" + m_fileStatus.toString() + ", state=" + fState);
 
 		// Check if the file status has changed
 

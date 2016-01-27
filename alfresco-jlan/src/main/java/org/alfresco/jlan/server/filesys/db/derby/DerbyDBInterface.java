@@ -408,12 +408,12 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 	 * @return FileStatus.NotExist, FileStatus.FileExists or FileStatus.DirectoryExists
 	 * @throws DBException
 	 */
-	public int fileExists(int dirId, String fname)
+	public FileStatus fileExists(int dirId, String fname)
 		throws DBException {
 
 		// Check if the file exists, and whether it is a file or folder
 
-		int sts = FileStatus.NotExist;
+	    FileStatus sts = FileStatus.NotExist;
 
 		Connection conn = null;
 		Statement stmt = null;

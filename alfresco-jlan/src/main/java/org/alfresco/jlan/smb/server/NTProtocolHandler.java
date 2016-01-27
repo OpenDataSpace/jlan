@@ -2428,7 +2428,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 			// Check if the requested file already exists
 
-			int fileSts = disk.fileExists(m_sess, conn, fileName);
+			FileStatus fileSts = disk.fileExists(m_sess, conn, fileName);
 
 			if ( fileSts == FileStatus.NotExist) {
 
@@ -4969,7 +4969,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 						// Check if the target file exists
 
-						int fileSts = disk.fileExists( m_sess, conn, newPath);
+						FileStatus fileSts = disk.fileExists( m_sess, conn, newPath);
 
 						if ( fileSts == FileStatus.FileExists && overwrite == false) {
 
@@ -5418,7 +5418,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 					// Check if the path refers to a file or directory
 
-					int fileSts = disk.fileExists(m_sess, conn, path);
+				    FileStatus fileSts = disk.fileExists(m_sess, conn, path);
 
 					// File attributes changed
 
@@ -5864,7 +5864,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 			// Check if the requested file already exists
 
-			int fileSts = disk.fileExists(m_sess, conn, params.getFullPath());
+		    FileStatus fileSts = disk.fileExists(m_sess, conn, params.getFullPath());
 
 			// Check if the path is to a folder, make sure the Directory flag is set in the open parameters for oplock checking
 
@@ -5944,7 +5944,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 						String[] paths = FileName.splitAllPaths( params.getPath());
 						StringBuilder pathStr = new StringBuilder( params.getPath().length());
-						int fldrSts = FileStatus.Unknown;
+						FileStatus fldrSts = FileStatus.Unknown;
 						int idx = 0;
 
 						while ( idx < paths.length) {
@@ -6907,7 +6907,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 			// Check if the requested file already exists
 
-			int fileSts = disk.fileExists(m_sess, conn, fileName);
+		    FileStatus fileSts = disk.fileExists(m_sess, conn, fileName);
 
 			if ( fileSts == FileStatus.NotExist) {
 

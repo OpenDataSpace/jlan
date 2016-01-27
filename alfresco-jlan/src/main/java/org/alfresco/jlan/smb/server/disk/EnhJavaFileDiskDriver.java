@@ -383,7 +383,7 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
    * @param name	File name
    * @return int
    */
-  public int fileExists(SrvSession sess, TreeConnection tree, String name) {
+  public FileStatus fileExists(SrvSession sess, TreeConnection tree, String name) {
 
     //  Get the full path for the file
 

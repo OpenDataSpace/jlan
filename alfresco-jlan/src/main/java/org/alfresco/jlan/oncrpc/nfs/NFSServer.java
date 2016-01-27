@@ -1881,7 +1881,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
       //	Check if the file exists
 
-      int existSts = disk.fileExists(sess, conn, filePath);
+      FileStatus existSts = disk.fileExists(sess, conn, filePath);
       if (existSts == FileStatus.FileExists) {
         errorSts = NFS.StsExist;
       }
@@ -2071,7 +2071,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 			//	Check if the file exists
 
-			int existSts = disk.fileExists(sess, conn, dirPath);
+			FileStatus existSts = disk.fileExists(sess, conn, dirPath);
 			if (existSts != FileStatus.NotExist) {
 				errorSts = NFS.StsExist;
 			}
@@ -2353,7 +2353,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
       //  Check if the file exists
 
-      int existSts = disk.fileExists(sess, conn, filePath);
+      FileStatus existSts = disk.fileExists(sess, conn, filePath);
       if (existSts == FileStatus.FileExists) {
         errorSts = NFS.StsExist;
       }
@@ -2537,7 +2537,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 			//	Check if the file exists
 
-			int existSts = disk.fileExists(sess, conn, delPath);
+			FileStatus existSts = disk.fileExists(sess, conn, delPath);
 			if (existSts == FileStatus.NotExist) {
 				errorSts = NFS.StsNoEnt;
 			}
@@ -2698,7 +2698,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 			//	Check if the file exists
 
-			int existSts = disk.fileExists(sess, conn, delPath);
+			FileStatus existSts = disk.fileExists(sess, conn, delPath);
 			if (existSts == FileStatus.NotExist) {
 				errorSts = NFS.StsNoEnt;
 			}
@@ -2866,7 +2866,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 			//	Check if the from path exists
 
-			int existSts = disk.fileExists(sess, conn, oldPath);
+			FileStatus existSts = disk.fileExists(sess, conn, oldPath);
 
 			if (existSts == FileStatus.NotExist) {
 			  errorSts = NFS.StsNoEnt;
@@ -4713,7 +4713,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
         //  Check if the file/directory exists
 
-        int fsts = disk.fileExists(sess, tree, filePath);
+        FileStatus fsts = disk.fileExists(sess, tree, filePath);
 
         if ( fsts == FileStatus.FileExists || fsts == FileStatus.DirectoryExists) {
 

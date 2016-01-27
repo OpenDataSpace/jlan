@@ -47,7 +47,7 @@ public class StateUpdateMessage extends ClusterMessage {
 
 	// Update values
 
-	private int m_fileStatus;
+	private FileStatus m_fileStatus;
 	private int m_fileStsReason;
 
 	private long m_fileSize;
@@ -132,7 +132,7 @@ public class StateUpdateMessage extends ClusterMessage {
 	 *
 	 * @return int
 	 */
-	public final int getFileStatus() {
+	public final FileStatus getFileStatus() {
 		return m_fileStatus;
 	}
 
@@ -207,7 +207,7 @@ public class StateUpdateMessage extends ClusterMessage {
 
 		if ( hasUpdate ( ClusterFileState.UpdateFileStatus)) {
 			str.append(",fileSts=");
-			str.append(FileStatus.asString( getFileStatus()));
+			str.append(getFileStatus().toString());
 
 			if ( getStatusChangeReason() != FileState.ReasonNone) {
 				str.append(",reason=");

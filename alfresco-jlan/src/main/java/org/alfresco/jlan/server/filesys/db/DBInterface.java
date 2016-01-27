@@ -27,6 +27,7 @@ import org.alfresco.jlan.server.filesys.DirectoryNotEmptyException;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
+import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfo;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfoList;
 import org.springframework.extensions.config.ConfigElement;
@@ -123,7 +124,7 @@ public interface DBInterface {
    * @return FileStatus.NotExist, FileStatus.FileExists or FileStatus.DirectoryExists
    * @throws DBException
    */
-  public int fileExists(int dirId, String fname)
+  public FileStatus fileExists(int dirId, String fname)
   	throws DBException;
 
   /**

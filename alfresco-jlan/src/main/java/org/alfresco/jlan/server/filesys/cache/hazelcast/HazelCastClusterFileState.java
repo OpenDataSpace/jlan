@@ -167,7 +167,7 @@ public class HazelCastClusterFileState extends ClusterFileState {
 	 * @param status int
 	 * @param reason int
 	 */
-	public void setFileStatus(int status, int reason) {
+	public void setFileStatus(FileStatus status, int reason) {
 
 		// Check if the file status has changed, or a reason has been specified
 
@@ -446,7 +446,7 @@ public class HazelCastClusterFileState extends ClusterFileState {
 	  str.append("[");
 	  str.append(getPath());
 	  str.append(",");
-	  str.append(FileStatus.asString(getFileStatus()));
+	  str.append(getFileStatus().toString());
 	  str.append(":Opn=");
 
 	  str.append(super.getOpenCount());	// Local open count only

@@ -101,7 +101,7 @@ public abstract class FileState implements Serializable {
 	//	File status, indicates if the file/folder exists and if it is a file or folder.
 	//	Constants are defined in the FileStatus class.
 
-	private int m_fileStatus;
+	private FileStatus m_fileStatus;
 
 	//	Open file count
 
@@ -166,7 +166,7 @@ public abstract class FileState implements Serializable {
 	 * @param status int
      * @param caseSensitive boolean
 	 */
-	public FileState(String fname, int status, boolean caseSensitive) {
+	public FileState(String fname, FileStatus status, boolean caseSensitive) {
 
 	  //	Normalize the file path
 
@@ -203,7 +203,7 @@ public abstract class FileState implements Serializable {
 	 *
 	 * @return int
 	 */
-	public final int getFileStatus() {
+	public final FileStatus getFileStatus() {
 	  return m_fileStatus;
 	}
 
@@ -415,7 +415,7 @@ public abstract class FileState implements Serializable {
 	 *
 	 * @param status int
 	 */
-	public void setFileStatus(int status) {
+	public void setFileStatus(FileStatus status) {
 	  setFileStatus(status, ReasonNone);
 	}
 
@@ -425,7 +425,7 @@ public abstract class FileState implements Serializable {
 	 * @param status int
 	 * @param reason int
 	 */
-	public void setFileStatus(int status, int reason) {
+	public void setFileStatus(FileStatus status, int reason) {
 	  m_fileStatus = status;
 	}
 
@@ -1152,7 +1152,7 @@ public abstract class FileState implements Serializable {
 	  str.append("[");
 	  str.append(getPath());
 	  str.append(",");
-	  str.append(FileStatus.asString(getFileStatus()));
+	  str.append(getFileStatus().toString());
 	  str.append(":Opn=");
 	  str.append(getOpenCount());
 

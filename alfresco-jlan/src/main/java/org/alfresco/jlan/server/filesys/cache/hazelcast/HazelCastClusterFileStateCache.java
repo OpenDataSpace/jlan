@@ -454,7 +454,7 @@ public class HazelCastClusterFileStateCache extends ClusterFileStateCache implem
 	 * @return FileState
 	 */
 	public FileState findFileState(String path, boolean create) {
-		return findFileState( path, create, -1);
+		return findFileState( path, create, FileStatus.Unknown);
 	}
 
     /**
@@ -466,7 +466,7 @@ public class HazelCastClusterFileStateCache extends ClusterFileStateCache implem
      * @param status int
      * @return FileState
      */
-	public FileState findFileState(String path, boolean create, int status) {
+	public FileState findFileState(String path, boolean create, FileStatus status) {
 
 		// Normalize the path, used as the cache key
 
@@ -484,7 +484,7 @@ public class HazelCastClusterFileStateCache extends ClusterFileStateCache implem
 		// DEBUG
 
 		if ( hasDebugLevel( DebugStateCache))
-			Debug.println( "findFileState path=" + path + ", create=" + create + ", sts=" + FileStatus.asString(status) + ", state=" + state);
+			Debug.println( "findFileState path=" + path + ", create=" + create + ", sts=" + status.toString() + ", state=" + state);
 
         // Check if we should create a new file state
 
@@ -497,7 +497,7 @@ public class HazelCastClusterFileStateCache extends ClusterFileStateCache implem
             // Set the file state timeout and add to the cache
 
             state.setExpiryTime(System.currentTimeMillis() + getFileStateExpireInterval());
-            if ( status != -1)
+            if ( status != FileStatus.Unknown)
             	state.setFileStatus( status);
 
             HazelCastClusterFileState curState = m_stateCache.putIfAbsent( state.getPath(), state);
@@ -1937,13 +1937,13 @@ public class HazelCastClusterFileStateCache extends ClusterFileStateCache implem
 	 * @exception AccessDeniedException
 	 * @exception FileExistsException
 	 */
-	public FileAccessToken grantFileAccess( FileOpenParams params, FileState fstate, int fileSts)
+	public FileAccessToken grantFileAccess( FileOpenParams params, FileState fstate, FileStatus fileSts)
 		throws FileSharingException, AccessDeniedException, FileExistsException {
 
 		// DEBUG
 
 		if ( hasDebugLevel( DebugFileAccess))
-			Debug.println("Grant file access for state=" + fstate + ", params=" + params + ", fileSts=" + FileStatus.asString( fileSts));
+			Debug.println("Grant file access for state=" + fstate + ", params=" + params + ", fileSts=" + fileSts.toString());
 
 		// Send a subset of the file open parameters to the remote task
 

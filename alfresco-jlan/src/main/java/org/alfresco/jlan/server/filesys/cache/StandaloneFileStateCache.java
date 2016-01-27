@@ -175,7 +175,7 @@ public class StandaloneFileStateCache extends FileStateCache {
      * @param status int
      * @return FileState
      */
-    public final FileState findFileState(String path, boolean create, int status) {
+    public final FileState findFileState(String path, boolean create, FileStatus status) {
 
     	FileState state = null;
 

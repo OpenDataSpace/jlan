@@ -574,7 +574,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
 				// Check if the path exists
 
-				int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+				FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 				if ( sts == FileStatus.NotExist) {
 
@@ -1362,7 +1362,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
                 // Access the virtual filesystem driver
                 DiskInterface disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
 
-                int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+                FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
                 if (sts == FileStatus.NotExist)
                 {
@@ -2077,7 +2077,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
 			// Check if the file exists and it is a file
 
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( sts == FileStatus.FileExists) {
 
@@ -2258,7 +2258,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 		DiskInterface disk = null;
 		TreeConnection tree = null;
 		NetworkFile netFile = null;
-		int sts = FileStatus.NotExist;
+		FileStatus sts = FileStatus.NotExist;
 
         // Flag to indicate if the file should be deleted on close, used if there is an error during the upload
         // and the file did not exist before the upload
@@ -2612,7 +2612,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			// Check if the file exists and it is a file
 
 			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( sts == FileStatus.FileExists) {
 
@@ -2714,7 +2714,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			// Check if the file exists and it is a file
 
 			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( sts != FileStatus.NotExist) {
 
@@ -2820,7 +2820,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			// Check if the file exists and it is a file
 
 			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( (sts == FileStatus.NotExist) ||
 				 // Special condition where we are changing case of file name but the search above is case insensitive
@@ -2926,7 +2926,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			// Check if the directory exists
 
 			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( sts == FileStatus.NotExist) {
 
@@ -3036,7 +3036,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			// Check if the directory exists
 
 			disk = (DiskInterface) ftpPath.getSharedDevice().getInterface();
-			int sts = disk.fileExists(this, tree, ftpPath.getSharePath());
+			FileStatus sts = disk.fileExists(this, tree, ftpPath.getSharePath());
 
 			if ( sts == FileStatus.DirectoryExists) {
 

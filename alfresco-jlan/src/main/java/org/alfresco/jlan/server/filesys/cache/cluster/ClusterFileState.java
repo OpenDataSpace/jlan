@@ -418,7 +418,7 @@ public abstract class ClusterFileState extends FileState implements Serializable
      * @param fSts int
      * @param reason int
      */
-    public final void setFileStatusInternal( int fSts, int reason) {
+    public final void setFileStatusInternal( FileStatus fSts, int reason) {
     	super.setFileStatus( fSts, reason);
 
     	m_fileStsReason = reason;
@@ -534,7 +534,7 @@ public abstract class ClusterFileState extends FileState implements Serializable
 	  str.append("[");
 	  str.append(getPath());
 	  str.append(",");
-	  str.append(FileStatus.asString(getFileStatus()));
+	  str.append(getFileStatus().toString());
 	  if ( getStatusChangeReason() != ReasonNone) {
 		  str.append("(");
 		  str.append( FileState.getChangeReasonString( getStatusChangeReason()));

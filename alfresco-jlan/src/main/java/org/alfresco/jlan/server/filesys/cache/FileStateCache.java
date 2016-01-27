@@ -334,10 +334,10 @@ public abstract class FileStateCache {
      *
      * @param path String
      * @param create boolean
-     * @param status int
+     * @param status FileStatus
      * @return FileState
      */
-    public abstract FileState findFileState(String path, boolean create, int status);
+    public abstract FileState findFileState(String path, boolean create, FileStatus status);
 
 	/**
 	 * Remove the file state for the specified path
@@ -642,7 +642,7 @@ public abstract class FileStateCache {
 	 * @exception AccessDeniedException
 	 * @exception FileExistsException
 	 */
-	public FileAccessToken grantFileAccess( FileOpenParams params, FileState fstate, int fileSts)
+	public FileAccessToken grantFileAccess( FileOpenParams params, FileState fstate, FileStatus fileSts)
 		throws FileSharingException, AccessDeniedException, FileExistsException {
 
 		LocalFileAccessToken accToken = null;

@@ -97,7 +97,7 @@ public interface DiskInterface extends DeviceInterface {
    * @return int
    * @see FileStatus
    */
-  int fileExists(SrvSession sess, TreeConnection tree, String name);
+  FileStatus fileExists(SrvSession sess, TreeConnection tree, String name);
 
   /**
    * Flush any buffered output for the specified file.

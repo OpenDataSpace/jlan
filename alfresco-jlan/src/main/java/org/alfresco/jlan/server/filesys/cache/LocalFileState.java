@@ -21,6 +21,7 @@ package org.alfresco.jlan.server.filesys.cache;
 
 import java.util.HashMap;
 
+import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.pseudo.PseudoFileList;
 
 /**
@@ -71,7 +72,7 @@ public class LocalFileState extends FileState {
 	 * @param status int
      * @param caseSensitive boolean
 	 */
-	public LocalFileState(String fname, int status, boolean caseSensitive) {
+	public LocalFileState(String fname, FileStatus status, boolean caseSensitive) {
 		super( fname, status, caseSensitive);
 	}
 

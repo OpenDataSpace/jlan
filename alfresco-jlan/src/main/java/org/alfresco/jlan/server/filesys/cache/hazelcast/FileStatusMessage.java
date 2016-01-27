@@ -37,7 +37,7 @@ public class FileStatusMessage extends ClusterMessage {
 	// Updated path and file status
 
 	private String m_path;
-	private int m_fileStatus;
+	private FileStatus m_fileStatus;
 
 	/**
 	 * Default constructor
@@ -52,7 +52,7 @@ public class FileStatusMessage extends ClusterMessage {
 	 * @param path String
 	 * @param fileSts int
 	 */
-	public FileStatusMessage( String targetNode, String path, int fileSts) {
+	public FileStatusMessage( String targetNode, String path, FileStatus fileSts) {
 		super ( targetNode, ClusterMessageType.FileStateUpdate);
 		m_path = path;
 		m_fileStatus = fileSts;
@@ -72,7 +72,7 @@ public class FileStatusMessage extends ClusterMessage {
 	 *
 	 * @return int
 	 */
-	public final int getFileStatus() {
+	public final FileStatus getFileStatus() {
 		return m_fileStatus;
 	}
 
@@ -89,7 +89,7 @@ public class FileStatusMessage extends ClusterMessage {
 		str.append( ",path=");
 		str.append( getPath());
 		str.append( ",fileSts=");
-		str.append( FileStatus.asString( getFileStatus()));
+		str.append( getFileStatus().toString());
 		str.append( "]");
 
 		return str.toString();

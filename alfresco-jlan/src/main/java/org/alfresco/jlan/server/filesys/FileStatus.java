@@ -24,44 +24,28 @@ package org.alfresco.jlan.server.filesys;
  *
  * @author gkspencer
  */
-public class FileStatus {
+public enum FileStatus {
+    Unknown(-1, "Unknown"), NotExist(0, "NotExist"), FileExists(1, "FileExists"), DirectoryExists(2, "DirExists");
 
-    // File status constants
+    private int value;
+    private String name;
 
-    public final static int Unknown         = -1;
-    public final static int NotExist        = 0;
-    public final static int FileExists      = 1;
-    public final static int DirectoryExists = 2;
+    private FileStatus(final int value, final String name) {
+        this.value = value;
+        this.name = name;
+    }
 
-    public final static int MaxStatus       = 2;
-
-    /**
-     * Return the file status as a string
-     *
-     * @param sts int
-     * @return String
-     */
-    public final static String asString(int sts) {
-
-        // Convert the status to a string
-
-        String ret = "";
-
-        switch (sts) {
-            case Unknown:
-                ret = "Unknown";
-                break;
-            case NotExist:
-                ret = "NotExist";
-                break;
-            case FileExists:
-                ret = "FileExists";
-                break;
-            case DirectoryExists:
-                ret = "DirExists";
-                break;
+    public static FileStatus forValue(final int value) {
+        for (FileStatus t : FileStatus.values()) {
+            if (t.value == value) {
+                return t;
+            }
         }
+        return FileStatus.Unknown;
+    }
 
-        return ret;
+    @Override
+    public String toString() {
+        return name;
     }
 }
