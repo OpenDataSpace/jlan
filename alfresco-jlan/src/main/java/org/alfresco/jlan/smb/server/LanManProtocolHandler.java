@@ -21,6 +21,7 @@ package org.alfresco.jlan.smb.server;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.EnumSet;
 
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.netbios.RFCNetBIOSProtocol;
@@ -32,6 +33,7 @@ import org.alfresco.jlan.server.core.InvalidDeviceInterfaceException;
 import org.alfresco.jlan.server.core.ShareType;
 import org.alfresco.jlan.server.core.SharedDevice;
 import org.alfresco.jlan.server.filesys.AccessDeniedException;
+import org.alfresco.jlan.server.filesys.DeviceAttribute;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.FileAccess;
@@ -2999,7 +3001,7 @@ class LanManProtocolHandler extends CoreProtocolHandler {
 			// Filesystem device information
 
 			case DiskInfoPacker.InfoFsDevice:
-				DiskInfoPacker.packFsDevice(0, 0, replyBuf);
+				DiskInfoPacker.packFsDevice(0, EnumSet.noneOf(DeviceAttribute.class), replyBuf);
 				break;
 
 			// Filesystem attribute information

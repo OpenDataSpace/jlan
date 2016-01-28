@@ -19,6 +19,8 @@
 
 package org.alfresco.jlan.server.filesys;
 
+import java.util.EnumSet;
+
 import org.alfresco.jlan.server.core.DeviceContext;
 import org.alfresco.jlan.server.core.DeviceContextException;
 import org.alfresco.jlan.server.filesys.cache.FileStateCache;
@@ -60,7 +62,7 @@ public class DiskDeviceContext extends DeviceContext {
 	//	Disk device attributes, can be used to make the device appear as a removeable, read-only,
 	//	or write-once device for example.
 
-	private int m_deviceAttribs;
+	private EnumSet<DeviceAttribute> m_deviceAttribs = EnumSet.noneOf(DeviceAttribute.class);
 
     // File state cache
 
@@ -143,8 +145,8 @@ public class DiskDeviceContext extends DeviceContext {
 	 *
 	 * @return int
 	 */
-	public final int getDeviceAttributes() {
-	  return m_deviceAttribs;
+	public final EnumSet<DeviceAttribute> getDeviceAttributes() {
+	  return m_deviceAttribs.clone();
 	}
 
   /**
@@ -314,11 +316,12 @@ public class DiskDeviceContext extends DeviceContext {
 	/**
 	 * Set the device attributes
 	 *
-	 * @param attrib int
+	 * @param attributes int
 	 */
-	public final void setDeviceAttributes(int attrib) {
-	  m_deviceAttribs = attrib;
-	}
+    public final void setDeviceAttributes(final EnumSet<DeviceAttribute> attributes) {
+        m_deviceAttribs.clear();
+        m_deviceAttribs.addAll(attributes);
+    }
 
 	/**
 	 * Enable/disable file server change notifications

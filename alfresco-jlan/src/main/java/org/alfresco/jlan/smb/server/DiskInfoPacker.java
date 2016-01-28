@@ -19,6 +19,9 @@
 
 package org.alfresco.jlan.smb.server;
 
+import java.util.EnumSet;
+
+import org.alfresco.jlan.server.filesys.DeviceAttribute;
 import org.alfresco.jlan.server.filesys.DiskInfo;
 import org.alfresco.jlan.server.filesys.SrvDiskInfo;
 import org.alfresco.jlan.server.filesys.VolumeInfo;
@@ -171,17 +174,17 @@ class DiskInfoPacker {
    * Pack the filesystem device information, InfoFsDevice
    *
    * @param typ					Device type
-   * @param devChar			Device characteristics
+   * @param devAttributes			Device characteristics
    * @param buf         Buffer to pack data into.
    */
-  public final static void packFsDevice(int typ, int devChar, DataBuffer buf) {
+  public final static void packFsDevice(int typ, final EnumSet<DeviceAttribute> devAttributes, DataBuffer buf) {
 
   	//	Information format :-
   	//	 UINT		Device type
   	//	 UINT 	Characteristics
 
 		buf.putInt(typ);
-		buf.putInt(devChar);
+		buf.putInt(DeviceAttribute.asInt(devAttributes));
   }
 
   /**

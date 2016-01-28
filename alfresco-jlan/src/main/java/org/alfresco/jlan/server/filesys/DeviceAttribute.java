@@ -19,22 +19,38 @@
 
 package org.alfresco.jlan.server.filesys;
 
+import java.util.EnumSet;
+
 /**
- *	Device Attribute Constants Class
+ * Device Attribute Constants Class
  *
- *	<p>Specifies the constants that can be used to set the DiskDeviceContext device attributes.
+ * <p>
+ * Specifies the constants that can be used to set the DiskDeviceContext device attributes.
  *
  * @author gkspencer
  */
-public final class DeviceAttribute {
-
-  //	Device attributes
-
-  public static final int Removable		=	0x0001;
-  public static final int ReadOnly		= 0x0002;
-  public static final int FloppyDisk	= 0x0004;
-  public static final int WriteOnce		= 0x0008;
-  public static final int Remote			= 0x0010;
-  public static final int Mounted			= 0x0020;
-  public static final int Virtual			= 0x0040;
+public enum DeviceAttribute {
+    Removable(0x0001), ReadOnly(0x0002), FloppyDisk(0x0004), WriteOnce(0x0008), Remote(0x0010), Mounted(0x0020), Virtual(0x0040);
+    private final int bit;
+    private DeviceAttribute(final int flag) {
+        this.bit = flag;
+    }
+    
+    public static EnumSet<DeviceAttribute> fromInt(final int flag) {
+        final EnumSet<DeviceAttribute> result = EnumSet.noneOf(DeviceAttribute.class);
+        for (DeviceAttribute attribute : DeviceAttribute.values()) {
+            if ((attribute.bit & flag) != 0) {
+                result.add(attribute);
+            }
+        }
+        return result;
+    }
+    
+    public static int asInt(final EnumSet<DeviceAttribute> attributes) {
+        int result = 0;
+        for (DeviceAttribute attribute : attributes) {
+            result += attribute.bit;
+        }
+        return result;
+    }
 }
