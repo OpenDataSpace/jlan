@@ -45,7 +45,7 @@ public class StringList {
    *
    * @param list Vector
    */
-  public StringList(Vector list) {
+  public StringList(Vector<String> list) {
 
     //	Allocate the string list
 

@@ -50,6 +50,7 @@ import org.alfresco.jlan.smb.SMBErrorText;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
 import org.alfresco.jlan.smb.ServerType;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.UnknownLocalDomainException;
 import org.alfresco.jlan.smb.UnsupportedDeviceTypeException;
@@ -1240,7 +1241,7 @@ public final class SessionFactory {
 
 			// Get the domain list
 
-			ServerList domList = admSess.getServerList(ServerType.DomainEnum);
+			ServerList domList = admSess.getServerList(EnumSet.of(ServerTypeFlag.DomainEnum));
 			admSess.CloseSession();
 			return domList;
 		}
@@ -1285,7 +1286,7 @@ public final class SessionFactory {
 
 			// Ask the browse master for the domain list
 
-			domList = admSess.getServerList(ServerType.DomainEnum);
+			domList = admSess.getServerList(EnumSet.of(ServerTypeFlag.DomainEnum));
 		}
 		catch (SMBException ex) {
 
@@ -1402,7 +1403,7 @@ public final class SessionFactory {
 
 		// Chain to the main server list method
 
-		return getServerList(domnam, 0x0FFFFFFF);
+		return getServerList(domnam, EnumSet.range(ServerTypeFlag.WorkStation, ServerTypeFlag.TerminalServer));
 	}
 
 	/**
@@ -1414,7 +1415,7 @@ public final class SessionFactory {
 	 * @exception SMBException If an SMB exception occurs.
 	 * @exception java.io.IOException If an I/O error occurs.
 	 */
-	public final static ServerList getServerList(String domnam, int srvFlags)
+	public final static ServerList getServerList(String domnam, EnumSet<ServerTypeFlag> srvFlags)
 		throws SMBException, java.io.IOException {
 
 		// Check if this node is the browse master for the specified domain
@@ -1422,6 +1423,7 @@ public final class SessionFactory {
 		PCShare admShr = null;
 		AdminSession admSess = null;
 		String browseMaster = null;
+        srvFlags.removeAll(EnumSet.range(ServerTypeFlag.DCEServer, ServerTypeFlag.DomainEnum));
 
 		try {
 
@@ -1437,15 +1439,14 @@ public final class SessionFactory {
 			if ( admSess.getSession().getDomain() != null && admSess.getSession().getDomain().compareTo(domnam) == 0) {
 
 				// Get the local domains server list
-
-				ServerList srvList = admSess.getServerList(srvFlags & 0x0FFFFFFF);
+				ServerList srvList = admSess.getServerList(srvFlags);
 				admSess.CloseSession();
 				return srvList;
 			}
 
 			// Get the domain list
 
-			ServerList domList = admSess.getServerList(ServerType.DomainEnum);
+			ServerList domList = admSess.getServerList(EnumSet.of(ServerTypeFlag.DomainEnum));
 			if ( domList != null) {
 
 				// Check if we have found the requested domain in the list
@@ -1554,7 +1555,7 @@ public final class SessionFactory {
 		// Return the server list for the domain, make sure we do not search for domains, mask
 		// out the domain search flags.
 
-		ServerList srvList = admSess.getServerList(srvFlags & 0x0FFFFFFF);
+		ServerList srvList = admSess.getServerList(srvFlags);
 		admSess.CloseSession();
 		return srvList;
 	}

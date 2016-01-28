@@ -42,6 +42,7 @@ import org.alfresco.jlan.smb.PacketType;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
 import org.alfresco.jlan.smb.ServerType;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.dcerpc.DCEBuffer;
 import org.alfresco.jlan.smb.dcerpc.DCEBufferException;
@@ -1035,7 +1036,7 @@ public final class AdminSession {
 	 * @exception java.io.IOException If an I/O error occurs
 	 * @exception SMBException If an SMB exception occurs
 	 */
-	public final ServerList getServerList(int flags)
+	public final ServerList getServerList(final EnumSet<ServerTypeFlag> flags)
 		throws java.io.IOException, SMBException {
 
 		// Use the RAP call for now
@@ -2291,7 +2292,7 @@ public final class AdminSession {
 	 * @exception java.io.IOException If an I/O error occurs
 	 * @exception SMBException If an SMB exception occurs
 	 */
-	private final ServerList getRAPServerList(int flags)
+	private final ServerList getRAPServerList(EnumSet<ServerTypeFlag> flags)
 		throws java.io.IOException, SMBException {
 
 		// Create an SMB transaction packet for the server enum request
@@ -2313,16 +2314,12 @@ public final class AdminSession {
 		pos += 2;
 		DataPacker.putIntelShort(m_defBufSize - SMBPacket.TRANS_HEADERLEN, params, pos);
 		pos += 2;
-		DataPacker.putIntelInt(flags, params, pos);
+		DataPacker.putIntelInt(ServerTypeFlag.toInt(flags), params, pos);
 		pos += 4;
 
 		// Set the domain enumeration flag
 
-		boolean domainEnum = false;
-
-		if ( (flags & ServerType.DomainEnum) != 0)
-			domainEnum = true;
-
+		boolean domainEnum = flags.contains(ServerTypeFlag.DomainEnum);
 		// Check for the domain enum flag, if set then specify a null domain
 		// name string.
 
@@ -2437,16 +2434,12 @@ public final class AdminSession {
 		pos += 4;
 
 		// Set the domain enumeration flag
-
-		boolean domainEnum = false;
-
-		if ( (flags & ServerType.DomainEnum) != 0)
-			domainEnum = true;
+        final EnumSet<ServerTypeFlag> typeFlags = ServerTypeFlag.fromInt(flags);
 
 		// Check for the domain enum flag, if set then specify a null domain
 		// name string.
 
-		if ( m_sess.getDomain() == null || domainEnum == true)
+		if ( m_sess.getDomain() == null || typeFlags.contains(ServerTypeFlag.DomainEnum))
 			pos = DataPacker.putString("", params, pos, true);
 		else
 			pos = DataPacker.putString(m_sess.getDomain(), params, pos, true);

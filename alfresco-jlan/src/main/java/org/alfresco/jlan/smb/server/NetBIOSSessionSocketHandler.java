@@ -25,6 +25,7 @@ import java.net.Socket;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.SocketSessionHandler;
 import org.alfresco.jlan.server.config.ServerConfiguration;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.mailslot.TcpipNetBIOSHostAnnouncer;
 
 /**

@@ -28,6 +28,7 @@ import org.alfresco.jlan.server.core.SharedDevice;
 import org.alfresco.jlan.server.core.SharedDeviceList;
 import org.alfresco.jlan.smb.PacketType;
 import org.alfresco.jlan.smb.SMBStatus;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.TransactBuffer;
 import org.alfresco.jlan.util.DataBuffer;
 
@@ -232,7 +233,7 @@ class PipeLanmanHandler {
 
 			// Pack the server capability flags
 
-			dataBuf.putInt(sess.getSMBServer().getServerType());
+			dataBuf.putInt(ServerTypeFlag.toInt(sess.getSMBServer().getServerType()));
 
 			// Pack the server comment string
 

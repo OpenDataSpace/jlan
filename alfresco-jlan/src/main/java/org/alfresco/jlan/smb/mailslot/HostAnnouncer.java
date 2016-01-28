@@ -19,9 +19,12 @@
 
 package org.alfresco.jlan.smb.mailslot;
 
+import java.util.EnumSet;
+
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.netbios.NetBIOSName;
 import org.alfresco.jlan.smb.ServerType;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.TransactionName;
 import org.alfresco.jlan.util.StringList;
 
@@ -61,7 +64,7 @@ public abstract class HostAnnouncer extends Thread {
 
 	// Server type flags
 
-	private int m_srvtype = ServerType.WorkStation + ServerType.Server;
+	private EnumSet<ServerTypeFlag> m_srvtype = EnumSet.of(ServerTypeFlag.WorkStation, ServerTypeFlag.Server);
 
 	// SMB mailslot packet
 
@@ -170,7 +173,7 @@ public abstract class HostAnnouncer extends Thread {
 	 *
 	 * @return int
 	 */
-	public final int getServerType() {
+	public final EnumSet<ServerTypeFlag> getServerType() {
 		return m_srvtype;
 	}
 
@@ -318,8 +321,8 @@ public abstract class HostAnnouncer extends Thread {
 
 		// Clear the server flag in the announced host type
 
-		if ( (m_srvtype & ServerType.Server) != 0)
-			m_srvtype -= ServerType.Server;
+		if (m_srvtype.contains(ServerTypeFlag.Server))
+			m_srvtype.remove(ServerTypeFlag.Server);
 
 		// Send out a number of host announcement to remove the host name(s) from Network
 		// Neighborhood
@@ -448,8 +451,9 @@ public abstract class HostAnnouncer extends Thread {
 	 *
 	 * @param typ int
 	 */
-	public final void setServerType(int typ) {
-		m_srvtype = typ;
+	public final void setServerType(final EnumSet<ServerTypeFlag> typ) {
+		m_srvtype.clear();
+		m_srvtype.addAll(typ);
 	}
 
 	/**

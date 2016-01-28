@@ -19,6 +19,9 @@
 
 package org.alfresco.jlan.smb.mailslot;
 
+import java.util.EnumSet;
+
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.util.DataPacker;
 
 /**
@@ -60,7 +63,7 @@ public final class MailSlot {
    * @param upd int
    * @return int
    */
-  public final static int createHostAnnouncement(byte[] buf, int off, String host, String comment, int typ, int interval, int upd) {
+  public final static int createHostAnnouncement(byte[] buf, int off, String host, String comment, EnumSet<ServerTypeFlag> typ, int interval, int upd) {
 
     //  Set the command code and update count
 
@@ -88,7 +91,7 @@ public final class MailSlot {
 
     //  Set the server type flags
 
-    DataPacker.putIntelInt(typ, buf, off+24);
+    DataPacker.putIntelInt(ServerTypeFlag.toInt(typ), buf, off+24);
 
     //  Browser election version and  browser constant
 

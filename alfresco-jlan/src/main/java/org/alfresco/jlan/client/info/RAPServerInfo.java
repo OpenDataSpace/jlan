@@ -22,6 +22,7 @@ package org.alfresco.jlan.client.info;
 import java.util.*;
 
 import org.alfresco.jlan.client.admin.RAPReadable;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.dcerpc.info.ServerInfo;
 
 /**
@@ -109,7 +110,7 @@ public final class RAPServerInfo extends ServerInfo implements RAPReadable, java
 				setVersion(byt1.intValue(), byt2.intValue());
 
 				ival = (Integer) objs.elementAt(3);
-				setServerType(ival.intValue());
+				setServerType(ServerTypeFlag.fromInt(ival.intValue()));
 
 				setComment((String) objs.elementAt(4));
 				break;

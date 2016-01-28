@@ -19,6 +19,9 @@
 
 package org.alfresco.jlan.smb.dcerpc.info;
 
+import java.util.EnumSet;
+
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.dcerpc.DCEBuffer;
 import org.alfresco.jlan.smb.dcerpc.DCEBufferException;
 import org.alfresco.jlan.smb.dcerpc.DCEReadable;
@@ -53,7 +56,7 @@ public class ServerInfo implements DCEWriteable, DCEReadable {
 	private String m_name;
 	private int m_verMajor;
 	private int m_verMinor;
-	private int m_srvType;
+	private EnumSet<ServerTypeFlag> m_srvType;
 	private String m_comment;
 
 	/**
@@ -130,8 +133,8 @@ public class ServerInfo implements DCEWriteable, DCEReadable {
 	 *
 	 * @return int
 	 */
-	public final int getServerType() {
-	  return m_srvType;
+	public final EnumSet<ServerTypeFlag> getServerType() {
+	  return m_srvType.clone();
 	}
 
 	/**
@@ -175,7 +178,7 @@ public class ServerInfo implements DCEWriteable, DCEReadable {
 	 *
 	 * @param typ int
 	 */
-	public final void setServerType(int typ) {
+	public final void setServerType(final EnumSet<ServerTypeFlag> typ) {
 	  m_srvType = typ;
 	}
 
@@ -238,7 +241,7 @@ public class ServerInfo implements DCEWriteable, DCEReadable {
     		buf.skipPointer();
     		m_verMajor = buf.getInt();
     		m_verMinor = buf.getInt();
-    		m_srvType  = buf.getInt();
+    		m_srvType  = ServerTypeFlag.fromInt(buf.getInt());
     		buf.skipPointer();
 
     		m_name = buf.getString(DCEBuffer.ALIGN_INT);
@@ -297,7 +300,7 @@ public class ServerInfo implements DCEWriteable, DCEReadable {
       	buf.putPointer(true);
       	buf.putInt(getMajorVersion());
       	buf.putInt(getMinorVersion());
-      	buf.putInt(getServerType());
+      	buf.putInt(ServerTypeFlag.toInt(getServerType()));
       	buf.putPointer(true);
 
       	strBuf.putString(getServerName(), DCEBuffer.ALIGN_INT, true);

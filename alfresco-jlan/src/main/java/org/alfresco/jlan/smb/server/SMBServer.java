@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.util.EnumSet;
 import java.util.Enumeration;
 import java.util.Random;
 import java.util.Vector;
@@ -47,6 +48,7 @@ import org.alfresco.jlan.server.thread.ThreadRequestPool;
 import org.alfresco.jlan.smb.Dialect;
 import org.alfresco.jlan.smb.DialectSelector;
 import org.alfresco.jlan.smb.ServerType;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.dcerpc.UUID;
 import org.alfresco.jlan.smb.server.nio.NIOCifsConnectionsHandler;
 import org.alfresco.jlan.smb.server.nio.win32.AsyncWinsockCifsConnectionsHandler;
@@ -88,7 +90,7 @@ public class SMBServer extends NetworkFileServer implements Runnable, Configurat
 
 	// Server type flags, used when announcing the host
 
-	private int m_srvType = ServerType.WorkStation + ServerType.Server;
+	private EnumSet<ServerTypeFlag> m_srvType = EnumSet.of(ServerTypeFlag.WorkStation, ServerTypeFlag.Server);
 
 	// Server GUID
 
@@ -291,8 +293,8 @@ public class SMBServer extends NetworkFileServer implements Runnable, Configurat
 	 *
 	 * @return int
 	 */
-	public final int getServerType() {
-		return m_srvType;
+	public final EnumSet<ServerTypeFlag> getServerType() {
+		return m_srvType.clone();
 	}
 
 	/**
@@ -437,8 +439,9 @@ public class SMBServer extends NetworkFileServer implements Runnable, Configurat
 			if ( getCIFSConfiguration().getEnabledDialects().hasDialect(Dialect.NT) == true) {
 
 				// Enable the NT server flag
-
-				getCIFSConfiguration().setServerType(getServerType() + ServerType.NTServer);
+			    EnumSet<ServerTypeFlag> flags = getServerType();
+			    flags.add(ServerTypeFlag.NTServer);
+				getCIFSConfiguration().setServerType(ServerTypeFlag.toInt(flags));
 
 				// Debug
 

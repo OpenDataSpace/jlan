@@ -21,6 +21,7 @@ package org.alfresco.jlan.smb.server;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.StringTokenizer;
 
@@ -35,6 +36,7 @@ import org.alfresco.jlan.server.config.InvalidConfigurationException;
 import org.alfresco.jlan.server.config.ServerConfiguration;
 import org.alfresco.jlan.smb.DialectSelector;
 import org.alfresco.jlan.smb.ServerType;
+import org.alfresco.jlan.smb.ServerTypeFlag;
 import org.alfresco.jlan.smb.TcpipSMB;
 import org.alfresco.jlan.util.StringList;
 
@@ -63,7 +65,7 @@ public class CIFSConfigSection extends ConfigSection {
 
   //  Server type, used by the host announcer
 
-  private int m_srvType = ServerType.WorkStation + ServerType.Server;
+  private EnumSet<ServerTypeFlag> m_srvType = EnumSet.of(ServerTypeFlag.WorkStation, ServerTypeFlag.Server);
 
   //  Server comment
 
@@ -386,8 +388,8 @@ public class CIFSConfigSection extends ConfigSection {
    *
    * @return int
    */
-  public final int getServerType() {
-    return m_srvType;
+  public final EnumSet<ServerTypeFlag> getServerType() {
+    return m_srvType.clone();
   }
 
   /**
@@ -1138,9 +1140,9 @@ public class CIFSConfigSection extends ConfigSection {
     throws InvalidConfigurationException {
 
     //  Inform listeners, validate the configuration change
-
-    int sts = fireConfigurationChange(ConfigId.SMBServerType, new Integer(typ));
-    m_srvType = typ;
+      final EnumSet<ServerTypeFlag> flags = ServerTypeFlag.fromInt(typ);
+    int sts = fireConfigurationChange(ConfigId.SMBServerType, flags);
+    m_srvType = flags;
 
     //  Return the change status
 
