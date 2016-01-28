@@ -22,7 +22,7 @@ package org.alfresco.jlan.smb.mailslot;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.netbios.NetBIOSName;
 import org.alfresco.jlan.smb.ServerType;
-import org.alfresco.jlan.smb.TransactionNames;
+import org.alfresco.jlan.smb.TransactionName;
 import org.alfresco.jlan.util.StringList;
 
 /**
@@ -211,7 +211,7 @@ public abstract class HostAnnouncer extends Thread {
 
 		// Create the mailslot SMB
 
-		m_smbPkt.initializeMailslotSMB(TransactionNames.MailslotBrowse, data, pos);
+		m_smbPkt.initializeMailslotSMB(TransactionName.MAILSLOT_BROWSE.toString(), data, pos);
 	}
 
 	/**

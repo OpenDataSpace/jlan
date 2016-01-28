@@ -24,10 +24,16 @@ package org.alfresco.jlan.smb;
  *
  * @author gkspencer
  */
-public class TransactionNames {
+public enum TransactionName {
+    PIPE_LANMAN("\\PIPE\\LANMAN"), MAILSLOT_BROWSE("\\MAILSLOT\\BROWSE");
+    private String name;
 
-  //	Available transaction names
+    private TransactionName(final String name) {
+        this.name = name;
+    }
 
-  public static final String PipeLanman 		= "\\PIPE\\LANMAN";
-  public static final String MailslotBrowse	=	"\\MAILSLOT\\BROWSE";
+    @Override
+    public String toString() {
+        return name;
+    }
 }

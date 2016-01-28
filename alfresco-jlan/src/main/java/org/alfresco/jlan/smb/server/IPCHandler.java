@@ -34,7 +34,7 @@ import org.alfresco.jlan.server.filesys.TreeConnection;
 import org.alfresco.jlan.server.filesys.UnsupportedInfoLevelException;
 import org.alfresco.jlan.smb.PacketType;
 import org.alfresco.jlan.smb.SMBStatus;
-import org.alfresco.jlan.smb.TransactionNames;
+import org.alfresco.jlan.smb.TransactionName;
 import org.alfresco.jlan.smb.WinNT;
 import org.alfresco.jlan.smb.dcerpc.DCEPipeType;
 import org.alfresco.jlan.smb.dcerpc.server.DCEPipeFile;
@@ -151,7 +151,7 @@ class IPCHandler {
 
 		// Call the required transaction handler
 
-		if ( tbuf.getName().compareTo(TransactionNames.PipeLanman) == 0) {
+		if ( tbuf.getName().compareTo(TransactionName.PIPE_LANMAN.toString()) == 0) {
 
 			// Call the \PIPE\LANMAN transaction handler to process the request
 
