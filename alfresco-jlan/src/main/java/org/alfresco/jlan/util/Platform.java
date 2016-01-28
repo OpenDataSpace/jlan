@@ -22,7 +22,7 @@ package org.alfresco.jlan.util;
 /**
  * Platform Class
  *
- * <p>Determine the platform type that we are runnng on.
+ * <p>Determine the platform type that we are running on.
  *
  * @author gkspencer
  */
