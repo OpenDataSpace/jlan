@@ -36,8 +36,8 @@ public class SessionSettings {
 
     //  Primary and secondary protocols to connect with
 
-    private int m_primaryProto   = Protocol.TCPNetBIOS;
-    private int m_secondaryProto = Protocol.NativeSMB;
+    private Protocol m_primaryProto   = Protocol.TCPNetBIOS;
+    private Protocol m_secondaryProto = Protocol.NativeSMB;
 
     // SMB dialects to negotiate
 
@@ -85,7 +85,7 @@ public class SessionSettings {
      * @param primaryProto int
      * @param secondaryProto int
      */
-    public SessionSettings(int primaryProto, int secondaryProto) {
+    public SessionSettings(Protocol primaryProto, Protocol secondaryProto) {
       m_primaryProto   = primaryProto;
       m_secondaryProto = secondaryProto;
     }
@@ -98,7 +98,7 @@ public class SessionSettings {
      * @param secondaryProto int
      * @param tmo int
      */
-    public SessionSettings(int primaryProto, int secondaryProto, int tmo) {
+    public SessionSettings(Protocol primaryProto, Protocol secondaryProto, int tmo) {
       m_primaryProto   = primaryProto;
       m_secondaryProto = secondaryProto;
 
@@ -110,7 +110,7 @@ public class SessionSettings {
      *
      * @return int
      */
-    public final int getPrimaryProtocol() {
+    public final Protocol getPrimaryProtocol() {
       return m_primaryProto;
     }
 
@@ -119,7 +119,7 @@ public class SessionSettings {
      *
      * @return int
      */
-    public final int getSecondaryProtocol() {
+    public final Protocol getSecondaryProtocol() {
       return m_secondaryProto;
     }
 
@@ -227,7 +227,7 @@ public class SessionSettings {
      *
      * @param proto int
      */
-    public final void setPrimaryProtocol(int proto) {
+    public final void setPrimaryProtocol(Protocol proto) {
       m_primaryProto = proto;
     }
 
@@ -236,7 +236,7 @@ public class SessionSettings {
      *
      * @param proto int
      */
-    public final void setSecondaryProtocol(int proto) {
+    public final void setSecondaryProtocol(Protocol proto) {
       m_secondaryProto = proto;
     }
 
@@ -339,9 +339,9 @@ public class SessionSettings {
       StringBuffer str = new StringBuffer();
 
       str.append("[");
-      str.append(Protocol.asString(getPrimaryProtocol()));
+      str.append(getPrimaryProtocol().toString());
       str.append(",");
-      str.append(Protocol.asString(getSecondaryProtocol()));
+      str.append(getSecondaryProtocol().toString());
       str.append(",Tmo=");
       str.append(getSessionTimeout());
       str.append("ms,Dialects=");

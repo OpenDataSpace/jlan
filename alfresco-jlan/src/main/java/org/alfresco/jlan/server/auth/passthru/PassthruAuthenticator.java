@@ -1236,8 +1236,8 @@ public class PassthruAuthenticator extends CifsAuthenticator implements SessionL
 			// Parse the protocol order list
 
 			StringTokenizer tokens = new StringTokenizer(protoOrder.getValue(), ",");
-			int primaryProto = Protocol.None;
-			int secondaryProto = Protocol.None;
+			Protocol primaryProto = Protocol.None;
+			Protocol secondaryProto = Protocol.None;
 
 			// There should only be one or two tokens
 
@@ -1281,8 +1281,8 @@ public class PassthruAuthenticator extends CifsAuthenticator implements SessionL
 			// DEBUG
 
 			if ( hasDebug())
-				Debug.println("Protocol order primary=" + Protocol.asString(primaryProto) + ", secondary="
-						+ Protocol.asString(secondaryProto));
+				Debug.println("Protocol order primary=" + primaryProto.toString() + ", secondary="
+						+ secondaryProto.toString());
 		}
 
 		// Check if the offline check interval has been specified

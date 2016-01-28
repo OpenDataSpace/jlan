@@ -64,8 +64,8 @@ public final class PCShare {
 
 	//	Primary and secondary protocols to try connection on
 
-	private int m_primaryProto		= Protocol.UseDefault;
-	private int m_secondaryProto	= Protocol.UseDefault;
+	private Protocol m_primaryProto		= Protocol.UseDefault;
+	private Protocol m_secondaryProto	= Protocol.UseDefault;
 
   // Flag to indicate if this is a null logon
 
@@ -294,7 +294,7 @@ public final class PCShare {
    *
    * @return int
    */
-  public final int getPrimaryProtocol() {
+  public final Protocol getPrimaryProtocol() {
   	return m_primaryProto;
   }
 
@@ -303,7 +303,7 @@ public final class PCShare {
    *
    * @return int
    */
-  public final int getSecondaryProtocol() {
+  public final Protocol getSecondaryProtocol() {
   	return m_secondaryProto;
   }
 
@@ -590,7 +590,7 @@ public final class PCShare {
 	 * @param pri int
 	 * @param sec int
 	 */
-	public final void setProtocolOrder(int pri, int sec) {
+	public final void setProtocolOrder(Protocol pri, Protocol sec) {
 		m_primaryProto   = pri;
 		m_secondaryProto = sec;
 	}

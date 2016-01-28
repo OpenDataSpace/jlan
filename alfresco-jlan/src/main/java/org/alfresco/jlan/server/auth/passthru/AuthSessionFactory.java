@@ -114,8 +114,8 @@ public final class AuthSessionFactory {
 
 	//	Primary and secondary protocols to connect with
 
-	private static int m_primaryProto		= Protocol.TCPNetBIOS;
-	private static int m_secondaryProto	= Protocol.NativeSMB;
+	private static Protocol m_primaryProto		= Protocol.TCPNetBIOS;
+	private static Protocol m_secondaryProto	= Protocol.NativeSMB;
 
   //	Session factory debug flag
 
@@ -312,7 +312,7 @@ public final class AuthSessionFactory {
 	 *
 	 * @return int
 	 */
-	public static final int getPrimaryProtocol() {
+	public static final Protocol getPrimaryProtocol() {
 		return m_primaryProto;
 	}
 
@@ -321,7 +321,7 @@ public final class AuthSessionFactory {
 	 *
 	 * @return int
 	 */
-	public static final int getSecondaryProtocol() {
+	public static final Protocol getSecondaryProtocol() {
 		return m_secondaryProto;
 	}
 
@@ -436,45 +436,36 @@ public final class AuthSessionFactory {
 		}
 
 		//	Connect to the requested server
-
 		NetworkSession netSession = null;
-
-		switch ( getPrimaryProtocol()) {
-
-			//	NetBIOS connection
-
-			case Protocol.TCPNetBIOS:
-				netSession = connectNetBIOSSession(shr.getNodeName(), localName, tmo);
-				break;
-
-			//	Native SMB connection
-
-			case Protocol.NativeSMB:
-				netSession = connectNativeSMBSession(shr.getNodeName(), localName, tmo);
-				break;
-		}
+        switch (getPrimaryProtocol()) {
+            // NetBIOS connection
+            case TCPNetBIOS:
+                netSession = connectNetBIOSSession(shr.getNodeName(), localName, tmo);
+                break;
+            // Native SMB connection
+            case NativeSMB:
+                netSession = connectNativeSMBSession(shr.getNodeName(), localName, tmo);
+                break;
+            default:
+                break;
+        }
 
 		//	If the connection was not made using the primary protocol try the secondary protocol, if configured
-
-		if ( netSession == null) {
-
-			//	Try the secondary protocol
-
-			switch ( getSecondaryProtocol()) {
-
-				//	NetBIOS connection
-
-				case Protocol.TCPNetBIOS:
-					netSession = connectNetBIOSSession(shr.getNodeName(), localName, tmo);
-					break;
-
-				//	Native SMB connection
-
-				case Protocol.NativeSMB:
-					netSession = connectNativeSMBSession(shr.getNodeName(), localName, tmo);
-					break;
-			}
-		}
+        if (netSession == null) {
+            // Try the secondary protocol
+            switch (getSecondaryProtocol()) {
+                // NetBIOS connection
+                case TCPNetBIOS:
+                    netSession = connectNetBIOSSession(shr.getNodeName(), localName, tmo);
+                    break;
+                // Native SMB connection
+                case NativeSMB:
+                    netSession = connectNativeSMBSession(shr.getNodeName(), localName, tmo);
+                    break;
+                default:
+                    break;
+            }
+        }
 
 		//	Check if we connected to the remote host
 
@@ -579,7 +570,7 @@ public final class AuthSessionFactory {
 	 * @param sec		Secondary connection protocol, or none
 	 * @return boolean
 	 */
-	public static final boolean setProtocolOrder(int pri, int sec) {
+	public static final boolean setProtocolOrder(Protocol pri, Protocol sec) {
 
 		//	Primary protocol must be specified
 

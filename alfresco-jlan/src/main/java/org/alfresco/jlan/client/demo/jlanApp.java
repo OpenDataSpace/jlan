@@ -459,8 +459,8 @@ public abstract class jlanApp {
 
 				// Set the session connection order values
 
-				int c1 = conn1.equals("NETBIOS") ? Protocol.TCPNetBIOS : Protocol.NativeSMB;
-				int c2 = Protocol.None;
+			    Protocol c1 = conn1.equals("NETBIOS") ? Protocol.TCPNetBIOS : Protocol.NativeSMB;
+			    Protocol c2 = Protocol.None;
 
 				if ( conn2 != null)
 					c2 = conn2.equals(("NETBIOS")) ? Protocol.TCPNetBIOS : Protocol.NativeSMB;

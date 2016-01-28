@@ -1376,7 +1376,7 @@ public final class SessionFactory {
 	 *
 	 * @return int
 	 */
-	public static final int getPrimaryProtocol() {
+	public static final Protocol getPrimaryProtocol() {
 		return m_defaultSettings.getPrimaryProtocol();
 	}
 
@@ -1386,7 +1386,7 @@ public final class SessionFactory {
 	 *
 	 * @return int
 	 */
-	public static final int getSecondaryProtocol() {
+	public static final Protocol getSecondaryProtocol() {
 		return m_defaultSettings.getSecondaryProtocol();
 	}
 
@@ -1994,82 +1994,71 @@ public final class SessionFactory {
 			Debug.println("** os.arch = " + System.getProperty("os.arch") + ", java.version: "
 					+ System.getProperty("java.version"));
 			Debug.println("** JLAN version is " + SessionFactory.isVersion());
-			Debug.println("** Trying primary protocol - " + Protocol.asString(settings.getPrimaryProtocol()));
+			Debug.println("** Trying primary protocol - " + settings.getPrimaryProtocol().toString());
 		}
 
-		// Connect to the requested server using the primary protocol
+        // Connect to the requested server using the primary protocol
+        NetworkSession netSession = null;
+        try {
+            switch (settings.getPrimaryProtocol()) {
+                // NetBIOS connection
+                case TCPNetBIOS:
+                    netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
+                    break;
+                // Native SMB connection
+                case NativeSMB:
+                    netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
+                    break;
+                default:
+                    break;
+            }
+        } catch (IOException ex) {
 
-		NetworkSession netSession = null;
+            // Check if there is a secondary protocolcfno configured, if not then rethrow the
+            // exception
 
-		try {
-
-			switch (settings.getPrimaryProtocol()) {
-
-				// NetBIOS connection
-
-				case Protocol.TCPNetBIOS:
-					netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
-					break;
-
-				// Native SMB connection
-
-				case Protocol.NativeSMB:
-					netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
-					break;
-			}
-		}
-		catch (IOException ex) {
-
-			// Check if there is a secondary protocolcfno configured, if not then rethrow the
-			// exception
-
-			if ( settings.getSecondaryProtocol() == Protocol.None)
-				throw ex;
-		}
+            if (settings.getSecondaryProtocol() == Protocol.None)
+                throw ex;
+        }
 
 		// If the connection was not made using the primary protocol try the secondary protocol, if
 		// configured
 
-		if ( netSession == null) {
+        if (netSession == null) {
+            // DEBUG
+            if (Debug.EnableInfo && Session.hasDebug())
+                Debug.println("** Trying secondary protocol - " + settings.getSecondaryProtocol().toString());
 
-			// DEBUG
+            // Try the secondary protocol
+            switch (settings.getSecondaryProtocol()) {
+                // NetBIOS connection
+                case TCPNetBIOS:
+                    netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
+                    break;
+                // Native SMB connection
+                case NativeSMB:
+                    netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
+                    break;
+                default:
+                    break;
+            }
 
-			if ( Debug.EnableInfo && Session.hasDebug())
-				Debug.println("** Trying secondary protocol - " + Protocol.asString(settings.getSecondaryProtocol()));
+            // If the secondary connection was successful check if the protocol order should be
+            // updated
 
-			// Try the secondary protocol
+            if (settings.hasUpdateProtocol() && netSession != null) {
 
-			switch (settings.getSecondaryProtocol()) {
+                // Update the primary protocol
 
-				// NetBIOS connection
+                settings.setPrimaryProtocol(settings.getSecondaryProtocol());
+                settings.setSecondaryProtocol(Protocol.None);
 
-				case Protocol.TCPNetBIOS:
-					netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
-					break;
+                // Debug
 
-				// Native SMB connection
-
-				case Protocol.NativeSMB:
-					netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
-					break;
-			}
-
-			// If the secondary connection was successful check if the protocol order should be
-			// updated
-
-			if ( settings.hasUpdateProtocol() && netSession != null) {
-
-				// Update the primary protocol
-
-				settings.setPrimaryProtocol(settings.getSecondaryProtocol());
-				settings.setSecondaryProtocol(Protocol.None);
-
-				// Debug
-
-				if ( Debug.EnableInfo && Session.hasDebug())
-					Debug.println("** Updated primary protocol : " + Protocol.asString(settings.getPrimaryProtocol()));
-			}
-		}
+                if (Debug.EnableInfo && Session.hasDebug())
+                    Debug.println("** Updated primary protocol : " + settings.getPrimaryProtocol().toString());
+            }
+        }
 
 		// Check if we connected to the remote host
 
@@ -2232,35 +2221,29 @@ public final class SessionFactory {
 			Debug.println("** JLAN version is " + SessionFactory.isVersion());
 		}
 
-		// Connect to the requested server using the primary protocol
+        // Connect to the requested server using the primary protocol
+        NetworkSession netSession = null;
+        try {
+            switch (settings.getPrimaryProtocol()) {
+                // NetBIOS connection
+                case TCPNetBIOS:
+                    netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
+                    break;
+                // Native SMB connection
+                case NativeSMB:
+                    netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
+                    break;
+                default:
+                    break;
+            }
+        } catch (IOException ex) {
 
-		NetworkSession netSession = null;
+            // Check if there is a secondary protocolcfno configured, if not then rethrow the
+            // exception
 
-		try {
-
-			switch (settings.getPrimaryProtocol()) {
-
-				// NetBIOS connection
-
-				case Protocol.TCPNetBIOS:
-					netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
-					break;
-
-				// Native SMB connection
-
-				case Protocol.NativeSMB:
-					netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
-					break;
-			}
-		}
-		catch (IOException ex) {
-
-			// Check if there is a secondary protocolcfno configured, if not then rethrow the
-			// exception
-
-			if ( settings.getSecondaryProtocol() == Protocol.None)
-				throw ex;
-		}
+            if (settings.getSecondaryProtocol() == Protocol.None)
+                throw ex;
+        }
 
 		// If the connection was not made using the primary protocol try the secondary protocol, if
 		// configured
@@ -2270,24 +2253,21 @@ public final class SessionFactory {
 			// DEBUG
 
 			if ( Debug.EnableInfo && Session.hasDebug())
-				Debug.println("** Trying secondary protocol - " + Protocol.asString(settings.getSecondaryProtocol()));
+				Debug.println("** Trying secondary protocol - " + settings.getSecondaryProtocol().toString());
 
-			// Try the secondary protocol
-
-			switch (settings.getSecondaryProtocol()) {
-
-				// NetBIOS connection
-
-				case Protocol.TCPNetBIOS:
-					netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
-					break;
-
-				// Native SMB connection
-
-				case Protocol.NativeSMB:
-					netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
-					break;
-			}
+            // Try the secondary protocol
+            switch (settings.getSecondaryProtocol()) {
+                // NetBIOS connection
+                case TCPNetBIOS:
+                    netSession = connectNetBIOSSession(shr.getNodeName(), localName, settings);
+                    break;
+                // Native SMB connection
+                case NativeSMB:
+                    netSession = connectNativeSMBSession(shr.getNodeName(), localName, settings);
+                    break;
+                default:
+                    break;
+            }
 
 			// If the secondary connection was successful check if the protocol order should be
 			// updated
@@ -2302,7 +2282,7 @@ public final class SessionFactory {
 				// Debug
 
 				if ( Debug.EnableInfo && Session.hasDebug())
-					Debug.println("** Updated primary protocol : " + Protocol.asString(settings.getPrimaryProtocol()));
+					Debug.println("** Updated primary protocol : " + settings.getPrimaryProtocol().toString());
 			}
 		}
 
@@ -2550,7 +2530,7 @@ public final class SessionFactory {
 	 * @param sec Secondary connection protocol, or none
 	 * @return boolean
 	 */
-	public static final boolean setProtocolOrder(int pri, int sec) {
+	public static final boolean setProtocolOrder(Protocol pri, Protocol sec) {
 
 		// Primary protocol must be specified
 
