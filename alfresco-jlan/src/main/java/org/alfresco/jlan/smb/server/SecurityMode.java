@@ -19,19 +19,30 @@
 
 package org.alfresco.jlan.smb.server;
 
+import java.util.EnumSet;
+
 /**
  * Security Mode Class
  *
- * <p>CIFS security mode constants.
+ * <p>
+ * CIFS security mode constants.
  *
  * @author gkspencer
  */
-public class SecurityMode
-{
-  // Security mode flags returned in the SMB negotiate response
+public enum SecurityMode {
+    // Security mode flags returned in the SMB negotiate response
+    UserMode(0x0001), EncryptedPasswords(0x0002), SignaturesEnabled(0x0004), SignaturesRequired(0x0008);
+    private final int bit;
 
-  public static final int UserMode            = 0x0001;
-  public static final int EncryptedPasswords  = 0x0002;
-  public static final int SignaturesEnabled   = 0x0004;
-  public static final int SignaturesRequired  = 0x0008;
+    private SecurityMode(final int bit) {
+        this.bit = bit;
+    }
+    
+    public static int asInt(EnumSet<SecurityMode> modes) {
+        int result = 0;
+        for (SecurityMode mode : modes) {
+            result += mode.bit;
+        }
+        return result;
+    }
 }

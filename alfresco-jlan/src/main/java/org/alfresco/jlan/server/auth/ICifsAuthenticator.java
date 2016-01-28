@@ -18,11 +18,14 @@
  */
 package org.alfresco.jlan.server.auth;
 
+import java.util.EnumSet;
+
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.server.core.SharedDevice;
 import org.alfresco.jlan.smb.server.SMBSrvException;
 import org.alfresco.jlan.smb.server.SMBSrvPacket;
 import org.alfresco.jlan.smb.server.SMBSrvSession;
+import org.alfresco.jlan.smb.server.SecurityMode;
 
 /**
  * CIFS Authenticator Interface
@@ -96,7 +99,7 @@ public interface ICifsAuthenticator
      *
      * @return int
      */
-    public int getSecurityMode();
+    public EnumSet<SecurityMode> getSecurityMode();
 
     /**
      * Generate the CIFS negotiate response packet, the authenticator should add authentication

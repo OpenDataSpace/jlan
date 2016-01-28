@@ -22,6 +22,7 @@ package org.alfresco.jlan.server.auth;
 import java.net.InetAddress;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.util.EnumSet;
 
 import org.springframework.extensions.config.ConfigElement;
 import org.alfresco.jlan.debug.Debug;
@@ -69,7 +70,7 @@ public abstract class CifsAuthenticator implements ICifsAuthenticator {
 
 	// Security mode flags
 
-	private int m_securityMode = SecurityMode.UserMode + SecurityMode.EncryptedPasswords;
+	private EnumSet<SecurityMode> m_securityMode = EnumSet.of(SecurityMode.UserMode, SecurityMode.EncryptedPasswords);
 
 	// Password encryption algorithms
 
@@ -340,8 +341,8 @@ public abstract class CifsAuthenticator implements ICifsAuthenticator {
 	/* (non-Javadoc)
      * @see org.alfresco.jlan.server.auth.ICifsAuthenticator#getSecurityMode()
      */
-	public final int getSecurityMode() {
-		return m_securityMode;
+	public final EnumSet<SecurityMode> getSecurityMode() {
+		return m_securityMode.clone();
 	}
 
 	/* (non-Javadoc)
@@ -726,8 +727,9 @@ public abstract class CifsAuthenticator implements ICifsAuthenticator {
 	 *
 	 * @param flg int
 	 */
-	protected final void setSecurityMode(int flg) {
-		m_securityMode = flg;
+	protected final void setSecurityMode(EnumSet<SecurityMode> flg) {
+		m_securityMode.clear();
+		m_securityMode.addAll(flg);
 	}
 
 	/**

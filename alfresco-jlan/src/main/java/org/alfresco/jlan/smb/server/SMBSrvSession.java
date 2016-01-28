@@ -1088,7 +1088,7 @@ public class SMBSrvSession extends SrvSession implements Runnable {
 
 			smbPkt.setParameterCount(13);
 			smbPkt.setParameter(0, diaIdx);
-			smbPkt.setParameter(1, auth.getSecurityMode());
+			smbPkt.setParameter(1, SecurityMode.asInt(auth.getSecurityMode()));
 			smbPkt.setParameter(2, LanManBufferSize);
 			smbPkt.setParameter(3, LanManMaxMultiplexed); // maximum multiplexed requests
 			smbPkt.setParameter(4, MaxVirtualCircuits); // maximum number of virtual circuits
@@ -1160,7 +1160,7 @@ public class SMBSrvSession extends SrvSession implements Runnable {
 
 			smbPkt.setParameterCount(17);
 			nt.packWord(diaIdx); 				// selected dialect index
-			nt.packByte(auth.getSecurityMode());
+			nt.packByte(SecurityMode.asInt(auth.getSecurityMode()));
 			nt.packWord(NTMaxMultiplexed); 		// maximum multiplexed requests
 												// setting to 1 will disable change notify requests from the client
 			nt.packWord(MaxVirtualCircuits); 	// maximum number of virtual circuits
