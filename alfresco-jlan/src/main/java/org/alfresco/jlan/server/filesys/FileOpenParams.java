@@ -19,6 +19,8 @@
 
 package org.alfresco.jlan.server.filesys;
 
+import java.util.EnumSet;
+
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
@@ -36,20 +38,6 @@ public class FileOpenParams {
 
 	public final static String StreamSeparator	=	":";
 
-	//	Conversion array for Core/LanMan open actions to NT open action codes
-
-	private static int[] _NTToLMOpenCode = { FileAction.TruncateExisting + FileAction.CreateNotExist,
-											 FileAction.OpenIfExists,
-											 FileAction.CreateNotExist,
-											 FileAction.OpenIfExists + FileAction.CreateNotExist,
-											 FileAction.TruncateExisting,
-											 FileAction.TruncateExisting + FileAction.CreateNotExist
-	};
-
-	//	File open mode strings
-
-	private static String[] _openMode = { "Supersede", "Open", "Create", "OpenIf", "Overwrite", "OverwriteIf" };
-
 	//	File/directory to be opened
 
 	private String m_path;
@@ -60,7 +48,7 @@ public class FileOpenParams {
 
 	//	File open action
 
-	private int m_openAction;
+	private NTOpenAction m_openAction = NTOpenAction.OPEN;
 
 	//	Desired access mode
 
@@ -143,7 +131,7 @@ public class FileOpenParams {
 
 		parseFileName(path);
 
-		m_openAction = convertToNTOpenAction(openAction);
+		m_openAction = NTOpenAction.convertToNTOpenAction(openAction);
 		m_accessMode = convertToNTAccessMode(accessMode);
 		m_attr       = fileAttr;
 		m_pid        = pid;
@@ -176,7 +164,7 @@ public class FileOpenParams {
 
 		parseFileName(path);
 
-		m_openAction = convertToNTOpenAction(openAction);
+		m_openAction = NTOpenAction.convertToNTOpenAction(openAction);
 		m_accessMode = convertToNTAccessMode(accessMode);
 		m_attr       = fileAttr;
 		m_pid        = pid;
@@ -214,7 +202,7 @@ public class FileOpenParams {
 
 		parseFileName(path);
 
-		m_openAction   = convertToNTOpenAction(openAction);
+		m_openAction   = NTOpenAction.convertToNTOpenAction(openAction);
 		m_accessMode   = convertToNTAccessMode(accessMode);
 		m_attr 		   = fileAttr;
 		m_sharedAccess = convertToNTSharedMode(accessMode);
@@ -254,7 +242,7 @@ public class FileOpenParams {
 
 		parseFileName(path);
 
-		m_openAction    = openAction;
+		m_openAction    = NTOpenAction.fromValue(openAction);
 		m_accessMode	= accessMode;
 		m_attr 		 	= attr;
 		m_sharedAccess  = sharedAccess;
@@ -332,11 +320,11 @@ public class FileOpenParams {
 	/**
 	 * Return the open/create file/directory action
 	 *
-	 * All actions are mapped to the FileAction.NTxxx action codes.
+	 * All actions are mapped to the OpenAction.NTxxx action codes.
 	 *
 	 * @return int
 	 */
-	public final int getOpenAction() {
+	public final NTOpenAction getOpenAction() {
 		return m_openAction;
 	}
 
@@ -522,9 +510,9 @@ public class FileOpenParams {
 	 * @return boolean
 	 */
 	public final boolean isOverwrite() {
-		if ( getOpenAction() == FileAction.NTSupersede ||
-				 getOpenAction() == FileAction.NTOverwrite ||
-				 getOpenAction() == FileAction.NTOverwriteIf)
+		if ( getOpenAction() == NTOpenAction.SUPERSEDE ||
+				 getOpenAction() == NTOpenAction.OVERWRITE ||
+				 getOpenAction() == NTOpenAction.OVERWRITE_IF)
 			return true;
 		return false;
 	}
@@ -795,25 +783,6 @@ public class FileOpenParams {
 	}
 
 	/**
-	 * Convert a Core/LanMan open action to an NT open action
-	 *
-	 * @param openAction int
-	 * @return int
-	 */
-	private final int convertToNTOpenAction(int openAction) {
-
-		//	Convert the Core/LanMan SMB dialect open action to an NT open action
-
-		int action = FileAction.NTOpen;
-
-		for ( int i = 0; i < _NTToLMOpenCode.length; i++) {
-			if ( _NTToLMOpenCode[i] == openAction)
-				action = i;
-		}
-		return action;
-	}
-
-	/**
 	 * Convert a Core/LanMan shared access to NT sharing flags
 	 *
 	 * @param sharedAccess int
@@ -890,7 +859,7 @@ public class FileOpenParams {
 		str.append(getPath());
 
 		str.append(",");
-		str.append(_openMode[getOpenAction()]);
+		str.append(getOpenAction().toString());
 		str.append(",acc=0x");
 		str.append(Integer.toHexString(m_accessMode));
 		str.append(",attr=0x");

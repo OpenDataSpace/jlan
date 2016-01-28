@@ -26,6 +26,7 @@ import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterFileState;
 import org.alfresco.jlan.smb.OpLock;
@@ -122,7 +123,7 @@ public class GrantFileAccessTask extends RemoteStateTask<FileAccessToken> {
 
 			// Check if the open action indicates a new file create
 
-			if ( m_params.getOpenAction() == FileAction.NTCreate)
+			if ( m_params.getOpenAction() == NTOpenAction.CREATE)
 				throw new FileExistsException();
 
 			// Check for impersonation security level from the original process that opened the file

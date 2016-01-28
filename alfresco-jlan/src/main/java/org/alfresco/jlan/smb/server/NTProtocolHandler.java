@@ -64,6 +64,7 @@ import org.alfresco.jlan.server.filesys.IOControlNotImplementedException;
 import org.alfresco.jlan.server.filesys.IOCtlInterface;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.NotifyChange;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.server.filesys.PathNotFoundException;
 import org.alfresco.jlan.server.filesys.PermissionDeniedException;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -5773,7 +5774,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 		long allocSize = prms.unpackLong();
 		int attrib = prms.unpackInt();
 		int shrAccess = prms.unpackInt();
-		int createDisp = prms.unpackInt();
+		NTOpenAction createDisp = NTOpenAction.fromValue(prms.unpackInt());
 		int createOptn = prms.unpackInt();
 		int impersonLev = prms.unpackInt();
 		int secFlags = prms.unpackByte();
@@ -5834,7 +5835,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 		// Create the file open parameters to be passed to the disk interface
 
-		FileOpenParams params = new FileOpenParams(fileName, createDisp, accessMask, attrib, shrAccess, allocSize, createOptn,
+		FileOpenParams params = new FileOpenParams(fileName, createDisp.getValue(), accessMask, attrib, shrAccess, allocSize, createOptn,
 				rootFID, impersonLev, secFlags, smbPkt.getProcessIdFull());
 
 		// Set the create flags, with oplock requests
@@ -5883,7 +5884,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
                 FileInfo finfo = disk.getFileInformation(m_sess, conn, params.getFullPath());
                 if ( finfo != null && finfo.isPseudoFile()) {
-                    createDisp = FileAction.NTOpen;
+                    createDisp = NTOpenAction.OPEN;
 
                     // Clear any oplock request for pseudo files
 
@@ -5907,8 +5908,8 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 				// Check if the file should be created if it does not exist
 
-				if ( createDisp == FileAction.NTCreate || createDisp == FileAction.NTOpenIf
-						|| createDisp == FileAction.NTOverwriteIf || createDisp == FileAction.NTSupersede) {
+				if ( createDisp == NTOpenAction.CREATE || createDisp == NTOpenAction.OPEN_IF
+						|| createDisp == NTOpenAction.OVERWRITE_IF || createDisp == NTOpenAction.SUPERSEDE) {
 
 					// Check if the user has the required access permission
 
@@ -5971,7 +5972,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 								// Create the current part of the path
 
-								FileOpenParams fldrParams = new FileOpenParams( pathStr.toString(), createDisp, accessMask, attrib, shrAccess, allocSize, createOptn,
+								FileOpenParams fldrParams = new FileOpenParams( pathStr.toString(), createDisp.getValue(), accessMask, attrib, shrAccess, allocSize, createOptn,
 										rootFID, impersonLev, secFlags, smbPkt.getProcessIdFull());
 								disk.createDirectory( m_sess, conn, fldrParams);
 							}
@@ -6019,7 +6020,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 					}
 				}
 			}
-			else if ( createDisp == FileAction.NTCreate) {
+			else if ( createDisp == NTOpenAction.CREATE) {
 
 				// Check for a file or directory
 
@@ -6065,7 +6066,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 				// Check if the file should be truncated
 
-				if ( createDisp == FileAction.NTSupersede || createDisp == FileAction.NTOverwriteIf) {
+				if ( createDisp == NTOpenAction.SUPERSEDE || createDisp == NTOpenAction.OVERWRITE_IF) {
 
 					// Truncate the file
 
@@ -6823,7 +6824,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 		long allocSize = tparams.getLong();
 		int attrib = tparams.getInt();
 		int shrAccess = tparams.getInt();
-		int createDisp = tparams.getInt();
+		NTOpenAction createDisp = NTOpenAction.fromValue(tparams.getInt());
 		int createOptn = tparams.getInt();
 		int sdLen = tparams.getInt();
 		int eaLen = tparams.getInt();
@@ -6889,7 +6890,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 		// Create the file open parameters to be passed to the disk interface
 
-		FileOpenParams params = new FileOpenParams(fileName, createDisp, accessMask, attrib, shrAccess, allocSize, createOptn,
+		FileOpenParams params = new FileOpenParams(fileName, createDisp.getValue(), accessMask, attrib, shrAccess, allocSize, createOptn,
 				rootFID, impersonLev, secFlags, smbPkt.getProcessIdFull());
 
 		// Debug
@@ -6915,8 +6916,8 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 				// Check if the file should be created if it does not exist
 
-				if ( createDisp == FileAction.NTCreate || createDisp == FileAction.NTOpenIf
-						|| createDisp == FileAction.NTOverwriteIf || createDisp == FileAction.NTSupersede) {
+				if ( createDisp == NTOpenAction.CREATE || createDisp == NTOpenAction.OPEN_IF
+						|| createDisp == NTOpenAction.OVERWRITE_IF || createDisp == NTOpenAction.SUPERSEDE) {
 
 					// Check if a new file or directory should be created
 
@@ -6959,7 +6960,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 					}
 				}
 			}
-			else if ( createDisp == FileAction.NTCreate) {
+			else if ( createDisp == NTOpenAction.CREATE) {
 
 				// Check for a file or directory
 
@@ -6986,7 +6987,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 				// Check if the file should be truncated
 
-				if ( createDisp == FileAction.NTSupersede || createDisp == FileAction.NTOverwriteIf) {
+				if ( createDisp == NTOpenAction.SUPERSEDE || createDisp == NTOpenAction.OVERWRITE_IF) {
 
 					// Truncate the file
 

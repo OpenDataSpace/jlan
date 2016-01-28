@@ -31,6 +31,7 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.SMBException;
 import org.alfresco.jlan.smb.SMBStatus;
@@ -172,7 +173,7 @@ public class OplockGrantTest extends Test {
 			OplockBreakHandler oplockHandler = new OplockBreakHandler( log);
 			CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
 			CIFSFile oplockFile = cifsSess.NTCreateWithOplock( testFileName, WinNT.RequestBatchOplock + WinNT.RequestExclusiveOplock, oplockHandler, AccessMode.NTReadWrite, FileAttribute.NTNormal,
-														       SharingMode.READWRITEDELETE, FileAction.NTOverwriteIf, 0, 0);
+														       SharingMode.READWRITEDELETE, NTOpenAction.OVERWRITE_IF.getValue(), 0, 0);
 
 			testLog( log, "Oplock granted, type=" + OpLock.getTypeAsString( oplockFile.getOplockType()) + " on server " + sess.getServer());
 

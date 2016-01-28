@@ -25,6 +25,7 @@ import java.text.*;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.*;
 import org.alfresco.jlan.client.*;
 import org.alfresco.jlan.client.admin.*;
@@ -118,7 +119,7 @@ public class jlanStat extends jlanApp {
 			// the security descriptor
 
 			SMBFile statFile = cifsSess.NTCreate(path, AccessMode.NTRead + AccessMode.NTReadControl + AccessMode.NTReadAttrib
-					+ AccessMode.NTReadEA, FileAttribute.NTNormal, SharingMode.READWRITE, FileAction.NTOpen, 0, 0);
+					+ AccessMode.NTReadEA, FileAttribute.NTNormal, SharingMode.READWRITE, NTOpenAction.OPEN.getValue(), 0, 0);
 
 			// Get the main file/folder information
 

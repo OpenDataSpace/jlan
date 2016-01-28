@@ -31,6 +31,7 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
@@ -198,7 +199,7 @@ public class OplockBreakLevelIITest extends Test {
 				// Primary thread opens the file with an oplock
 
 				oplockFile = cifsSess.NTCreateWithOplock( testFileName, WinNT.RequestBatchOplock + WinNT.RequestExclusiveOplock, oplockHandler, AccessMode.NTReadWrite, FileAttribute.NTNormal,
-														       SharingMode.READWRITEDELETE, FileAction.NTOverwriteIf, 0, 0);
+														       SharingMode.READWRITEDELETE, NTOpenAction.OVERWRITE_IF.getValue(), 0, 0);
 
 				testLog( log, "Oplock granted, type=" + OpLock.getTypeAsString( oplockFile.getOplockType()) + " on server " + sess.getServer());
 
@@ -211,7 +212,7 @@ public class OplockBreakLevelIITest extends Test {
 				// Other threads just try and open the file, to break the oplock
 
 				try {
-					oplockFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal, SharingMode.READWRITEDELETE, FileAction.NTOverwriteIf, 0, 0);
+					oplockFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadWrite, FileAttribute.NTNormal, SharingMode.READWRITEDELETE, NTOpenAction.OVERWRITE_IF.getValue(), 0, 0);
 
 					testLog( log, "Opened oplocked file on server " + sess.getServer());
 				}

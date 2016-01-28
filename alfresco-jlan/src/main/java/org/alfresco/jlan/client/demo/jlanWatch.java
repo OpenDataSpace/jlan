@@ -24,6 +24,7 @@ import java.io.*;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.*;
 import org.alfresco.jlan.client.*;
 import org.alfresco.jlan.client.smb.DirectoryWatcher;
@@ -102,7 +103,7 @@ public class jlanWatch extends jlanApp {
 			// notification request
 
 			SMBFile watchDir = cifsSess.NTCreate(path, AccessMode.NTRead, FileAttribute.NTNormal, SharingMode.READWRITE,
-					FileAction.NTOpen, 0, 0);
+			        NTOpenAction.OPEN.getValue(), 0, 0);
 
 			// Create a directory watcher
 

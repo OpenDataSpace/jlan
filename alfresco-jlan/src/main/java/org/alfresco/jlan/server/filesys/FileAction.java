@@ -39,15 +39,6 @@ public final class FileAction {
   public static final int FileCreated 		= 0x0002;
   public static final int FileTruncated 	= 0x0003;
 
-	//	NT file/device open action codes
-
-	public final static int NTSupersede			= 0;	//	supersede if exists, else create a new file
-	public final static int NTOpen     			= 1;	//	only open if the file exists
-	public final static int NTCreate      		= 2;	//	create if file does not exist, else fail
-	public final static int NTOpenIf      		= 3;	//	open if exists else create
-	public final static int NTOverwrite 		= 4;	//	overwrite if exists, else fail
-	public final static int NTOverwriteIf     	= 5;	//	overwrite if exists, else create
-
   /**
    * Check if the file action value indicates that the file should be created if the file
    * does not exist.

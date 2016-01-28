@@ -25,6 +25,7 @@ import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.server.filesys.cache.cluster.ClusterNode;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.WinNT;
@@ -61,7 +62,7 @@ public class GrantAccessParams implements Serializable {
 	private int m_sharedAccess;
 	private int m_secLevel;
 	private int m_createOptions;
-	private int m_openAction;
+	private NTOpenAction m_openAction;
 
 	// Oplock requested/type
 
@@ -145,7 +146,7 @@ public class GrantAccessParams implements Serializable {
 	 *
 	 * @return int
 	 */
-	public final int getOpenAction() {
+	public final NTOpenAction getOpenAction() {
 		return m_openAction;
 	}
 
@@ -276,7 +277,7 @@ public class GrantAccessParams implements Serializable {
 		else
 			str.append( "Unknown");
 		str.append( ",openAction=");
-		str.append( FileAction.asString( getOpenAction()));
+		str.append( FileAction.asString( getOpenAction().getValue()));
 		str.append( ",create=0x");
 		str.append( Integer.toHexString( m_createOptions));
 		str.append( ",access=0x");

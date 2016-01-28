@@ -31,6 +31,7 @@ import org.alfresco.jlan.client.smb.DirectoryWatcher;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.DataType;
 import org.alfresco.jlan.smb.Dialect;
 import org.alfresco.jlan.smb.FileInfoLevel;
@@ -177,7 +178,7 @@ public final class CIFSDiskSession extends DiskSession {
 			// Use the NTCreateAndX SMB to create the directory
 
 			CIFSFile dirFile = NTCreate(newPath, AccessMode.NTRead, FileAttribute.NTDirectory, SharingMode.READWRITE,
-					FileAction.NTCreate, 0, WinNT.CreateDirectory);
+			        NTOpenAction.CREATE.getValue(), 0, WinNT.CreateDirectory);
 
 			// Close the directory file
 
@@ -714,21 +715,21 @@ public final class CIFSDiskSession extends DiskSession {
 
 			// Default open mode is 'open if file exists'
 
-			int openMode = FileAction.NTOpen;
+			int openMode = NTOpenAction.OPEN.getValue();
 			int accessMode = AccessMode.NTRead;
 
 			if ( AccessMode.getAccessMode(flags) == AccessMode.WriteOnly) {
 
 				// Truncate the file if it exists, create file if it does not exist
 
-				openMode = FileAction.NTOverwriteIf;
+				openMode = NTOpenAction.OVERWRITE_IF.getValue();
 				accessMode = AccessMode.NTWrite;
 			}
 			else if ( AccessMode.getAccessMode(flags) == AccessMode.ReadWrite) {
 
 				// Open the file if it exists, create the file if it does not exist
 
-				openMode = FileAction.NTOpenIf;
+				openMode = NTOpenAction.OPEN_IF.getValue();
 				accessMode = AccessMode.NTReadWrite;
 			}
 
@@ -1804,7 +1805,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Open the symlink file
 
 		CIFSFile linkFile = NTCreateInternal(linkPath, 0, AccessMode.NTRead + AccessMode.NTReadControl + AccessMode.NTReadAttrib
-				+ AccessMode.NTReadEA, FileAttribute.NTNormal, SharingMode.READWRITE, FileAction.NTOpen, 0,
+				+ AccessMode.NTReadEA, FileAttribute.NTNormal, SharingMode.READWRITE, NTOpenAction.OPEN.getValue(), 0,
 				WinNT.CreateReparsePoint, false);
 
 		SymLink symLink = null;

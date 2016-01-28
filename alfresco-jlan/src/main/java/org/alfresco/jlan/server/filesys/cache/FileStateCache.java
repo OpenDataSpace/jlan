@@ -38,6 +38,7 @@ import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.NetworkFile;
+import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.server.locking.OpLockDetails;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
@@ -676,7 +677,7 @@ public abstract class FileStateCache {
 
 				// Check if the open action indicates a new file create
 
-				if ( params.getOpenAction() == FileAction.NTCreate)
+				if ( params.getOpenAction() == NTOpenAction.CREATE)
 					throw new FileExistsException();
 
 				// Check for impersonation security level from the original process that opened the file
