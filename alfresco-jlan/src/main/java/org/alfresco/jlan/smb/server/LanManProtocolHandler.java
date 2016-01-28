@@ -1477,7 +1477,7 @@ class LanManProtocolHandler extends CoreProtocolHandler {
 
 		// Extract the old file name
 
-		if ( smbPkt.unpackByte() != DataType.ASCII) {
+		if ( smbPkt.unpackByte() != DataType.ASCII.asChar()) {
 			m_sess.sendErrorResponseSMB( smbPkt, SMBStatus.DOSInvalidData, SMBStatus.ErrDos);
 			return;
 		}
@@ -1490,7 +1490,7 @@ class LanManProtocolHandler extends CoreProtocolHandler {
 
 		// Extract the new file name
 
-		if ( smbPkt.unpackByte() != DataType.ASCII) {
+		if ( smbPkt.unpackByte() != DataType.ASCII.asChar()) {
 			m_sess.sendErrorResponseSMB( smbPkt, SMBStatus.DOSInvalidData, SMBStatus.ErrDos);
 			return;
 		}

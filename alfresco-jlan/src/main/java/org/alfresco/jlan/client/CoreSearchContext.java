@@ -78,9 +78,9 @@ class CoreSearchContext extends SearchContext {
 		int pos = m_pkt.getByteOffset() + 2;
 		byte[] buf = m_pkt.getBuffer();
 
-		buf[pos++] = (byte) DataType.ASCII;
+		buf[pos++] = (byte) DataType.ASCII.asChar();
 		buf[pos++] = (byte) 0x00;
-		buf[pos++] = (byte) DataType.VariableBlock;
+		buf[pos++] = (byte) DataType.VariableBlock.asChar();
 
 		DataPacker.putIntelShort(DirResumeLength, buf, pos);
 		pos += 2;
@@ -273,12 +273,12 @@ class CoreSearchContext extends SearchContext {
 		// Pack the search string
 
 		m_pkt.resetBytePointer();
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(searchPath, false);
 
 		// Append a null resume key, to indicate the start of a new search
 
-		m_pkt.packByte(DataType.VariableBlock);
+		m_pkt.packByte(DataType.VariableBlock.asChar());
 		m_pkt.packWord(0);
 
 		m_pkt.setByteCount();

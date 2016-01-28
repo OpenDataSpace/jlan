@@ -163,7 +163,7 @@ public final class CIFSDiskSession extends DiskSession {
 			// Copy the directory name data block to the SMB packet
 
 			m_pkt.resetBytePointer();
-			m_pkt.packByte(DataType.ASCII);
+			m_pkt.packByte(DataType.ASCII.asChar());
 			m_pkt.packString(newPath, m_pkt.isUnicode());
 
 			m_pkt.setByteCount();
@@ -233,7 +233,7 @@ public final class CIFSDiskSession extends DiskSession {
 
 		m_pkt.resetBytePointer();
 
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(delPath, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();
@@ -277,7 +277,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Copy the file name data block to the SMB packet
 
 		m_pkt.resetBytePointer();
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(delName, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();
@@ -494,12 +494,12 @@ public final class CIFSDiskSession extends DiskSession {
 			// Pack the search string
 
 			m_pkt.resetBytePointer();
-			m_pkt.packByte(DataType.ASCII);
+			m_pkt.packByte(DataType.ASCII.asChar());
 			m_pkt.packString("", false);
 
 			// Append a null resume key, to indicate the start of a new search
 
-			m_pkt.packByte(DataType.VariableBlock);
+			m_pkt.packByte(DataType.VariableBlock.asChar());
 			m_pkt.packWord(0);
 
 			m_pkt.setByteCount();
@@ -598,7 +598,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Pack the directory name
 
 		m_pkt.resetBytePointer();
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(pathName, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();
@@ -779,10 +779,10 @@ public final class CIFSDiskSession extends DiskSession {
 
 		m_pkt.resetBytePointer();
 
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(fromName, m_pkt.isUnicode());
 
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(toName, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();
@@ -841,7 +841,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Pack the file name
 
 		m_pkt.resetBytePointer();
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(fileName, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();
@@ -960,7 +960,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Pack the file name
 
 		m_pkt.resetBytePointer();
-		m_pkt.packByte(DataType.ASCII);
+		m_pkt.packByte(DataType.ASCII.asChar());
 		m_pkt.packString(fileName, m_pkt.isUnicode());
 
 		m_pkt.setByteCount();

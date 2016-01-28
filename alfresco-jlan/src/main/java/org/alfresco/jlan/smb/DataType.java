@@ -20,20 +20,22 @@
 package org.alfresco.jlan.smb;
 
 /**
- *  SMB data type class.
+ * SMB data type class.
  *
- *  <p>This class contains the data types that are used within an SMB protocol
- *  packet.
+ * <p>
+ * This class contains the data types that are used within an SMB protocol packet.
  *
  * @author gkspencer
  */
-public class DataType {
+public enum DataType {
+    DataBlock((char) 0x01), Dialect((char) 0x02), Pathname((char) 0x03), ASCII((char) 0x04), VariableBlock((char) 0x05);
+    private char type;
 
-  // SMB data types
+    private DataType(final char type) {
+        this.type = type;
+    }
 
-  public static final char DataBlock 			= (char) 0x01;
-  public static final char Dialect 				= (char) 0x02;
-  public static final char Pathname 			= (char) 0x03;
-  public static final char ASCII 					= (char) 0x04;
-  public static final char VariableBlock 	= (char) 0x05;
+    public char asChar() {
+        return type;
+    }
 }

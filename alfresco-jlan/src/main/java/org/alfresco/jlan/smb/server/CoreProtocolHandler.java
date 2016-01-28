@@ -1951,7 +1951,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 		// Return the data block
 
 		int bytOff = respPkt.getByteOffset();
-		buf[bytOff] = (byte) DataType.DataBlock;
+		buf[bytOff] = (byte) DataType.DataBlock.asChar();
 		DataPacker.putIntelShort(rdlen, buf, bytOff + 1);
 		smbPkt.setByteCount(rdlen + 3); // data type + 16bit length
 
@@ -2174,7 +2174,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		int resumeLen = 0;
 
-		if ( buf[dataPos++] == DataType.VariableBlock) {
+		if ( buf[dataPos++] == DataType.VariableBlock.asChar()) {
 
 			// Extract the resume key length
 
@@ -2387,7 +2387,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		respPkt.setParameterCount(1);
 		int bufPos = respPkt.getByteOffset();
-		buf[bufPos] = (byte) DataType.VariableBlock;
+		buf[bufPos] = (byte) DataType.VariableBlock.asChar();
 		bufPos += 3; // save two bytes for the actual block length
 		int fileCnt = 0;
 
@@ -2619,7 +2619,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 		smbPkt.setParameterCount(1);
 		int bufPos = smbPkt.getByteOffset();
 		byte[] buf = smbPkt.getBuffer();
-		buf[bufPos++] = (byte) DataType.VariableBlock;
+		buf[bufPos++] = (byte) DataType.VariableBlock.asChar();
 
 		// Calculate the data length
 
@@ -3466,7 +3466,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		// Check that the data block is valid
 
-		if ( buf[pos] != DataType.DataBlock) {
+		if ( buf[pos] != DataType.DataBlock.asChar()) {
 			m_sess.sendErrorResponseSMB( smbPkt, SMBStatus.DOSInvalidData, SMBStatus.ErrDos);
 			return;
 		}

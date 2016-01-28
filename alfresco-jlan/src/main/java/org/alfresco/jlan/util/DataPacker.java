@@ -19,6 +19,8 @@
 
 package org.alfresco.jlan.util;
 
+import org.alfresco.jlan.smb.DataType;
+
 /**
  *  The data packing class is a static class that is used to pack and unpack
  *  basic data types to/from network byte order and Intel byte order.
@@ -52,11 +54,11 @@ public final class DataPacker {
    * @return         String, else null if the terminating null character was
    *                 not found.
    */
-  public final static String getDataString(char typ, byte[] bytarray, int pos, int maxlen, boolean uni) {
+  public final static String getDataString(final DataType typ, byte[] bytarray, int pos, int maxlen, boolean uni) {
 
     //  Check if the data string has the required data type
 
-    if (bytarray[pos++] == (byte) typ) {
+    if (bytarray[pos++] == (byte) typ.asChar()) {
 
       //  Extract the null terminated string
 

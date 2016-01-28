@@ -96,7 +96,7 @@ class CorePrintSession extends PrintSession {
 
 		StringBuffer idbuf = new StringBuffer();
 
-		idbuf.append((char) DataType.ASCII);
+		idbuf.append(DataType.ASCII.asChar());
 		idbuf.append(id);
 		idbuf.append((char) 0x00);
 

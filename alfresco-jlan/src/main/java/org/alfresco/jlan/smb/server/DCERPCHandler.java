@@ -422,7 +422,7 @@ public class DCERPCHandler {
 
 			// Check that the received data is valid
 
-			if ( buf[pos++] != DataType.DataBlock) {
+			if ( buf[pos++] != DataType.DataBlock.asChar()) {
 				sess.sendErrorResponseSMB(smbPkt, SMBStatus.DOSInvalidData, SMBStatus.ErrDos);
 				return;
 			}
@@ -608,7 +608,7 @@ public class DCERPCHandler {
 
 				pos = respPkt.getByteOffset();
 
-				buf[pos++] = (byte) DataType.DataBlock;
+				buf[pos++] = (byte) DataType.DataBlock.asChar();
 				DataPacker.putIntelShort(rdLen, buf, pos);
 				pos += 2;
 

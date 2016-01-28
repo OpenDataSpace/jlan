@@ -2429,13 +2429,13 @@ public final class SessionFactory {
 
 		pkt.resetBytePointer();
 
-		pkt.packByte(DataType.ASCII);
+		pkt.packByte(DataType.ASCII.asChar());
 		pkt.packString(localName, false);
 
-		pkt.packByte(DataType.ASCII);
+		pkt.packByte(DataType.ASCII.asChar());
 		pkt.packString(remName.toUpperCase(), false);
 
-		pkt.packByte(DataType.DataBlock);
+		pkt.packByte(DataType.DataBlock.asChar());
 		pkt.packWord(msg.length());
 		pkt.packBytes(msg.getBytes(), msg.length());
 

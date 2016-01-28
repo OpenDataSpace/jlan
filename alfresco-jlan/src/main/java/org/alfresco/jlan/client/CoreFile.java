@@ -259,7 +259,7 @@ public class CoreFile extends SMBFile {
 			m_rxoffset = m_rxpkt.getByteOffset();
 			byte[] buf = m_rxpkt.getBuffer();
 
-			if ( buf[m_rxoffset++] != DataType.DataBlock)
+			if ( buf[m_rxoffset++] != DataType.DataBlock.asChar())
 				return false;
 
 			// Get the received data block length
@@ -391,7 +391,7 @@ public class CoreFile extends SMBFile {
 		byte[] buf = m_txpkt.getBuffer();
 		int bytoff = m_txpkt.getByteOffset();
 
-		buf[bytoff++] = (byte) DataType.DataBlock;
+		buf[bytoff++] = (byte) DataType.DataBlock.asChar();
 		DataPacker.putIntelShort(m_txlen, buf, bytoff);
 
 		// Exchange the write data SMB packet with the file server

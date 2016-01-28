@@ -107,7 +107,7 @@ public class CoreDiskSession extends DiskSession {
 		// Check if the directory name contains a path
 
 		StringBuffer pathbuf = new StringBuffer();
-		pathbuf.append((char) DataType.ASCII);
+		pathbuf.append((char) DataType.ASCII.asChar());
 
 		if ( dir.startsWith("\\")) {
 
@@ -170,7 +170,7 @@ public class CoreDiskSession extends DiskSession {
 		// Check if the directory name contains a path
 
 		StringBuffer pathbuf = new StringBuffer();
-		pathbuf.append((char) DataType.ASCII);
+		pathbuf.append((char) DataType.ASCII.asChar());
 
 		if ( dir.startsWith("\\")) {
 
@@ -274,7 +274,7 @@ public class CoreDiskSession extends DiskSession {
 
 		StringBuffer pathbuf = new StringBuffer();
 
-		pathbuf.append((char) DataType.ASCII);
+		pathbuf.append((char) DataType.ASCII.asChar());
 
 		if ( fname.startsWith("\\"))
 			pathbuf.append(fname);
@@ -343,7 +343,7 @@ public class CoreDiskSession extends DiskSession {
 		// Build the remote directory tree relative path
 
 		StringBuffer pathbuf = new StringBuffer();
-		pathbuf.append((char) DataType.ASCII);
+		pathbuf.append((char) DataType.ASCII.asChar());
 
 		if ( dir.startsWith("\\"))
 			pathbuf.append(dir);
@@ -414,7 +414,7 @@ public class CoreDiskSession extends DiskSession {
 
 		StringBuffer pathbuf = new StringBuffer();
 
-		pathbuf.append((char) DataType.ASCII);
+		pathbuf.append((char) DataType.ASCII.asChar());
 
 		if ( fname.startsWith("\\"))
 			pathbuf.append(fname);
@@ -542,11 +542,11 @@ public class CoreDiskSession extends DiskSession {
 
 			// Use the input/output file names as is
 
-			pathbuf.append((char) DataType.ASCII);
+			pathbuf.append(DataType.ASCII.asChar());
 			pathbuf.append(curnam);
 			pathbuf.append((char) 0x00);
 
-			pathbuf.append((char) DataType.ASCII);
+			pathbuf.append(DataType.ASCII.asChar());
 			pathbuf.append(newnam);
 			pathbuf.append((char) 0x00);
 		}
@@ -559,7 +559,7 @@ public class CoreDiskSession extends DiskSession {
 
 			// Check if the output file name contains a path
 
-			pathbuf.append((char) DataType.ASCII);
+			pathbuf.append(DataType.ASCII.asChar());
 			if ( newnam.startsWith("\\"))
 				pathbuf.append(newnam);
 			else
