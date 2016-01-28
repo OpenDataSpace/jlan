@@ -62,6 +62,7 @@ import org.alfresco.jlan.server.filesys.loader.FileSegmentInfo;
 import org.alfresco.jlan.server.filesys.loader.MultipleFileRequest;
 import org.alfresco.jlan.server.filesys.loader.SingleFileRequest;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfo;
+import org.alfresco.jlan.smb.server.ntfs.StreamInfoFlag;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfoList;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.WildCard;
@@ -1104,7 +1105,7 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 
 			// Check if the access date/time has been set
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetAccessDate)) {
+			if ( sinfo.hasSetFlag(StreamInfoFlag.SetAccessDate)) {
 
 				// Add the SQL to update the access date/time
 
@@ -1115,7 +1116,7 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 
 			// Check if the modify date/time has been set
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetModifyDate)) {
+			if ( sinfo.hasSetFlag(StreamInfoFlag.SetModifyDate)) {
 
 				// Add the SQL to update the modify date/time
 
@@ -1126,7 +1127,7 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 
 			// Check if the stream size should be updated
 
-			if ( sinfo.hasSetFlag(StreamInfo.SetStreamSize)) {
+			if ( sinfo.hasSetFlag(StreamInfoFlag.SetStreamSize)) {
 
 				// Update the stream size
 

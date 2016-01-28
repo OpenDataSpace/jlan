@@ -19,6 +19,8 @@
 
 package org.alfresco.jlan.smb.server.ntfs;
 
+import java.util.EnumSet;
+
 /**
  * File Stream Information Class
  *
@@ -31,14 +33,6 @@ public class StreamInfo {
 	//	Constants
 
 	public static final String StreamSeparator	= ":";
-
-  //	Set stream information flags
-
-  public static final int SetStreamSize			= 0x0001;
-  public static final int SetAllocationSize	= 0x0002;
-  public static final int SetModifyDate			= 0x0004;
-  public static final int SetCreationDate		= 0x0008;
-  public static final int SetAccessDate			= 0x0010;
 
 	//	File path and stream name
 
@@ -63,7 +57,7 @@ public class StreamInfo {
 
 	//	Set stream information setter flags
 
-	private int m_setFlags;
+	private EnumSet<StreamInfoFlag> m_setFlags = EnumSet.noneOf(StreamInfoFlag.class);
 
 	/**
 	 * Default constructor
@@ -227,10 +221,8 @@ public class StreamInfo {
 	 * @param flag int
 	 * @return boolean
 	 */
-	public final boolean hasSetFlag(int flag) {
-	  if (( m_setFlags & flag) != 0)
-	    return true;
-	  return false;
+	public final boolean hasSetFlag(final StreamInfoFlag flag) {
+	    return this.m_setFlags.contains(flag);
 	}
 
 	/**
@@ -238,8 +230,8 @@ public class StreamInfo {
 	 *
 	 * @return int
 	 */
-	public final int getSetStreamInformationFlags() {
-	  return m_setFlags;
+	public final EnumSet<StreamInfoFlag> getSetStreamInformationFlags() {
+	  return m_setFlags.clone();
 	}
 
 
@@ -334,14 +326,15 @@ public class StreamInfo {
 		m_allocSize = alloc;
 	}
 
-	/**
-	 * Set the set stream information flags to indicated which values are to be set
-	 *
-	 * @param setFlags int
-	 */
-	public final void setStreamInformationFlags(int setFlags) {
-	  m_setFlags = setFlags;
-	}
+    /**
+     * Set the set stream information flags to indicated which values are to be set
+     *
+     * @param setFlags
+     */
+    public final void setStreamInformationFlags(final EnumSet<StreamInfoFlag> setFlags) {
+        m_setFlags.clear();
+        m_setFlags.addAll(setFlags);
+    }
 
 	/**
 	 * Parse a path to split into file name and stream name components

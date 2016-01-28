@@ -22,6 +22,7 @@ package org.alfresco.jlan.server.filesys.db;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.EnumSet;
 
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.locking.LockConflictException;
@@ -70,6 +71,7 @@ import org.alfresco.jlan.smb.nt.SecurityDescriptor;
 import org.alfresco.jlan.smb.server.SMBSrvException;
 import org.alfresco.jlan.smb.server.ntfs.NTFSStreamsInterface;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfo;
+import org.alfresco.jlan.smb.server.ntfs.StreamInfoFlag;
 import org.alfresco.jlan.smb.server.ntfs.StreamInfoList;
 import org.alfresco.jlan.util.MemorySize;
 import org.alfresco.jlan.util.WildCard;
@@ -3198,7 +3200,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
       String parentPath = FileName.getParentPathForStream( stream.getFullName());
       FileState parent = getFileState( parentPath, dbCtx, false);
       StreamInfo sInfo = null;
-      int sattr = 0;
+      final EnumSet<StreamInfoFlag> sattr = EnumSet.noneOf(StreamInfoFlag.class);
 
       if ( parent != null) {
 
@@ -3215,7 +3217,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
             //  Update the stream size
 
             sInfo.setSize(stream.getFileSize());
-            sattr += StreamInfo.SetStreamSize;
+            sattr.add(StreamInfoFlag.SetStreamSize);
 
             //  DEBUG
 
@@ -3244,13 +3246,13 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
           sInfo.setSize(stream.getFileSize());
           sInfo.setStreamId(stream.getStreamId());
 
-          sattr += StreamInfo.SetStreamSize;
+          sattr.add(StreamInfoFlag.SetStreamSize);
         }
 
         //  Set the modify date/time for the stream
 
         sInfo.setModifyDateTime(System.currentTimeMillis());
-        sattr += StreamInfo.SetModifyDate;
+        sattr.add(StreamInfoFlag.SetModifyDate);
 
         // Set the stream information values to be updated
 
