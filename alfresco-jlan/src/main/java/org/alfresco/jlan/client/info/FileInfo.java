@@ -19,7 +19,8 @@
 
 package org.alfresco.jlan.client.info;
 
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.smb.SMBDate;
 
 /**
@@ -356,7 +357,7 @@ public class FileInfo {
 	 * @return true if the file is a directory, else false.
 	 */
 	public final boolean isDirectory() {
-		return (m_attr & FileAttribute.Directory) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Directory.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -365,7 +366,7 @@ public class FileInfo {
 	 * @return true if the file is hidden, else false.
 	 */
 	public final boolean isHidden() {
-		return (m_attr & FileAttribute.Hidden) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Hidden.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -374,7 +375,7 @@ public class FileInfo {
 	 * @return true if the file is read-only, else false.
 	 */
 	public final boolean isReadOnly() {
-		return (m_attr & FileAttribute.ReadOnly) != 0 ? true : false;
+		return (m_attr & FileAttributeType.ReadOnly.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -383,7 +384,7 @@ public class FileInfo {
 	 * @return true if the file is a system file, else false.
 	 */
 	public final boolean isSystem() {
-		return (m_attr & FileAttribute.System) != 0 ? true : false;
+		return (m_attr & FileAttributeType.System.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -392,7 +393,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isArchived() {
-		return (m_attr & FileAttribute.Archive) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Archive.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -401,7 +402,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isCompressed() {
-		return (m_attr & FileAttribute.NTCompressed) != 0 ? true : false;
+		return (m_attr & NTFileAttributeType.Compressed.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -410,7 +411,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isOffline() {
-		return (m_attr & FileAttribute.NTOffline) != 0 ? true : false;
+		return (m_attr & NTFileAttributeType.Offline.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -419,7 +420,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isEncrypted() {
-		return (m_attr & FileAttribute.NTEncrypted) != 0 ? true : false;
+		return (m_attr & NTFileAttributeType.Encrypted.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -428,7 +429,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isTemporary() {
-		return (m_attr & FileAttribute.NTTemporary) != 0 ? true : false;
+		return (m_attr & NTFileAttributeType.Temporary.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -437,7 +438,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isIndexed() {
-		return (m_attr & FileAttribute.NTIndexed) != 0 ? true : false;
+		return (m_attr & NTFileAttributeType.Indexed.getFlag()) != 0 ? true : false;
 	}
 
 	/**

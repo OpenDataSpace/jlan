@@ -37,7 +37,11 @@ public final class PrintJob implements Serializable {
 
 	//	Print job status codes
 
-	public static final int Queued 			= 0x00;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 8665393925390140192L;
+    public static final int Queued 			= 0x00;
 	public static final int Paused 			= 0x01;
 	public static final int Spooling 		= 0x02;
 

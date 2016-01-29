@@ -39,6 +39,11 @@ import org.alfresco.jlan.smb.dcerpc.info.UserInfo;
 public final class RAPUserInfo extends UserInfo implements RAPReadable, Serializable {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = 8904259448440759391L;
+
+    /**
 	 * Default constructor
 	 */
 	public RAPUserInfo() {

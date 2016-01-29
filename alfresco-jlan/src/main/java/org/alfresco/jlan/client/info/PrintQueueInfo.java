@@ -33,7 +33,11 @@ import java.io.Serializable;
  */
 public final class PrintQueueInfo implements Serializable {
 
-	//	Remote print status codes
+	/**
+     * 
+     */
+    private static final long serialVersionUID = -2717453272261326651L;
+    //	Remote print status codes
 
 	public static final int QueueActive 		= 0;
 	public static final int QueuePaused 		= 1;

@@ -31,6 +31,7 @@ import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.OpLock;
 import org.alfresco.jlan.smb.SMBException;
@@ -183,7 +184,7 @@ public class AttributesOnlyOplockGrantTest extends Test {
 			String testFileName = getPerThreadFileName(threadId, iteration);
 
 			CIFSDiskSession cifsSess = (CIFSDiskSession) sess;
-			CIFSFile attribFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadAttributesOnly, FileAttribute.NTNormal,
+			CIFSFile attribFile = cifsSess.NTCreate( testFileName, AccessMode.NTReadAttributesOnly, NTFileAttributeType.Normal.getFlag(),
 														       SharingMode.READWRITEDELETE, NTOpenAction.OPEN.getValue(), 0, 0);
 
 			testLog( log, "Opened for attributes only access on server " + sess.getServer());
@@ -191,7 +192,7 @@ public class AttributesOnlyOplockGrantTest extends Test {
 			// Now open the same file with an oplock
 
 			OplockBreakHandler oplockHandler = new OplockBreakHandler( log);
-			CIFSFile oplockFile = cifsSess.NTCreateWithOplock( testFileName, WinNT.RequestBatchOplock + WinNT.RequestExclusiveOplock, oplockHandler, AccessMode.NTReadWrite, FileAttribute.NTNormal,
+			CIFSFile oplockFile = cifsSess.NTCreateWithOplock( testFileName, WinNT.RequestBatchOplock + WinNT.RequestExclusiveOplock, oplockHandler, AccessMode.NTReadWrite, NTFileAttributeType.Normal.getFlag(),
 				       SharingMode.READWRITEDELETE, NTOpenAction.OVERWRITE_IF.getValue(), 0, 0);
 
 			if ( oplockFile.getOplockType() != OpLock.TypeNone)

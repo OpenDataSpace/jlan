@@ -25,7 +25,7 @@ import java.io.IOException;
 import org.alfresco.jlan.client.info.DiskInfo;
 import org.alfresco.jlan.client.info.FileInfo;
 import org.alfresco.jlan.client.info.VolumeInfo;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.smb.PCShare;
 import org.alfresco.jlan.smb.SMBDeviceType;
 import org.alfresco.jlan.smb.SMBException;
@@ -136,7 +136,7 @@ public abstract class DiskSession extends Session {
 
 		// Call the delete file method for normal files
 
-		DeleteFile(fname, FileAttribute.Normal);
+		DeleteFile(fname, FileAttributeType.Normal.getFlag());
 	}
 
 	/**
@@ -370,7 +370,7 @@ public abstract class DiskSession extends Session {
 
 		// Rename the normal attribute file(s)
 
-		return RenameFile(curnam, newnam, FileAttribute.Normal);
+		return RenameFile(curnam, newnam, FileAttributeType.Normal.getFlag());
 	}
 
 	/**

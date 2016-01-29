@@ -19,7 +19,7 @@
 
 package org.alfresco.jlan.server.filesys.pseudo;
 
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 
@@ -94,7 +94,7 @@ public abstract class PseudoFile {
    * @return boolean
    */
   public final boolean isFile() {
-    return (m_fileFlags & FileAttribute.Directory) != 0 ? false : true;
+    return (m_fileFlags & FileAttributeType.Directory.getFlag()) != 0 ? false : true;
   }
 
   /**
@@ -103,7 +103,7 @@ public abstract class PseudoFile {
    * @return boolean
    */
   public final boolean isDirectory() {
-    return (m_fileFlags & FileAttribute.Directory) != 0 ? true : false;
+    return (m_fileFlags & FileAttributeType.Directory.getFlag()) != 0 ? true : false;
   }
 
   /**
@@ -112,7 +112,7 @@ public abstract class PseudoFile {
    * @return boolean
    */
   public final boolean isReadOnly() {
-    return (m_fileFlags & FileAttribute.ReadOnly) != 0 ? true : false;
+    return (m_fileFlags & FileAttributeType.ReadOnly.getFlag()) != 0 ? true : false;
   }
 
   /**
@@ -121,7 +121,7 @@ public abstract class PseudoFile {
    * @return boolean
    */
   public final boolean isHidden() {
-    return (m_fileFlags & FileAttribute.Hidden) != 0 ? true : false;
+    return (m_fileFlags & FileAttributeType.Hidden.getFlag()) != 0 ? true : false;
   }
 
   /**

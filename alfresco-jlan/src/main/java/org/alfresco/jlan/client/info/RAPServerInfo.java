@@ -39,7 +39,11 @@ public final class RAPServerInfo extends ServerInfo implements RAPReadable, java
 
 	// Flag to indicate if the object refers to a domain or server
 
-	private boolean m_domain;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 3105965863449562873L;
+    private boolean m_domain;
 
 	/**
 	 * Default constructor

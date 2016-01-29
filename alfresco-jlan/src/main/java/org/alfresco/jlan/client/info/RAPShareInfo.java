@@ -36,6 +36,11 @@ import org.alfresco.jlan.smb.dcerpc.info.ShareInfo;
 public class RAPShareInfo extends ShareInfo implements RAPReadable, Serializable {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = -6007406652356146028L;
+
+    /**
 	 * Default constructor
 	 */
 	public RAPShareInfo() {

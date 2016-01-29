@@ -22,8 +22,7 @@ package org.alfresco.jlan.client.demo;
 import java.io.*;
 
 import org.alfresco.jlan.server.filesys.AccessMode;
-import org.alfresco.jlan.server.filesys.FileAction;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.*;
 import org.alfresco.jlan.client.*;
@@ -102,7 +101,7 @@ public class jlanWatch extends jlanApp {
 			// Use the NTCreateAndX call to open the folder as we require the file id for the change
 			// notification request
 
-			SMBFile watchDir = cifsSess.NTCreate(path, AccessMode.NTRead, FileAttribute.NTNormal, SharingMode.READWRITE,
+			SMBFile watchDir = cifsSess.NTCreate(path, AccessMode.NTRead, NTFileAttributeType.Normal.getFlag(), SharingMode.READWRITE,
 			        NTOpenAction.OPEN.getValue(), 0, 0);
 
 			// Create a directory watcher

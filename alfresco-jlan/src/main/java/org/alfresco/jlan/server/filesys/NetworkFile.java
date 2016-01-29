@@ -295,7 +295,7 @@ public abstract class NetworkFile {
 	 */
 
 	public final boolean isDirectory() {
-		return (m_attrib & FileAttribute.Directory) != 0 ? true : false;
+		return (m_attrib & FileAttributeType.Directory.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -305,7 +305,7 @@ public abstract class NetworkFile {
 	 */
 
 	public final boolean isHidden() {
-		return (m_attrib & FileAttribute.Hidden) != 0 ? true : false;
+		return (m_attrib & FileAttributeType.Hidden.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -315,7 +315,7 @@ public abstract class NetworkFile {
 	 */
 
 	public final boolean isReadOnly() {
-		return (m_attrib & FileAttribute.ReadOnly) != 0 ? true : false;
+		return (m_attrib & FileAttributeType.ReadOnly.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -325,7 +325,7 @@ public abstract class NetworkFile {
 	 */
 
 	public final boolean isSystem() {
-		return (m_attrib & FileAttribute.System) != 0 ? true : false;
+		return (m_attrib & FileAttributeType.System.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -334,7 +334,7 @@ public abstract class NetworkFile {
 	 * @return boolean
 	 */
 	public final boolean isArchived() {
-		return (m_attrib & FileAttribute.Archive) != 0 ? true : false;
+		return (m_attrib & FileAttributeType.Archive.getFlag()) != 0 ? true : false;
 	}
 
 	/**

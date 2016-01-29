@@ -22,7 +22,7 @@ package org.alfresco.jlan.client.demo;
 import java.io.*;
 import java.text.*;
 
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.smb.*;
 import org.alfresco.jlan.client.*;
 import org.alfresco.jlan.client.info.*;
@@ -81,7 +81,7 @@ public class jlanDir extends jlanApp {
 
 		// Start a search of the remote directory
 
-		SearchContext srch = sess.StartSearch(remPath.getRelativePath(), FileAttribute.Directory);
+		SearchContext srch = sess.StartSearch(remPath.getRelativePath(), FileAttributeType.Directory.getFlag());
 
 		// Get a file from the search
 

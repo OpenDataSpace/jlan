@@ -36,6 +36,11 @@ import org.alfresco.jlan.smb.dcerpc.info.WorkstationInfo;
 public class RAPWorkstationInfo extends WorkstationInfo implements RAPReadable, Serializable {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = -3822436539191110056L;
+
+    /**
 	 * Default constructor
 	 */
 	public RAPWorkstationInfo() {

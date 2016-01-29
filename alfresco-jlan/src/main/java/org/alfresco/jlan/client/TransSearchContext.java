@@ -24,6 +24,7 @@ import java.io.*;
 import org.alfresco.jlan.client.info.FileInfo;
 import org.alfresco.jlan.client.info.ReparsePointFileInfo;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.smb.FileInfoLevel;
 import org.alfresco.jlan.smb.NTTime;
 import org.alfresco.jlan.smb.PCShare;
@@ -610,7 +611,7 @@ class TransSearchContext extends SearchContext {
 
 		FileInfo finfo = null;
 
-		if ( FileAttribute.hasAttribute(attrib, FileAttribute.NTReparsePoint))
+		if ( FileAttribute.hasAttribute(attrib, NTFileAttributeType.ReparsePoint.getFlag()))
 			finfo = new ReparsePointFileInfo(fileName, fileSize, attrib, eaSize);
 		else
 			finfo = new FileInfo(fileName, fileSize, attrib);

@@ -40,7 +40,11 @@ public class PrinterList implements Serializable {
 
 	// Printer list vector
 
-	private List<PrintQueueInfo> m_list;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 4224046172620858638L;
+    private List<PrintQueueInfo> m_list;
 
 	/**
 	 * Class constructor

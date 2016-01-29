@@ -72,11 +72,12 @@ import org.alfresco.jlan.server.filesys.DiskFullException;
 import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.DiskSharedDevice;
 import org.alfresco.jlan.server.filesys.FileAction;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileOfflineException;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.NotifyChange;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -2933,7 +2934,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 				// Create the new directory
 
 				FileOpenParams params = new FileOpenParams(ftpPath.getSharePath(), FileAction.CreateNotExist,
-						AccessMode.ReadWrite, FileAttribute.NTDirectory, 0);
+						AccessMode.ReadWrite, NTFileAttributeType.Directory.getFlag(), 0);
 
 				disk.createDirectory(this, tree, params);
 
@@ -4217,7 +4218,7 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 
 						// Create a file information object for the top level directory details
 
-						FileInfo finfo = new FileInfo(shr.getName(), 0L, FileAttribute.Directory);
+						FileInfo finfo = new FileInfo(shr.getName(), 0L, FileAttributeType.Directory.getFlag());
 						files.add(finfo);
 					}
 					else
@@ -4243,9 +4244,9 @@ public class FTPSrvSession extends SrvSession implements Runnable {
 			DiskInterface disk = null;
 			SearchContext ctx = null;
 
-			int searchAttr = FileAttribute.Directory + FileAttribute.Normal;
+			int searchAttr = FileAttributeType.Directory.getFlag() + FileAttributeType.Normal.getFlag();
 			if ( hidden)
-				searchAttr += FileAttribute.Hidden;
+				searchAttr += FileAttributeType.Hidden.getFlag();
 
 			try {
 				disk = (DiskInterface) path.getSharedDevice().getInterface();

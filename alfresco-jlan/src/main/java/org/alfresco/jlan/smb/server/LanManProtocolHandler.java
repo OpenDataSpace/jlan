@@ -39,6 +39,7 @@ import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.FileAccess;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileOfflineException;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
@@ -2278,7 +2279,7 @@ class LanManProtocolHandler extends CoreProtocolHandler {
 				}
 
 				lastNameOff = dataBuf.getPosition();
-				FileInfo dotInfo = new FileInfo(".", 0, FileAttribute.Directory);
+				FileInfo dotInfo = new FileInfo(".", 0, FileAttributeType.Directory.getFlag());
 				dotInfo.setFileId(dotInfo.getFileName().hashCode());
 				dotInfo.setCreationDateTime(DotFileDateTime);
 				dotInfo.setModifyDateTime(DotFileDateTime);

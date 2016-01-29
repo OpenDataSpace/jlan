@@ -37,6 +37,7 @@ import java.sql.Timestamp;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.config.InvalidConfigurationException;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
@@ -554,10 +555,10 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 			pstmt.setTimestamp(4, timeNow);
 			pstmt.setInt(5, dirId);
 			pstmt.setBoolean(6, dirRec);
-			pstmt.setBoolean(7, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.ReadOnly));
-			pstmt.setBoolean(8, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Archive));
-			pstmt.setBoolean(9, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.System));
-			pstmt.setBoolean(10, FileAttribute.hasAttribute(params.getAttributes(), FileAttribute.Hidden));
+			pstmt.setBoolean(7, FileAttribute.hasAttribute(params.getAttributes(), FileAttributeType.ReadOnly.getFlag()));
+			pstmt.setBoolean(8, FileAttribute.hasAttribute(params.getAttributes(), FileAttributeType.Archive.getFlag()));
+			pstmt.setBoolean(9, FileAttribute.hasAttribute(params.getAttributes(), FileAttributeType.System.getFlag()));
+			pstmt.setBoolean(10, FileAttribute.hasAttribute(params.getAttributes(), FileAttributeType.Hidden.getFlag()));
 			pstmt.setInt(11, 0);
 
 			pstmt.setInt(12, params.hasGid() ? params.getGid() : 0);
@@ -1434,19 +1435,19 @@ public class DerbyDBInterface extends JdbcDBInterface implements DBQueueInterfac
 						int attr = 0;
 
 						if ( rs.getBoolean("ReadOnlyFile") == true)
-							attr += FileAttribute.ReadOnly;
+							attr += FileAttributeType.ReadOnly.getFlag();
 
 						if ( rs.getBoolean("SystemFile") == true)
-							attr += FileAttribute.System;
+							attr += FileAttributeType.System.getFlag();
 
 						if ( rs.getBoolean("HiddenFile") == true)
-							attr += FileAttribute.Hidden;
+							attr += FileAttributeType.Hidden.getFlag();
 
 						if ( rs.getBoolean("DirectoryFile") == true)
-							attr += FileAttribute.Directory;
+							attr += FileAttributeType.Directory.getFlag();
 
 						if ( rs.getBoolean("ArchivedFile") == true)
-							attr += FileAttribute.Archive;
+							attr += FileAttributeType.Archive.getFlag();
 
 						finfo.setFileAttributes(attr);
 

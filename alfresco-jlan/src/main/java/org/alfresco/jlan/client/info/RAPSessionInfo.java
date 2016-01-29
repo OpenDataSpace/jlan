@@ -36,6 +36,11 @@ import org.alfresco.jlan.smb.dcerpc.info.SessionInfo;
 public class RAPSessionInfo extends SessionInfo implements RAPReadable, Serializable {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = -8669958150441982797L;
+
+    /**
 	 * Default constructor.
 	 */
 	public RAPSessionInfo() {

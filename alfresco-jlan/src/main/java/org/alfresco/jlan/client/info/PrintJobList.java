@@ -38,7 +38,11 @@ public final class PrintJobList implements java.io.Serializable {
 
 	// Print job list vector
 
-	private List<PrintJob> m_list;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 1265965497289152977L;
+    private List<PrintJob> m_list;
 
 	/**
 	 * Class constructor

@@ -35,7 +35,11 @@ public class DiskInfo implements java.io.Serializable {
 
 	//	Node/share details
 
-	protected String m_nodename;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = 2647095664957030947L;
+    protected String m_nodename;
 	protected String m_share;
 
 	//	Total number of allocation units, available allocation units

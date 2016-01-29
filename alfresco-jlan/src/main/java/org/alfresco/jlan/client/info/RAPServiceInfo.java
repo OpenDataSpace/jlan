@@ -36,6 +36,11 @@ import org.alfresco.jlan.smb.dcerpc.info.ServiceStatusInfo;
 public class RAPServiceInfo extends ServiceStatusInfo implements RAPReadable, Serializable {
 
 	/**
+     * 
+     */
+    private static final long serialVersionUID = 4442624986792615786L;
+
+    /**
 	 * Default constructor
 	 */
 	public RAPServiceInfo() {

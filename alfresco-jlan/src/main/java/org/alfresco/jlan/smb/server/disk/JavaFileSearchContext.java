@@ -22,6 +22,7 @@ package org.alfresco.jlan.smb.server.disk;
 import java.io.File;
 
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -281,14 +282,14 @@ public class JavaFileSearchContext extends SearchContext {
         long flen = 0L;
 
         if (isDirectory(m_root))
-          fattr = FileAttribute.Directory;
+          fattr = FileAttributeType.Directory.getFlag();
         else
           flen = m_root.length();
 
         //	Check if the file/folder is read-only
 
         if ( m_root.canWrite() == false)
-        	fattr += FileAttribute.ReadOnly;
+        	fattr += FileAttributeType.ReadOnly.getFlag();
 
         //  Return the file information
 
@@ -327,7 +328,7 @@ public class JavaFileSearchContext extends SearchContext {
 
 	        //  Check if the file matches the search attributes
 
-	        if (FileAttribute.hasAttribute(m_attr, FileAttribute.Directory) &&
+	        if (FileAttribute.hasAttribute(m_attr, FileAttributeType.Directory.getFlag()) &&
 	            isDirectory(curFile)) {
 
 	          //  Found a match
@@ -371,12 +372,12 @@ public class JavaFileSearchContext extends SearchContext {
 
           // Set the directory attribute
 
-          fattr = FileAttribute.Directory;
+          fattr = FileAttributeType.Directory.getFlag();
 
           // Check if the diretory should be hidden
 
           if ( fname.startsWith( "."))
-            fattr += FileAttribute.Hidden;
+            fattr += FileAttributeType.Hidden.getFlag();
         }
         else {
 
@@ -387,14 +388,14 @@ public class JavaFileSearchContext extends SearchContext {
           //	Check if the file/folder is read-only
 
           if ( curFile.canWrite() == false)
-          	fattr += FileAttribute.ReadOnly;
+          	fattr += FileAttributeType.ReadOnly.getFlag();
 
           //	Check for common hidden files
 
 	        if ( fname.equalsIgnoreCase("Desktop.ini") ||
 	        		 fname.equalsIgnoreCase("Thumbs.db")   ||
                fname.startsWith( "."))
-	        	fattr += FileAttribute.Hidden;
+	        	fattr += FileAttributeType.Hidden.getFlag();
         }
 
         //  Create the file information object

@@ -30,7 +30,8 @@ import org.alfresco.jlan.client.info.VolumeInfo;
 import org.alfresco.jlan.client.smb.DirectoryWatcher;
 import org.alfresco.jlan.server.filesys.AccessMode;
 import org.alfresco.jlan.server.filesys.FileAction;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.DataType;
 import org.alfresco.jlan.smb.Dialect;
@@ -177,7 +178,7 @@ public final class CIFSDiskSession extends DiskSession {
 
 			// Use the NTCreateAndX SMB to create the directory
 
-			CIFSFile dirFile = NTCreate(newPath, AccessMode.NTRead, FileAttribute.NTDirectory, SharingMode.READWRITE,
+			CIFSFile dirFile = NTCreate(newPath, AccessMode.NTRead, NTFileAttributeType.Directory.getFlag(), SharingMode.READWRITE,
 			        NTOpenAction.CREATE.getValue(), 0, WinNT.CreateDirectory);
 
 			// Close the directory file
@@ -490,7 +491,7 @@ public final class CIFSDiskSession extends DiskSession {
 
 			m_pkt.setParameterCount(2);
 			m_pkt.setParameter(0, 1); // number of directory entries to return
-			m_pkt.setParameter(1, FileAttribute.Volume);
+			m_pkt.setParameter(1, FileAttributeType.Volume.getFlag());
 
 			// Pack the search string
 
@@ -735,7 +736,7 @@ public final class CIFSDiskSession extends DiskSession {
 
 			// Open the remote file
 
-			return NTCreate(fileName, accessMode, FileAttribute.NTNormal, SharingMode.READWRITEDELETE, openMode, 0, WinNT.CreateFile);
+			return NTCreate(fileName, accessMode, NTFileAttributeType.Normal.getFlag(), SharingMode.READWRITEDELETE, openMode, 0, WinNT.CreateFile);
 		}
 	}
 
@@ -1805,7 +1806,7 @@ public final class CIFSDiskSession extends DiskSession {
 		// Open the symlink file
 
 		CIFSFile linkFile = NTCreateInternal(linkPath, 0, AccessMode.NTRead + AccessMode.NTReadControl + AccessMode.NTReadAttrib
-				+ AccessMode.NTReadEA, FileAttribute.NTNormal, SharingMode.READWRITE, NTOpenAction.OPEN.getValue(), 0,
+				+ AccessMode.NTReadEA, NTFileAttributeType.Normal.getFlag(), SharingMode.READWRITE, NTOpenAction.OPEN.getValue(), 0,
 				WinNT.CreateReparsePoint, false);
 
 		SymLink symLink = null;

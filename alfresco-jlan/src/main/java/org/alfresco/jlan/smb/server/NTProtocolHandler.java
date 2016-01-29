@@ -50,6 +50,7 @@ import org.alfresco.jlan.server.filesys.ExistingOpLockException;
 import org.alfresco.jlan.server.filesys.FileAccess;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
@@ -3504,7 +3505,7 @@ public class NTProtocolHandler extends CoreProtocolHandler {
 
 				// Check if the search has the '.' file entry details
 
-				FileInfo dotInfo = new FileInfo(".", 0, FileAttribute.Directory);
+				FileInfo dotInfo = new FileInfo(".", 0, FileAttributeType.Directory.getFlag());
 				dotInfo.setFileId(dotInfo.getFileName().hashCode());
 
 				if ( ctx.hasDotFiles())

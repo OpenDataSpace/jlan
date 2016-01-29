@@ -54,6 +54,7 @@ import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.DiskSizeInterface;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileIdInterface;
 import org.alfresco.jlan.server.filesys.FileInfo;
@@ -62,6 +63,7 @@ import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.FileType;
 import org.alfresco.jlan.server.filesys.GrantedFileAccess;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.NotifyChange;
 import org.alfresco.jlan.server.filesys.SearchContext;
@@ -100,7 +102,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
   public static final int DBG_DIRECTORY = 0x00000200; //	Directory commands
   public static final int DBG_SESSION 	= 0x00000400; //	Session creation/deletion
 
-  //	Unix path seperator
+  //	Unix path separator
 
   public static final String UNIX_SEPERATOR 	= "/";
   public static final char UNIX_SEPERATOR_CHAR 	= '/';
@@ -2096,7 +2098,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 				//	Directory creation parameters
 
 				FileOpenParams params = new FileOpenParams(dirPath, FileAction.CreateNotExist, AccessMode.ReadWrite,
-																									 FileAttribute.NTDirectory, gid, uid, mode, 0);
+																									 NTFileAttributeType.Directory.getFlag(), gid, uid, mode, 0);
 
 				//	Create a new directory
 
@@ -3166,7 +3168,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 				//	Start a new search, allocate a search id
 
-				search = disk.startSearch(sess, conn, searchPath, FileAttribute.Directory + FileAttribute.Normal);
+				search = disk.startSearch(sess, conn, searchPath, FileAttributeType.Directory.getFlag() + FileAttributeType.Normal.getFlag());
 
 				//	Allocate a search id for the new search
 
@@ -3203,7 +3205,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 					//	Restart the search
 
-					search = disk.startSearch(sess, conn, searchPath, FileAttribute.Directory + FileAttribute.Normal);
+					search = disk.startSearch(sess, conn, searchPath, FileAttributeType.Directory.getFlag() + FileAttributeType.Normal.getFlag());
 
 					//	Allocate a search id for the new search
 
@@ -3499,7 +3501,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 				//	Start a new search, allocate a search id
 
-				search = disk.startSearch(sess, conn, searchPath, FileAttribute.Directory + FileAttribute.Normal);
+				search = disk.startSearch(sess, conn, searchPath, FileAttributeType.Directory.getFlag() + FileAttributeType.Normal.getFlag());
 
 				//	Allocate a search id for the new search
 
@@ -3538,7 +3540,7 @@ public class NFSServer extends RpcNetworkServer implements RpcProcessor {
 
 					//	Restart the search
 
-					search = disk.startSearch(sess, conn, searchPath, FileAttribute.Directory + FileAttribute.Normal);
+					search = disk.startSearch(sess, conn, searchPath, FileAttributeType.Directory.getFlag() + FileAttributeType.Normal.getFlag());
 
 					//	Allocate a search id for the new search
 

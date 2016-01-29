@@ -25,6 +25,7 @@ import java.sql.Timestamp;
 
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.db.DBSearchContext;
 import org.alfresco.jlan.util.WildCard;
@@ -94,19 +95,19 @@ public class DerbySearchContext extends DBSearchContext {
         int attr = 0;
 
         if ( m_rs.getBoolean("ReadOnlyFile") == true)
-        	attr += FileAttribute.ReadOnly;
+        	attr += FileAttributeType.ReadOnly.getFlag();
 
         if ( m_rs.getBoolean("SystemFile") == true)
-        	attr += FileAttribute.System;
+        	attr += FileAttributeType.System.getFlag();
 
         if ( m_rs.getBoolean("HiddenFile") == true)
-        	attr += FileAttribute.Hidden;
+        	attr += FileAttributeType.Hidden.getFlag();
 
         if ( m_rs.getBoolean("DirectoryFile") == true)
-        	attr += FileAttribute.Directory;
+        	attr += FileAttributeType.Directory.getFlag();
 
 				if ( m_rs.getBoolean("ArchivedFile") == true)
-					attr += FileAttribute.Archive;
+					attr += FileAttributeType.Archive.getFlag();
 
         info.setFileAttributes(attr);
 

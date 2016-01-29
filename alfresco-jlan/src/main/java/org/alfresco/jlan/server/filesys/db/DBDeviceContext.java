@@ -28,7 +28,7 @@ import org.alfresco.jlan.server.config.ServerConfiguration;
 import org.alfresco.jlan.server.core.DeviceContextException;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.DiskSharedDevice;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileSystem;
 import org.alfresco.jlan.server.filesys.cache.FileState;
 import org.alfresco.jlan.server.filesys.cache.FileStateCacheListener;
@@ -382,7 +382,7 @@ public class DBDeviceContext extends DiskDeviceContext implements FileStateCache
 
 		m_rootInfo = new DBFileInfo("\\", "\\", 0, 0);
 
-		m_rootInfo.setFileAttributes(FileAttribute.Directory);
+		m_rootInfo.setFileAttributes(FileAttributeType.Directory.getFlag());
 		m_rootInfo.setMode(DBDiskDriver.DefaultNFSDirMode);
 
 		m_rootInfo.setGid(0);

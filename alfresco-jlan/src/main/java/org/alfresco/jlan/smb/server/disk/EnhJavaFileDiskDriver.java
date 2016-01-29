@@ -33,6 +33,7 @@ import org.alfresco.jlan.server.filesys.AccessDeniedException;
 import org.alfresco.jlan.server.filesys.DiskDeviceContext;
 import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
@@ -106,17 +107,17 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
         int fattr = 0;
 
         if (file.isDirectory())
-          fattr = FileAttribute.Directory;
+          fattr = FileAttributeType.Directory.getFlag();
 
         if ( file.canWrite() == false)
-        	fattr += FileAttribute.ReadOnly;
+        	fattr += FileAttributeType.ReadOnly.getFlag();
 
         //	Check for common hidden files
 
         if ( pathStr[1].equalsIgnoreCase("Desktop.ini") ||
         		 pathStr[1].equalsIgnoreCase("Thumbs.db") ||
         		 pathStr[1].charAt(0) == '.')
-        	fattr += FileAttribute.Hidden;
+        	fattr += FileAttributeType.Hidden.getFlag();
 
 				//	Create the file information
 
@@ -142,7 +143,7 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
 
           int fattr = 0;
           if (dir.isDirectory())
-            fattr = FileAttribute.Directory;
+            fattr = FileAttributeType.Directory.getFlag();
 
           FileInfo finfo = new FileInfo(pathStr[1] != null ? pathStr[1] : "", 0, fattr);
 	        long fdate = file.lastModified();
@@ -167,7 +168,7 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
 
         int fattr = 0;
         if (dir.isDirectory())
-          fattr = FileAttribute.Directory;
+          fattr = FileAttributeType.Directory.getFlag();
 
         FileInfo finfo = new FileInfo(pathStr[1] != null ? pathStr[1] : "", 0, fattr);
         long fdate = dir.lastModified();
@@ -804,7 +805,7 @@ public class EnhJavaFileDiskDriver implements DiskInterface, FileLockingInterfac
     //  Check if the file is actually a directory
 
     if ( file.isDirectory() || file.list() != null)
-    	netFile.setAttributes(FileAttribute.Directory);
+    	netFile.setAttributes(FileAttributeType.Directory.getFlag());
 
     //  Return the network file
 

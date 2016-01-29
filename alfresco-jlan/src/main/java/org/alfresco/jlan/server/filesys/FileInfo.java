@@ -503,7 +503,7 @@ public class FileInfo {
 	 * @return true if the file is a directory, else false.
 	 */
 	public final boolean isDirectory() {
-		return (m_attr & FileAttribute.Directory) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Directory.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -512,7 +512,7 @@ public class FileInfo {
 	 * @return true if the file is hidden, else false.
 	 */
 	public final boolean isHidden() {
-		return (m_attr & FileAttribute.Hidden) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Hidden.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -521,7 +521,7 @@ public class FileInfo {
 	 * @return true if the file is read-only, else false.
 	 */
 	public final boolean isReadOnly() {
-		return (m_attr & FileAttribute.ReadOnly) != 0 ? true : false;
+		return (m_attr & FileAttributeType.ReadOnly.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -530,7 +530,7 @@ public class FileInfo {
 	 * @return true if the file is a system file, else false.
 	 */
 	public final boolean isSystem() {
-		return (m_attr & FileAttribute.System) != 0 ? true : false;
+		return (m_attr & FileAttributeType.System.getFlag()) != 0 ? true : false;
 	}
 
 	/**
@@ -539,7 +539,7 @@ public class FileInfo {
      * @return true if the file is a temporary file, else false.
      */
     public final boolean isTemporary() {
-        return (m_attr & FileAttribute.NTTemporary) != 0 ? true : false;
+        return (m_attr & NTFileAttributeType.Temporary.getFlag()) != 0 ? true : false;
     }
 
 	/**
@@ -548,7 +548,7 @@ public class FileInfo {
 	 * @return boolean
 	 */
 	public final boolean isArchived() {
-		return (m_attr & FileAttribute.Archive) != 0 ? true : false;
+		return (m_attr & FileAttributeType.Archive.getFlag()) != 0 ? true : false;
 	}
 
   /**

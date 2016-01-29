@@ -36,12 +36,14 @@ import org.alfresco.jlan.server.filesys.DiskInterface;
 import org.alfresco.jlan.server.filesys.FileAccess;
 import org.alfresco.jlan.server.filesys.FileAction;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileName;
 import org.alfresco.jlan.server.filesys.FileOpenParams;
 import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.SearchContext;
 import org.alfresco.jlan.server.filesys.SrvDiskInfo;
@@ -519,7 +521,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 			// Directory creation parameters
 
 			FileOpenParams params = new FileOpenParams(dirName, FileAction.CreateNotExist, AccessMode.ReadWrite,
-					FileAttribute.NTDirectory, smbPkt.getProcessIdFull());
+					NTFileAttributeType.Directory.getFlag(), smbPkt.getProcessIdFull());
 
 			// Create the new directory
 
@@ -1317,7 +1319,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 					// Make sure the read-only attribute is set
 
-					finfo.setFileAttributes(finfo.getFileAttributes() + FileAttribute.ReadOnly);
+					finfo.setFileAttributes(finfo.getFileAttributes() + FileAttributeType.ReadOnly.getFlag());
 				}
 
 				// Return the file information
@@ -1446,7 +1448,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 					// Make sure the read-only attribute is set
 
-					finfo.setFileAttributes(finfo.getFileAttributes() + FileAttribute.ReadOnly);
+					finfo.setFileAttributes(finfo.getFileAttributes() + FileAttributeType.ReadOnly.getFlag());
 				}
 
 				// Initialize the return packet, no data bytes
@@ -2144,7 +2146,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		// Check if this is a volume label request
 
-		if ( (srchAttr & FileAttribute.Volume) != 0) {
+		if ( (srchAttr & FileAttributeType.Volume.getFlag()) != 0) {
 
 			// Process the volume label request
 
@@ -2393,7 +2395,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		// Check if this is the start of a wildcard search and includes directories
 
-		if ( (srchAttr & FileAttribute.Directory) != 0 && resumeId >= RESUME_DOTDOT && wildcardSearch == true) {
+		if ( (srchAttr & FileAttributeType.Directory.getFlag()) != 0 && resumeId >= RESUME_DOTDOT && wildcardSearch == true) {
 
 			// The first entries in the search should be the '.' and '..' entries for the
 			// current/parent directories.
@@ -2407,7 +2409,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 			// Check if we have valid information for the working directory
 
 			if ( dirInfo != null)
-				dirInfo = new FileInfo(".", 0, FileAttribute.Directory);
+				dirInfo = new FileInfo(".", 0, FileAttributeType.Directory.getFlag());
 
 			// Debug
 
@@ -2472,7 +2474,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 				// Make sure the read-only attribute is set
 
-				fileInfo.setFileAttributes(fileInfo.getFileAttributes() + FileAttribute.ReadOnly);
+				fileInfo.setFileAttributes(fileInfo.getFileAttributes() + FileAttributeType.ReadOnly.getFlag());
 			}
 
 			// Pack the file information
@@ -2634,7 +2636,7 @@ class CoreProtocolHandler extends ProtocolHandler {
 
 		// Pack the file information
 
-		buf[bufPos++] = (byte) (FileAttribute.Volume & 0x00FF);
+		buf[bufPos++] = (byte) (FileAttributeType.Volume.getFlag() & 0x00FF);
 
 		// Zero the date/time and file length fields
 

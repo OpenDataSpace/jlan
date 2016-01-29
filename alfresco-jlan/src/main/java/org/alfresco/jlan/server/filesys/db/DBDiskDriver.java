@@ -38,6 +38,7 @@ import org.alfresco.jlan.server.filesys.DiskSizeInterface;
 import org.alfresco.jlan.server.filesys.DiskVolumeInterface;
 import org.alfresco.jlan.server.filesys.FileAccessToken;
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileExistsException;
 import org.alfresco.jlan.server.filesys.FileIdInterface;
 import org.alfresco.jlan.server.filesys.FileInfo;
@@ -49,6 +50,7 @@ import org.alfresco.jlan.server.filesys.FileSharingException;
 import org.alfresco.jlan.server.filesys.FileStatus;
 import org.alfresco.jlan.server.filesys.FileType;
 import org.alfresco.jlan.server.filesys.GrantedFileAccess;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.server.filesys.SearchContext;
 import org.alfresco.jlan.server.filesys.SecurityDescriptorInterface;
@@ -1597,8 +1599,8 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
     	  // Check if this is a folder, make sure the Directory attribute does not get reset
 
-		  if ( dbInfo.isDirectory() && (info.getFileAttributes() & FileAttribute.Directory) == 0)
-			  info.setFileAttributes( info.getFileAttributes() + FileAttribute.Directory);
+		  if ( dbInfo.isDirectory() && (info.getFileAttributes() & FileAttributeType.Directory.getFlag()) == 0)
+			  info.setFileAttributes( info.getFileAttributes() + FileAttributeType.Directory.getFlag());
       }
 
       //  Update the information flags for the database update
@@ -2138,9 +2140,9 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 
       // Check if files should be marked as offline
 
-      if ( dbCtx.hasOfflineFiles() && finfo.hasAttribute( FileAttribute.NTOffline) == false) {
+      if ( dbCtx.hasOfflineFiles() && finfo.hasAttribute( NTFileAttributeType.Offline.getFlag()) == false) {
         if ( dbCtx.getOfflineFileSize() == 0 || finfo.getSize() >= dbCtx.getOfflineFileSize())
-          finfo.setFileAttributes( finfo.getFileAttributes() + FileAttribute.NTOffline);
+          finfo.setFileAttributes( finfo.getFileAttributes() + NTFileAttributeType.Offline.getFlag());
       }
     }
     else if ( finfo == null && fstate != null) {
@@ -3043,7 +3045,7 @@ public class DBDiskDriver implements DiskInterface, DiskSizeInterface, DiskVolum
 	    DBFileInfo sfinfo = new DBFileInfo(sInfo.getName(), params.getFullPath(), finfo.getFileId(), finfo.getDirectoryId());
 
 	    sfinfo.setFileSize(sInfo.getSize());
-	    sfinfo.setFileAttributes( FileAttribute.Normal);
+	    sfinfo.setFileAttributes( FileAttributeType.Normal.getFlag());
 
 	    sfinfo.setCreationDateTime( sInfo.getCreationDateTime());
 	    sfinfo.setModifyDateTime( sInfo.getModifyDateTime());

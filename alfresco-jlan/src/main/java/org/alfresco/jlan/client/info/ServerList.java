@@ -38,7 +38,11 @@ public class ServerList implements Serializable {
 
 	// Server list vector
 
-	private List<RAPServerInfo> m_list;
+	/**
+     * 
+     */
+    private static final long serialVersionUID = -723305419498605647L;
+    private List<RAPServerInfo> m_list;
 
 	/**
 	 * Class constructor

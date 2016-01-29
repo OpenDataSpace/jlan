@@ -22,7 +22,7 @@ package org.alfresco.jlan.server.filesys.pseudo;
 import java.io.IOException;
 
 import org.alfresco.jlan.server.filesys.AccessDeniedException;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.NetworkFile;
 import org.alfresco.jlan.smb.SeekType;
 
@@ -45,7 +45,7 @@ public class PseudoFolderNetworkFile extends NetworkFile {
   public PseudoFolderNetworkFile(String name) {
     super(name);
 
-    setAttributes(FileAttribute.Directory);
+    setAttributes(FileAttributeType.Directory.getFlag());
   }
 
   /**
@@ -58,7 +58,7 @@ public class PseudoFolderNetworkFile extends NetworkFile {
     super(name);
 
     setFullName(relPath);
-    setAttributes(FileAttribute.Directory);
+    setAttributes(FileAttributeType.Directory.getFlag());
   }
 
   /**

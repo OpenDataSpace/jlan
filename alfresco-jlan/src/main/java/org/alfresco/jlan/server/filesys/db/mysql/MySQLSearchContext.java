@@ -24,8 +24,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.FileAttributeType;
 import org.alfresco.jlan.server.filesys.FileInfo;
 import org.alfresco.jlan.server.filesys.FileType;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.db.DBSearchContext;
 import org.alfresco.jlan.util.WildCard;
 
@@ -90,29 +92,29 @@ public class MySQLSearchContext extends DBSearchContext {
         int attr = 0;
 
         if ( m_rs.getBoolean("ReadOnly") == true)
-        	attr += FileAttribute.ReadOnly;
+        	attr += FileAttributeType.ReadOnly.getFlag();
 
         if ( m_rs.getBoolean("SystemFile") == true)
-        	attr += FileAttribute.System;
+        	attr += FileAttributeType.System.getFlag();
 
         if ( m_rs.getBoolean("Hidden") == true)
-        	attr += FileAttribute.Hidden;
+        	attr += FileAttributeType.Hidden.getFlag();
 
         if ( m_rs.getBoolean("Directory") == true) {
-        	attr += FileAttribute.Directory;
+        	attr += FileAttributeType.Directory.getFlag();
           info.setFileType( FileType.DIRECTORY);
         }
         else
           info.setFileType( FileType.REGULAR_FILE);
 
 				if ( m_rs.getBoolean("Archived") == true)
-					attr += FileAttribute.Archive;
+					attr += FileAttributeType.Archive.getFlag();
 
         // Check if files should be marked as offline
 
         if ( hasMarkAsOffline()) {
           if ( getOfflineFileSize() == 0 || info.getSize() >= getOfflineFileSize())
-            attr += FileAttribute.NTOffline;
+            attr += NTFileAttributeType.Offline.getFlag();
         }
 
         info.setFileAttributes(attr);

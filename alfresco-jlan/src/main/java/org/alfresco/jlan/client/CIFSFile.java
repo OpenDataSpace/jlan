@@ -23,7 +23,7 @@ import java.io.*;
 
 import org.alfresco.jlan.client.info.FileInfo;
 import org.alfresco.jlan.netbios.RFCNetBIOSProtocol;
-import org.alfresco.jlan.server.filesys.FileAttribute;
+import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.smb.Dialect;
 import org.alfresco.jlan.smb.LockingAndX;
 import org.alfresco.jlan.smb.OpLock;
@@ -764,7 +764,7 @@ public final class CIFSFile extends SMBFile {
 	 * @return boolean
 	 */
 	public final boolean isReparsePoint() {
-		return (getAttributes() & FileAttribute.NTReparsePoint) != 0 ? true : false;
+		return (getAttributes() & NTFileAttributeType.ReparsePoint.getFlag()) != 0 ? true : false;
 	}
 
 	/**

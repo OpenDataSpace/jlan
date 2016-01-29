@@ -24,8 +24,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 
-import org.alfresco.jlan.debug.Debug;
-
 /**
  * TCP RPC Client Connection Class
  *

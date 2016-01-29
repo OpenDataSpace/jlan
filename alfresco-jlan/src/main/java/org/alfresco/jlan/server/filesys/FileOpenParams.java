@@ -19,8 +19,6 @@
 
 package org.alfresco.jlan.server.filesys;
 
-import java.util.EnumSet;
-
 import org.alfresco.jlan.server.SrvSession;
 import org.alfresco.jlan.smb.SharingMode;
 import org.alfresco.jlan.smb.WinNT;
@@ -256,8 +254,8 @@ public class FileOpenParams {
 		//	Make sure the directory attribute is set if the create directory option is set
 
 		if (( createOption & WinNT.CreateDirectory) != 0 &&
-		    ( m_attr & FileAttribute.Directory) == 0)
-		  m_attr += FileAttribute.Directory;
+		    ( m_attr & FileAttributeType.Directory.getFlag()) == 0)
+		  m_attr += FileAttributeType.Directory.getFlag();
 	}
 
 	/**
