@@ -29,8 +29,6 @@ import org.alfresco.jlan.client.OplockAdapter;
 import org.alfresco.jlan.client.SMBFile;
 import org.alfresco.jlan.debug.Debug;
 import org.alfresco.jlan.server.filesys.AccessMode;
-import org.alfresco.jlan.server.filesys.FileAction;
-import org.alfresco.jlan.server.filesys.FileAttribute;
 import org.alfresco.jlan.server.filesys.NTFileAttributeType;
 import org.alfresco.jlan.server.filesys.NTOpenAction;
 import org.alfresco.jlan.smb.OpLock;

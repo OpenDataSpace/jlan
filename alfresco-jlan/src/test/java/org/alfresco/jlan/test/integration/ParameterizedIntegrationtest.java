@@ -8,7 +8,6 @@ import java.util.List;
 import java.lang.reflect.Method;
 
 import static org.testng.Assert.*;
-import org.testng.ITestContext;
 
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.AfterTest;

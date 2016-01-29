@@ -1,7 +1,5 @@
 package org.alfresco.jlan.test.integration;
 
-import java.security.Provider;
-import java.security.Security;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,14 +8,11 @@ import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.testng.Assert.*;
-import org.testng.ITestContext;
 
 import org.testng.annotations.AfterMethod;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Optional;
 
 import org.slf4j.Logger;

@@ -53,11 +53,9 @@ public class OpenFileIT extends ParameterizedJcifsTest {
         }
         // Open existing file for exclusive access, else fail
         try (final SmbFileOutputStream os = new SmbFileOutputStream(sf.getCanonicalPath(), SmbFile.FILE_NO_SHARE)) {
-            if (null != os) {
                 // Hold the file open for a short while, other threads should fail to open the file
                 testSleep(2000);
                 // Close the test file done by autoclose
-            }
         } catch (SmbException ex) {
             // Check for an access denied error code
             assertTrue(ex.getNtStatus() == SmbException.NT_STATUS_ACCESS_DENIED, "Open failed with wrong error");

@@ -19,8 +19,6 @@
 
 package org.alfresco.jlan.test.integration;
 
-import java.io.IOException;
-import java.io.StringWriter;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -28,13 +26,11 @@ import static org.testng.Assert.*;
 import org.testng.annotations.Optional;
 import org.testng.annotations.Parameters;
 import org.testng.annotations.Test;
-import org.testng.Reporter;
 
 import org.alfresco.jlan.util.MemorySize;
 
 import jcifs.smb.SmbFile;
 import jcifs.smb.SmbRandomAccessFile;
-import jcifs.smb.SmbException;
 
 /**
  * Random Access File Write Test Class

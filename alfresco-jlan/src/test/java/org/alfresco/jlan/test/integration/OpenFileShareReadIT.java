@@ -19,7 +19,6 @@
 
 package org.alfresco.jlan.test.integration;
 
-import java.io.InputStream;
 import java.io.OutputStream;
 
 import static org.testng.Assert.*;

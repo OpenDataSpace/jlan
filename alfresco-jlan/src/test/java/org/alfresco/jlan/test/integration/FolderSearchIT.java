@@ -19,7 +19,6 @@
 
 package org.alfresco.jlan.test.integration;
 
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
 

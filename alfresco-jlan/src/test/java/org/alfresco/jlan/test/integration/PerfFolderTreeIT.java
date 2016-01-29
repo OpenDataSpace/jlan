@@ -7,7 +7,6 @@ import org.testng.annotations.Test;
 import org.testng.Reporter;
 
 import java.io.OutputStream;
-import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 

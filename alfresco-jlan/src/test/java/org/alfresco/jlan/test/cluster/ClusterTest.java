@@ -23,7 +23,6 @@ import java.io.StringWriter;
 import java.security.Provider;
 import java.security.Security;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CyclicBarrier;
@@ -57,10 +56,6 @@ public class ClusterTest {
 	private TestThread[] m_testThreads;
 	private CyclicBarrier m_startBarrier;
 	private CyclicBarrier m_stopBarrier;
-
-	// Test thread sets bit when test completed
-
-	private BitSet m_testDone;
 
 	// Test results
 
@@ -473,10 +468,6 @@ public class ClusterTest {
 
 		m_startBarrier = new CyclicBarrier( numTestThreads);
 		m_stopBarrier  = new CyclicBarrier( numTestThreads);
-
-		// Create the test thread completion bit set
-
-		m_testDone = new BitSet( numTestThreads);
 
 		// Create the per iteration test result list
 
