@@ -22,56 +22,38 @@ package org.alfresco.jlan.smb.nt;
 /**
  * Reparse Point Class
  *
- * <p>Contains reparse point constants.
+ * <p>
+ * Contains reparse point constants.
  *
  * @author gkspencer
  */
-public class ReparsePoint {
+public enum ReparsePoint {
+    Unknown(0, "Unknown"), TypeDFS(0x8000000A, "DFS"), TypeDFSR(0x80000012, "DFSR"), TypeHSM(0xC0000004, "HSM"), TypeHSM2(0x80000006,
+            "HSM2"), TypeMountPoint(0xA0000003, "MountPoint"), TypeSIS(0x80000007, "SIS"), TypeSymLink(0xA000000C, "SymLink");
 
-  // Reparse point types
+    private final int value;
+    private final String name;
 
-  public static final int TypeDFS       = 0x8000000A;
-  public static final int TypeDFSR      = 0x80000012;
-  public static final int TypeHSM       = 0xC0000004;
-  public static final int TypeHSM2      = 0x80000006;
-  public static final int TypeMountPoint= 0xA0000003;
-  public static final int TypeSIS       = 0x80000007;
-  public static final int TypeSymLink   = 0xA000000C;
-
-  /**
-   * Return a reparse point type as a string
-   *
-   * @param typ int
-   * @return String
-   */
-  public static final String getTypeAsString(int typ) {
-
-    String typStr = "Unknown";
-
-    switch ( typ) {
-      case TypeDFS:
-        typStr = "DFS";
-        break;
-      case TypeDFSR:
-        typStr = "DFSR";
-        break;
-      case TypeHSM:
-        typStr = "HSM";
-        break;
-      case TypeHSM2:
-        typStr = "HSM2";
-        break;
-      case TypeMountPoint:
-        typStr = "MountPoint";
-        break;
-      case TypeSIS:
-        typStr = "SIS";
-        break;
-      case TypeSymLink:
-        typStr = "SymLink";
-        break;
+    private ReparsePoint(final int value, final String name) {
+        this.value = value;
+        this.name = name;
     }
 
-    return typStr;
-  }
+    public int getValue() {
+        return this.value;
+    }
+
+    @Override
+    public String toString() {
+        return name;
+    }
+
+    public static ReparsePoint fromInt(int reparseType) {
+        for (ReparsePoint point : ReparsePoint.values()) {
+            if (point.value == reparseType) {
+                return point;
+            }
+        }
+        return ReparsePoint.Unknown;
+    }
 }

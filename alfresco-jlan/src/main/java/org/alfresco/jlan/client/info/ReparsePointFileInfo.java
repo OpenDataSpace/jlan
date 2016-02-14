@@ -93,6 +93,6 @@ public class ReparsePointFileInfo extends FileInfo {
 	 * @return File information string.
 	 */
 	public String toString() {
-		return super.toString() + " [Reparse point, type " + ReparsePoint.getTypeAsString(m_reparseType) + "]";
+		return super.toString() + " [Reparse point, type " + ReparsePoint.fromInt(m_reparseType).toString() + "]";
 	}
 }

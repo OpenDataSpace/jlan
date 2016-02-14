@@ -97,7 +97,7 @@ public class SymLink {
 
     // Make sure the details are for a symlink
 
-    if ( symlinkBuf.getInt() != ReparsePoint.TypeSymLink)
+    if ( symlinkBuf.getInt() != ReparsePoint.TypeSymLink.getValue())
       return;
 
     symlinkBuf.skipBytes( 4);
